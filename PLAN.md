@@ -186,7 +186,15 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
   - Internal disks report `BusProtocol = Apple Fabric`. Disk images report `BusProtocol = Disk Image`, `Internal = false`, `Removable = true`, `Ejectable = true` and `MediaName = Disk Image`.
   - `diskutil info -plist /` returns the snapshot `disk3s3s1` with `ParentWholeDisk = disk3` and `APFSPhysicalStores = [{APFSPhysicalStore: disk0s2}]`. Each store's `ParentWholeDisk` (here `disk0`) must also be excluded.
   - `DiskUUID` is absent on whole disks, so T08's identity check can't rely on it.
-- **Results (Nick):** _(pending; paste the spike's Findings block and checklist answers here, then amend T02/T05/T06 if anything differs from the assumptions in section 1)_
+- **Results, run 1 (Nick, 2026-10-07, M3 Max, macOS 26.3.1, RAM disk owned by the user):**
+  - **No password prompt.** This is expected for user-owned nodes. `hdiutil attach` makes `/dev/rdiskN` `uid=nick 0640`, and setuid-root `authopen` returns the fd without asking for authorization when the caller can already open the node. Real disks are `root:operator 0640`, so this run does **not** exercise the prompt. Run 2 (below) uses `sudo chown root:operator` on the RAM disk nodes to cover it. The spike now prints the node owner.
+  - `authopen -stdoutpipe -o 2` works as documented. The fd arrives through `SCM_RIGHTS` with 2 data bytes (`00 00`) and authopen exits 0. `fstat` shows a character device, and `F_GETFL` is `O_RDWR`.
+  - `DKIOCGETBLOCKSIZE`/`DKIOCGETBLOCKCOUNT` give 512 × 65536, which matches `diskutil`. `F_NOCACHE` succeeds.
+  - Unaligned **length** (100 bytes) and unaligned **offset** (1) both fail with `EINVAL`. Misaligned **memory** with an aligned length and offset succeeds on this device. Keep aligned buffers anyway: USB drivers may be stricter, and it's cheap. → **T02:** `FileBackedDevice` must reject requests whose length or offset isn't a block multiple with `EINVAL`, to emulate a raw device.
+  - **`F_FULLFSYNC` fails with `ENOTTY` (25) on the RAM disk.** → **T02/T05:** `fullSync()` must not treat `ENOTTY`/`ENOTSUP` as fatal. Fall back to `fsync()`, and verify on a USB stick whether `F_FULLFSYNC` is supported there.
+  - Writing and reading back 1 MiB through the same fd matches, so **one privileged open for write and verify works.** No change is needed to T06.
+  - Unmount and eject work without elevated rights for a user-attached image.
+- **Results, run 2 (pending, Nick):** the RAM disk with `root:operator` nodes (see the README, step 2). Record whether the dialog appears and what it says, the exit status on Cancel, and whether a second run within 5 minutes prompts again. Optionally run on a real USB stick and record the `F_FULLFSYNC` result. Then amend T02/T05 from these notes and mark T01 `DONE`.
 
 ---
 

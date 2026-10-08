@@ -70,6 +70,13 @@ func runSpike(_ options: Options) throws {
     let facts = try vetTarget(bsd: bsd, mode: options.mode)
     print(facts.summary)
     note("target \(bsd): \(facts.mediaName), \(facts.sizeBytes) bytes, block \(facts.blockSize), bus \(facts.busProtocol), mode \(options.mode)")
+    // authopen skips the password prompt when the caller can already open the
+    // node, which is the case for disk images the user attached themselves.
+    var node = stat()
+    if stat(options.rawPath, &node) == 0 {
+        let mode = String(node.st_mode & 0o777, radix: 8)
+        note("device node owner uid \(node.st_uid), gid \(node.st_gid), mode \(mode); you are uid \(getuid())")
+    }
 
     if options.dryRun {
         print("\nDry run: target accepted. Nothing was unmounted, opened or written.")

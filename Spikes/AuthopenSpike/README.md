@@ -31,7 +31,11 @@ swift build
 DISK=$(hdiutil attach -nomount ram://65536 | awk '{print $1}')
 RAW="/dev/r${DISK#/dev/}"
 echo "$DISK $RAW"
+sudo chown root:operator "$DISK" "$RAW"
+ls -l "$DISK" "$RAW"
 ```
+
+The `chown` matters. `hdiutil` gives the device nodes to the user who attached the image, and `authopen` (setuid root) then hands over the fd **without a password prompt**, because you can already open the node. Real disks are `root:operator 0640`, so the `chown` makes the RAM disk behave like one. `sudo` asks for your password in the terminal; that is not the prompt being tested. The prompt under test is the macOS dialog in step 4.
 
 **3. Optional: check the target without touching it:**
 
@@ -45,14 +49,15 @@ echo "$DISK $RAW"
 .build/debug/AuthopenSpike "$RAW" --i-know-this-is-a-test-disk
 ```
 
-**5. Clean up** if the disk is still attached (after an error or `--no-eject`). "no such disk" here is fine:
+**5. Clean up** if the disk is still attached (after an error, `--no-eject`, or if the spike's eject failed on the root-owned node). "no such disk" here is fine:
 
 ```sh
-hdiutil detach "$DISK"
+hdiutil detach "$DISK" || sudo hdiutil detach "$DISK"
 ```
 
 Also try these and note what happens:
 
+- **Prompt caching.** Right after a successful run, repeat steps 2 and 4 within 5 minutes. Does the dialog appear again? The `sys.openfile.` right has `timeout = 300`.
 - **Cancel the password prompt.** Repeat steps 2 and 4, but click Cancel. Record the `authopen exited with status N` line. T02 maps this status to `userCancelled`. Then run step 5.
 - **Wrong password three times**, if you're patient. Record the status.
 
