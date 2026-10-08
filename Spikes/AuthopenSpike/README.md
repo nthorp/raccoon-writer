@@ -16,37 +16,57 @@ Throwaway experiment. It proves that `authopen` can hand a writable raw-disk fil
 
 ## Run it (Nick)
 
-From the repo root:
+Commands are written so they paste cleanly into zsh (no `#` comments, which interactive zsh doesn't accept by default).
+
+**1. Build** (from the repo root):
 
 ```sh
 cd Spikes/AuthopenSpike
 swift build
+```
 
-# 1. Create a 32 MiB RAM disk (65536 × 512-byte sectors). Note the /dev/diskN it prints.
-hdiutil attach -nomount ram://65536
-#    → /dev/disk7   (your number may differ; use it below, as rdiskN)
+**2. Create a 32 MiB RAM disk** (65536 × 512-byte sectors). `RAW` holds its raw device path, e.g. `/dev/rdisk7`:
 
-# 2. Optional: check the target without touching it.
-.build/debug/AuthopenSpike /dev/rdisk7 --i-know-this-is-a-test-disk --dry-run
+```sh
+DISK=$(hdiutil attach -nomount ram://65536 | awk '{print $1}')
+RAW="/dev/r${DISK#/dev/}"
+echo "$DISK $RAW"
+```
 
-# 3. The real run. Type the disk name when asked, then enter your admin password.
-.build/debug/AuthopenSpike /dev/rdisk7 --i-know-this-is-a-test-disk
+**3. Optional: check the target without touching it:**
 
-# 4. Clean up if the disk is still attached (for example after an error or --no-eject).
-hdiutil detach /dev/disk7
+```sh
+.build/debug/AuthopenSpike "$RAW" --i-know-this-is-a-test-disk --dry-run
+```
+
+**4. The real run.** Type the disk name (e.g. `disk7`) when asked, then enter your admin password:
+
+```sh
+.build/debug/AuthopenSpike "$RAW" --i-know-this-is-a-test-disk
+```
+
+**5. Clean up** if the disk is still attached (after an error or `--no-eject`). "no such disk" here is fine:
+
+```sh
+hdiutil detach "$DISK"
 ```
 
 Also try these and note what happens:
 
-- **Cancel the password prompt.** Create a new RAM disk and run step 3 again, but click Cancel. Record the `authopen exited with status N` line. T02 maps this status to `userCancelled`.
+- **Cancel the password prompt.** Repeat steps 2 and 4, but click Cancel. Record the `authopen exited with status N` line. T02 maps this status to `userCancelled`. Then run step 5.
 - **Wrong password three times**, if you're patient. Record the status.
 
 ### Optional: a real USB stick
 
-Use only a stick whose contents you don't need. Its partition table is destroyed.
+Use only a stick whose contents you don't need. Its partition table is destroyed. Find the stick's `/dev/diskN` with:
 
 ```sh
-diskutil list external physical          # find the stick, e.g. /dev/disk8
+diskutil list external physical
+```
+
+Then, replacing `8` with your stick's number:
+
+```sh
 .build/debug/AuthopenSpike /dev/rdisk8 --i-know-this-is-a-test-disk --allow-physical-usb --dry-run
 .build/debug/AuthopenSpike /dev/rdisk8 --i-know-this-is-a-test-disk --allow-physical-usb
 ```
