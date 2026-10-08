@@ -103,7 +103,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 
 | ID | Task | Depends on | Status | Done date | Owner |
 | --- | --- | --- | --- | --- | --- |
-| T00 | Scaffolding: repo, package, XcodeGen, scripts | none | BLOCKED | | Claude |
+| T00 | Scaffolding: repo, package, XcodeGen, scripts | none | DONE | 2026-10-07 | Claude |
 | T01 | 🧑 Spike: authopen fd passing | T00 | TODO | | |
 | T02 | DeviceOpener protocol, AuthopenOpener, fakes | T01 | TODO | | |
 | T03 | Disk model and discovery with filtering | T00 | TODO | | |
@@ -144,8 +144,7 @@ Tasks are written so they can be done in ID order. T03 and T04 do not depend on 
 **Files:** `.gitignore`, `Package.swift`, `project.yml`, `scripts/*`, `App/*`, `Sources/ImageWriterCore/*`, `Tests/*`, `README.md`
 
 **Handoff notes:**
-- **Status: BLOCKED on toolchain (2026-10-07, Claude).** This machine has only the Command Line Tools (Swift 6.2.4): no Xcode.app and no `xcodegen`. All files are written and `scripts/test.sh` passes. The `scripts/build.sh` criteria (universal `IsoSword.app`, `lipo -archs`, window launches) **could not be verified**. To unblock, Nick should: install Xcode 16+, `sudo xcode-select -s /Applications/Xcode.app`, `brew install xcodegen`, then run `scripts/build.sh`, confirm the `lipo` line prints `arm64 x86_64`, and `open build/IsoSword.app`. If all of that works, mark T00 `DONE`. Otherwise fix `project.yml` (it has never been run through XcodeGen).
-- Partial check done: `App/*.swift` type-checks with `swiftc` against the built `ImageWriterCore` module. The only error was that the `#Preview` macro plugin ships only with full Xcode.
+- **Verified 2026-10-07** with Xcode 26.6 and XcodeGen from Homebrew: `scripts/test.sh` passes. `scripts/build.sh` and `scripts/build.sh --release` both succeed and report `x86_64 arm64`. `build/IsoSword.app` launches and shows a window titled "ISO Sword". `IsoSword.xcodeproj` is git-ignored. Harmless build log noise: `appintentsmetadataprocessor ... No AppIntents.framework dependency found`.
 - **Deviation: Swift Testing instead of XCTest.** XCTest isn't available with CLT alone. Swift Testing ships with the toolchain (no package dependency), but SwiftPM on CLT doesn't add its framework path. `scripts/test.sh` adds `-F`/`-rpath` for `$(xcode-select -p)/Library/Developer/Frameworks` only when the active dev dir is CommandLineTools. Effective minimum is Xcode 16 / CLT 16, noted in `AGENTS.md` Commands and `README.md`. Write all later tests with `import Testing`, `@Test`, `#expect`.
 - Strict concurrency is set via `.enableExperimentalFeature("StrictConcurrency=targeted")` in `Package.swift` (the 5.10 manifest has no first-class setting) and `SWIFT_STRICT_CONCURRENCY: targeted` in `project.yml`.
 - Test target declares `resources: [.copy("Fixtures")]`, so fixtures are accessible via `Bundle.module` (T03). `Fixtures/`, `Spikes/` and `docs/` hold `.gitkeep` placeholders.
@@ -413,3 +412,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | --- | --- | --- |
 | 2026-10-07 | Plan created | Claude |
 | 2026-10-07 | T00 scaffolding written; BLOCKED on Xcode/XcodeGen install. Tests switched to Swift Testing | Claude |
+| 2026-10-07 | T00 DONE after Xcode and XcodeGen were installed and the build was verified | Claude |
