@@ -17,7 +17,7 @@
 6. Update the tracker row and fill in the task's **Handoff notes** (what you built, where, gotchas, deviations, anything the next agent must know). Keep notes concise but specific.
 7. Commit: `T05: <short summary>`. One task per commit (or a small series), never mix tasks.
 8. If you are blocked or need a decision, set status `BLOCKED`, explain in Handoff notes, and stop.
-9. Tasks marked 🧑 are **human checkpoints**. The agent prepares everything, sets status `NEEDS_HUMAN`, writes exact instructions for Nick, and stops. Do not mark them `DONE` yourself.
+9. Tasks marked 🧑 are **human checkpoints**. The agent prepares everything, sets status `NEEDS_HUMAN`, writes exact instructions for Nick, and stops. Once Nick reports back, the agent may mark the task `DONE` itself, provided every agent step and human step is complete, the results are recorded in Handoff notes, and every acceptance criterion is met. If any human step was skipped or failed, leave it `NEEDS_HUMAN` (or set `BLOCKED`) and say what is missing.
 
 **Status values:** `TODO` · `IN_PROGRESS` · `BLOCKED` · `NEEDS_HUMAN` · `DONE`
 
@@ -451,3 +451,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-07 | T00 DONE after Xcode and XcodeGen were installed and the build was verified | Claude |
 | 2026-10-07 | T01 spike written; NEEDS_HUMAN for the authopen run | Claude |
 | 2026-10-07 | T01 DONE after Nick's runs; T02, T05, T10 and T12 amended from the findings | Claude |
+| 2026-10-07 | Agents may mark 🧑 tasks DONE once all agent and human steps are complete (section 0, AGENTS.md) | Claude |

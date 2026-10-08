@@ -5,7 +5,7 @@ Native macOS app (Swift/SwiftUI) that writes `.iso` / `.img` images to USB drive
 ## Workflow
 
 - Work from `PLAN.md`: take the first `TODO` task whose dependencies are `DONE`. Update the tracker and the task's Handoff notes when you finish. One task per commit, message format `T05: short summary`.
-- Tasks marked 🧑 are human checkpoints: prepare, set `NEEDS_HUMAN`, stop.
+- Tasks marked 🧑 are human checkpoints: prepare, set `NEEDS_HUMAN`, stop. After the human reports results, record them and mark the task `DONE` yourself if every step (agent and human) and acceptance criterion is complete.
 - If blocked or if the plan seems wrong, set `BLOCKED`, explain in Handoff notes, and stop rather than improvising a large change.
 
 ## Safety (non-negotiable)
