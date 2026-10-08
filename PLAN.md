@@ -67,7 +67,7 @@ Error and cancel are possible from any step after Confirm. After a cancel or fai
 - **authopen:** `/usr/libexec/authopen -stdoutpipe -o <open-flags> /dev/rdiskN` shows the system admin prompt and passes an open file descriptor back over its stdout socket using `SCM_RIGHTS` (`recvmsg`). The app itself never runs as root. Confirm exact flags with `man authopen` in the T01 spike.
 - **One privileged open.** Each authopen call prompts for a password, so open `O_RDWR` once and reuse that fd for both the write and the verify read-back.
 - **Raw device I/O must be block-aligned.** Use `posix_memalign`-ed buffers, I/O sizes that are multiples of the device block size (query with `DKIOCGETBLOCKSIZE` / `DKIOCGETBLOCKCOUNT` from `<sys/disk.h>`), chunk size around 4 MiB. Zero-pad the final partial block when writing; compare only the true image length when verifying.
-- **Cache and sync:** set `F_NOCACHE` on the fd; call `fcntl(fd, F_FULLFSYNC)` after the last write.
+- **Cache and sync:** set `F_NOCACHE` on the fd; call `fcntl(fd, F_FULLFSYNC)` after the last write, falling back to `fsync()` if it fails with `ENOTTY`/`ENOTSUP` (T01: RAM disks return `ENOTTY`).
 - **Hybrid detection:** read the first 64 KiB of the image. MBR signature `0x55 0xAA` at offset 510. GPT header `"EFI PART"` at offset 512. ISO 9660 `"CD001"` at offset `0x8001`. An ISO with `CD001` but no MBR or GPT gets a non-blocking "may not boot from USB" warning.
 - **Disk discovery** uses `diskutil list -plist` and `diskutil info -plist` (parsed with `PropertyListDecoder`). DiskArbitration is optional, for live add/remove notifications only.
 - **Boot disk exclusion:** resolve the disk backing `/` via `diskutil info -plist /`. On APFS this is a synthesized container, so also resolve its physical store(s) (`APFSPhysicalStores`). Exclude any disk that matches, plus anything with `Internal == true`.
@@ -104,7 +104,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | ID | Task | Depends on | Status | Done date | Owner |
 | --- | --- | --- | --- | --- | --- |
 | T00 | Scaffolding: repo, package, XcodeGen, scripts | none | DONE | 2026-10-07 | Claude |
-| T01 | 🧑 Spike: authopen fd passing | T00 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T01 | 🧑 Spike: authopen fd passing | T00 | DONE | 2026-10-07 | Claude (prep) / Nick (run) |
 | T02 | DeviceOpener protocol, AuthopenOpener, fakes | T01 | TODO | | |
 | T03 | Disk model and discovery with filtering | T00 | TODO | | |
 | T04 | ImageInspector | T00 | TODO | | |
@@ -194,7 +194,13 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
   - **`F_FULLFSYNC` fails with `ENOTTY` (25) on the RAM disk.** → **T02/T05:** `fullSync()` must not treat `ENOTTY`/`ENOTSUP` as fatal. Fall back to `fsync()`, and verify on a USB stick whether `F_FULLFSYNC` is supported there.
   - Writing and reading back 1 MiB through the same fd matches, so **one privileged open for write and verify works.** No change is needed to T06.
   - Unmount and eject work without elevated rights for a user-attached image.
-- **Results, run 2 (pending, Nick):** the RAM disk with `root:operator` nodes (see the README, step 2). Record whether the dialog appears and what it says, the exit status on Cancel, and whether a second run within 5 minutes prompts again. Optionally run on a real USB stick and record the `F_FULLFSYNC` result. Then amend T02/T05 from these notes and mark T01 `DONE`.
+- **Results, run 2 (Nick, 2026-10-07, same machine, RAM disk nodes `chown root:operator`):**
+  - **The macOS dialog appeared: "authopen wants to make changes."** It names `authopen`, not ISO Sword. After the password was entered, the fd arrived (exit 0, 35 s including the prompt). The write, read-back match, `EINVAL` probes and `F_FULLFSYNC` `ENOTTY` results were identical to run 1.
+  - **Cancel:** authopen prints `AuthorizationCreate failed: The authorization was canceled by the user.` to stderr and **exits 1**, with no fd. Exit status 1 is generic, so a cancel can only be told apart by the stderr text. → T02 amended.
+  - **No credential caching.** A second run within 5 minutes of a successful authorization prompted again, despite the right's `timeout = 300`. That run was also cancelled, with the same status and message. Each authopen call is a fresh process, so **every write prompts once**. The single-open design (one prompt per write, covering write and verify) is confirmed.
+  - `diskutil unmountDisk` and `eject` work as the user even when the nodes are root-owned.
+- **Not covered:** a real USB stick (optional, skipped) and Intel. `F_FULLFSYNC` support on USB media is still unknown, so T05's fallback handles both outcomes, and T12 records which one happens.
+- **Plan amendments made from these findings:** section 1 (sync fallback), T02 steps 2–3 (stderr-based cancel mapping, `EINVAL` emulation, sync fallback), T05 step 3, T10 confirm copy, T12 checklist, and section 4 (`-extauth` for a branded prompt).
 
 ---
 
@@ -206,8 +212,13 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 1. Define in `ImageWriterCore`:
    - `protocol DeviceOpener { func openForReadWrite(bsdName: String) async throws -> OpenedDevice }`
    - `OpenedDevice` (or `DeviceHandle`) wrapping the fd with `blockSize: Int`, `blockCount: UInt64`, `byteCount`, `read(into:at:)`, `write(from:at:)`, `fullSync()`, `close()`. Make it a protocol too so tests can use file-backed fakes.
-2. `AuthopenOpener`: production implementation from the T01 spike, mapped to typed errors (`userCancelled`, `permissionDenied`, `deviceBusy`, `authopenFailed(status)`).
+2. `AuthopenOpener`: production implementation from the T01 spike (`Spikes/AuthopenSpike/Sources/AuthopenSpike/Authopen.swift`, which handles the socketpair, spawn and `recvmsg`), mapped to typed errors (`userCancelled`, `permissionDenied`, `deviceBusy`, `authopenFailed(status, message)`).
+   - Exact invocation (verified in T01): `/usr/libexec/authopen -stdoutpipe -o 2 /dev/rdiskN` (`2` = `O_RDWR`), with stdout on one end of an `AF_UNIX` `socketpair`. authopen sends 2 data bytes (`00 00`) with the `SCM_RIGHTS` message, then exits 0.
+   - **Capture authopen's stderr through a pipe.** A cancel exits **1** with `AuthorizationCreate failed: The authorization was canceled by the user.`, and exit 1 is generic. Map stderr containing "canceled by the user" to `userCancelled`. Map other recognizable texts (for example "busy", "not permitted") to `deviceBusy`/`permissionDenied`; everything else becomes `authopenFailed(status, stderr)`. A clean exit with no fd is also `authopenFailed`. Tests cover this mapping with canned `(status, stderr)` pairs.
+   - The parent must close its copy of the child's socket end after spawning, or `recvmsg` never sees EOF when authopen fails.
 3. `FileBackedDevice` / `FakeDeviceOpener`: backed by a temp file with a configurable block size (use 512 and 4096 in tests), plus failure-injection hooks (fail on Nth write, short write, fail on sync).
+   - Emulate raw-device rules observed in T01: a read or write whose **length or offset is not a block multiple fails with `EINVAL`**. Misaligned *memory* was accepted by the RAM disk, but production code still uses aligned buffers.
+   - `fullSync()` in the production handle: `F_FULLFSYNC`, falling back to `fsync()` on `ENOTTY`/`ENOTSUP` (the RAM disk returns `ENOTTY`). Any other error is a real sync failure. The fake can simulate "F_FULLFSYNC unsupported" to test the fallback.
 4. Block-aligned I/O helpers (`AlignedBuffer` using `posix_memalign`).
 
 **Acceptance criteria**
@@ -266,7 +277,7 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 **Steps**
 1. `WriteEngine.write(image:to:) -> AsyncThrowingStream<WriteProgress, Error>` (or an async function plus an `AsyncStream` of progress). `WriteProgress`: `bytesWritten`, `totalBytes`, `fractionComplete`, `bytesPerSecond` (smoothed with an exponential moving average over about 1 s windows), `estimatedSecondsRemaining`.
 2. Pre-checks: device `byteCount >= image size`, else throw `imageTooLarge`.
-3. Loop: read a chunk (about 4 MiB, a multiple of the device block size) from the source file into an aligned buffer; zero-pad the last partial block; write at the correct offset; handle short writes by retrying the remainder; check `Task.isCancelled` between chunks; `fullSync()` at the end.
+3. Loop: read a chunk (about 4 MiB, a multiple of the device block size) from the source file into an aligned buffer; zero-pad the last partial block; write at the correct offset; handle short writes by retrying the remainder; check `Task.isCancelled` between chunks; `fullSync()` at the end (the handle owns the `F_FULLFSYNC` → `fsync` fallback from T02; the engine just treats a thrown error as failure).
 4. Set `F_NOCACHE` on the device handle when applicable (inside the production handle, not the engine).
 5. Emit progress at a throttled rate (at most about 10 per second).
 
@@ -360,7 +371,7 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 1. `App/` views bound to `WriteCoordinator` state:
    - **Image step:** "Select Image…" using `NSOpenPanel` (or `.fileImporter`) limited to `.iso`/`.img`; shows name and size; shows the non-boot warning if present.
    - **Drive step:** list of disks (name, size, BSD name); checkbox "Show all external disks"; refresh button and auto-refresh on disk changes (DiskArbitration notifications or a 2 s poll); empty state text ("Insert a USB drive").
-   - **Confirm step:** "You are about to erase **<name>** (<size>, /dev/diskN). Mounted volumes: …. All data on this drive will be permanently lost." Buttons: Cancel, **Erase and Write** (destructive style).
+   - **Confirm step:** "You are about to erase **<name>** (<size>, /dev/diskN). Mounted volumes: …. All data on this drive will be permanently lost." Buttons: Cancel, **Erase and Write** (destructive style). Add a line: "macOS will ask for an administrator password (the dialog says *authopen wants to make changes*)." T01 showed that the dialog names authopen, not the app, which could otherwise look suspicious.
    - **Progress step:** phase label (Writing / Verifying), progress bar, percent, speed (MB/s), ETA, Cancel button.
    - **Done step:** "Finished. You can remove the drive." with duration and average speed; "Write another" button.
    - **Error step:** plain-language message, what happened to the drive, "Try again".
@@ -402,7 +413,7 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 **Goal:** document and execute the first real-world validation.
 
 **Agent steps**
-1. Write `docs/HARDWARE_TESTS.md` as a checklist with expected results, covering: RAM-disk dry run (debug flag), real USB stick with a hybrid Linux ISO (boots on a test machine), an `.img` write, an image bigger than the stick, ejecting the stick mid-write (use a spare stick), cancelling during write and during verify, cancelling the password prompt, boot disk and internal disks absent from both list modes, Apple Silicon and Intel runs if available.
+1. Write `docs/HARDWARE_TESTS.md` as a checklist with expected results, covering: RAM-disk dry run (debug flag), real USB stick with a hybrid Linux ISO (boots on a test machine), an `.img` write, an image bigger than the stick, ejecting the stick mid-write (use a spare stick), cancelling during write and during verify, cancelling the password prompt, boot disk and internal disks absent from both list modes, Apple Silicon and Intel runs if available. Also record whether the USB stick supports `F_FULLFSYNC` or the `fsync` fallback was used (needs a debug log line from T05/T02).
 2. Finish `README.md`: what it is, requirements, build instructions, safety notes (what the app erases), known limitations (hybrid ISOs only, Windows ISOs unsupported), and the roadmap (SMAppService helper, signing and notarization).
 3. Set status to `NEEDS_HUMAN` and stop.
 
@@ -416,6 +427,7 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 
 ## 4. Future work (not in scope)
 
+- `authopen -extauth`: create the `AuthorizationRef` in-app (`AuthorizationCopyRights` for `sys.openfile.readwrite./dev/rdiskN`) and pass its external form on stdin. That shows a dialog naming ISO Sword instead of "authopen", and reports a cancel as a typed `errAuthorizationCanceled` instead of stderr text. Untested in T01.
 - `HelperOpener` using an SMAppService-registered privileged XPC helper (removes per-write password prompt). Requires Developer ID signing; design must re-validate targets inside the helper.
 - Developer ID signing, notarization, DMG packaging.
 - Compressed image support, SHA-256 display, drag-and-drop, localization.
@@ -438,3 +450,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-07 | T00 scaffolding written; BLOCKED on Xcode/XcodeGen install. Tests switched to Swift Testing | Claude |
 | 2026-10-07 | T00 DONE after Xcode and XcodeGen were installed and the build was verified | Claude |
 | 2026-10-07 | T01 spike written; NEEDS_HUMAN for the authopen run | Claude |
+| 2026-10-07 | T01 DONE after Nick's runs; T02, T05, T10 and T12 amended from the findings | Claude |
