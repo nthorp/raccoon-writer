@@ -104,7 +104,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | ID | Task | Depends on | Status | Done date | Owner |
 | --- | --- | --- | --- | --- | --- |
 | T00 | Scaffolding: repo, package, XcodeGen, scripts | none | DONE | 2026-10-07 | Claude |
-| T01 | 🧑 Spike: authopen fd passing | T00 | TODO | | |
+| T01 | 🧑 Spike: authopen fd passing | T00 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 | T02 | DeviceOpener protocol, AuthopenOpener, fakes | T01 | TODO | | |
 | T03 | Disk model and discovery with filtering | T00 | TODO | | |
 | T04 | ImageInspector | T00 | TODO | | |
@@ -170,7 +170,23 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - Spike compiles. Documented outcome of the real run is recorded below.
 - Findings that change the plan (e.g., different flags, extra prompts, read-back not possible on the same fd) are written down and the affected tasks (T02, T05, T06) are amended in this file.
 
-**Handoff notes:** _(empty)_
+**Handoff notes:**
+- **Agent prep done 2026-10-07, now `NEEDS_HUMAN`.** The spike is in `Spikes/AuthopenSpike/`, a standalone SwiftPM package that the root package ignores. Build it with `cd Spikes/AuthopenSpike && swift build` (Swift 6.3.3, builds clean). **Nick: follow `Spikes/AuthopenSpike/README.md`** and paste the printed Findings block, plus answers to its checklist, under "Results" below.
+- The agent never invoked `authopen` and never wrote to any disk. It verified only the paths that stop before any side effect, against a temporary RAM disk (attached, then detached):
+  - `--dry-run` accepts the RAM disk.
+  - Refused: `disk0` (internal), `disk3` (APFS container, internal), `disk5` (mounted iOS Simulator `.dmg`, "virtual but not ram://"), the RAM disk together with `--allow-physical-usb`, `/dev/disk7`, `/dev/rdisk7s1`, `/dev/rdisk7;ls`, a missing disk, a missing acknowledgement flag, and a wrong typed confirmation.
+- **Deviations from the steps above:**
+  1. The guard requires a `ram://` image in `hdiutil info`, not just `VirtualOrPhysical == Virtual`, because mounted `.dmg`s (here, the iOS Simulator runtime) are also `Virtual` whole disks.
+  2. The human steps mention an optional real-USB run, which step 2's virtual-only rule would block. `--allow-physical-usb` covers it: external, USB, removable or ejectable, whole, not the boot disk.
+  3. Added `--dry-run`, `--open-flags N`, `--no-eject` and a typed disk-name confirmation.
+  4. authopen is spawned with `posix_spawn`, not `Process`, for exact control over which socketpair end becomes the child's stdout. The parent must close the child's end so `recvmsg` sees EOF if authopen exits without sending an fd. T02 can decide whether `Process` is good enough.
+- **Implementation facts for T02:** `SCM_RIGHTS` needs an `AF_UNIX` socketpair (a `pipe(2)` won't carry fds). On this machine `CMSG_SPACE(sizeof(int))` is 16 and the `cmsghdr` header is 12 bytes. `<sys/disk.h>` ioctls aren't importable, so they're hard-coded: `DKIOCGETBLOCKSIZE = 0x40046418` and `DKIOCGETBLOCKCOUNT = 0x40086419` (checked against the C headers). `O_RDWR = 2` and `O_EXLOCK = 0x20`. Swift has no `WIFEXITED`, so status is decoded as `(s >> 8) & 0xff` and the signal as `s & 0x7f`.
+- **Facts observed for T03 (macOS 26.3.1, arm64, read-only `diskutil` queries):**
+  - Internal `disk0` reports `VirtualOrPhysical = Unknown`, not `Physical`. APFS volumes omit the key. Don't require `== "Physical"`; treat only `"Virtual"` as virtual.
+  - Internal disks report `BusProtocol = Apple Fabric`. Disk images report `BusProtocol = Disk Image`, `Internal = false`, `Removable = true`, `Ejectable = true` and `MediaName = Disk Image`.
+  - `diskutil info -plist /` returns the snapshot `disk3s3s1` with `ParentWholeDisk = disk3` and `APFSPhysicalStores = [{APFSPhysicalStore: disk0s2}]`. Each store's `ParentWholeDisk` (here `disk0`) must also be excluded.
+  - `DiskUUID` is absent on whole disks, so T08's identity check can't rely on it.
+- **Results (Nick):** _(pending; paste the spike's Findings block and checklist answers here, then amend T02/T05/T06 if anything differs from the assumptions in section 1)_
 
 ---
 
@@ -413,3 +429,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-07 | Plan created | Claude |
 | 2026-10-07 | T00 scaffolding written; BLOCKED on Xcode/XcodeGen install. Tests switched to Swift Testing | Claude |
 | 2026-10-07 | T00 DONE after Xcode and XcodeGen were installed and the build was verified | Claude |
+| 2026-10-07 | T01 spike written; NEEDS_HUMAN for the authopen run | Claude |
