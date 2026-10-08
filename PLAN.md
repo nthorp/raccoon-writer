@@ -106,7 +106,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T00 | Scaffolding: repo, package, XcodeGen, scripts | none | DONE | 2026-10-07 | Claude |
 | T01 | 🧑 Spike: authopen fd passing | T00 | DONE | 2026-10-07 | Claude (prep) / Nick (run) |
 | T02 | DeviceOpener protocol, AuthopenOpener, fakes | T01 | DONE | 2026-10-07 | Claude |
-| T03 | Disk model and discovery with filtering | T00 | TODO | | |
+| T03 | Disk model and discovery with filtering | T00 | DONE | 2026-10-07 | Claude |
 | T04 | ImageInspector | T00 | TODO | | |
 | T05 | WriteEngine | T02 | TODO | | |
 | T06 | Verifier | T05 | TODO | | |
@@ -282,7 +282,38 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - Tests prove: default list shows only the USB stick; toggle adds the Thunderbolt SSD and SD card; the boot disk, its APFS container and the internal disk never appear under either setting; disk images are hidden.
 - Failure mode: if the boot disk cannot be resolved, `listDisks` filtering **fails closed** (returns an error or an empty list), never an unfiltered list.
 
-**Handoff notes:** _(empty)_
+**Handoff notes:**
+- **Done 2026-10-07.** `scripts/test.sh` passes 98 tests. `scripts/build.sh` and `--release` succeed for `x86_64 arm64` with no compiler warnings. A throwaway probe (scratchpad only, not committed) ran discovery read-only on the real machine and got the boot set `{disk0, disk3}`. Every disk was rejected for the expected reason, and both lists were empty.
+- **Files** (in `Sources/ImageWriterCore/`): `CommandRunner` (protocol and `CommandResult`), `ProcessCommandRunner`, `CommandRunnerError`, `Fakes/FakeCommandRunner`; `DiskInfo`; `DiskDiscovery` (protocol), `DiskutilDiscovery`; `Diskutil` (internal helper that runs and decodes `list`/`info`), `DiskutilList`, `DiskutilInfo` (internal `Decodable` subsets); `BootDiskSet`, `BootDiskResolver` (and the `BootDiskResolving` protocol); `DiskFilter`, `DiskRejection`; `TargetDiskLister`; `DiskDiscoveryError`.
+- **Entry point for T10:** `TargetDiskLister(runner:).targets(showAllExternal:)`. It resolves the boot disks **first**, and if that throws, it throws without running `diskutil list`. `DiskFilter.rejection(for:bootDisks:)` returns the first rule a disk breaks. T08 can reuse it to give reasons.
+- **Fail-closed design:**
+  - `DiskFilter` takes a `BootDiskSet`, whose failable init refuses an empty set or a non-whole-disk name. Filtering without a resolved boot disk therefore doesn't compile.
+  - `BootDiskResolver` throws if `/` has no valid `ParentWholeDisk`, if an APFS root (`FilesystemType == apfs` or `APFSContainerReference`) lists no physical stores, or if any store fails to resolve. Every store is included (Fusion-style containers).
+  - A missing `Internal` key means internal. A missing `WholeDisk` key means not whole.
+- **Filter rules,** checked in this order: invalid name, not whole, internal, boot disk, system volume mounted (`/` or `/System/Volumes/…`), APFS container, virtual, size 0 (`noMedia`, e.g. an empty card reader). Default mode then also requires `BusProtocol == "USB"` and removable or ejectable. The system-volume rule backstops boot resolution. APFS synthesized containers (`APFSPhysicalStores` present) are always rejected, even after T08 allows virtual disks. Their physical disk is the target.
+- **Mount points:** `DiskInfo.mountPoints`/`volumeNames` come from `diskutil list -plist`. They include partitions, APFS volumes and mounted snapshots. **A container's volumes are also credited to the physical disk that holds its store.** So an APFS-formatted stick shows its real volumes on the confirm screen, and the internal `disk0` shows `/`.
+- **Discovery details:**
+  - `diskutil info` runs concurrently for each whole disk, and the results keep diskutil's order.
+  - A disk is left out (and logged under category `discovery`) when its `info` fails, decodes badly, or describes a different identifier. This is usually a stick pulled mid-refresh, and leaving a disk out is always safe.
+  - `CommandRunnerError` (launch failure, timeout) propagates instead, because it means diskutil itself is broken.
+  - Names from `WholeDisks` that fail `BSDName.isWholeDisk` are never passed to a command.
+- **diskutil errors:** with `-plist`, diskutil reports failures **as a plist on stdout** (`Error`, `ErrorMessage`, `ExitCode`), not on stderr. `Diskutil` maps them to `commandFailed(command:status:message:)`. The real reply is in fixture `info-missing.plist`. T07's `diskutil unmountDisk`/`eject` don't use `-plist` and print text, so T07 must read both stdout and stderr.
+- **`ProcessCommandRunner`** (for T07):
+  - Uses `Process` with an argument array and stdin set to `/dev/null`.
+  - Drains stdout and stderr concurrently, so it can't deadlock on full pipes.
+  - Has a 30 s default timeout, after which it sends SIGTERM and throws `timedOut`.
+  - A nonzero exit is **returned**, not thrown.
+- **`FakeCommandRunner`** is in the library (like the T02 fakes) for T07 tests and T10's Simulate mode. Unknown commands exit 1. `invocations` records `[executable] + arguments`.
+- **`BSDName.isDeviceIdentifier`** (`^disk[0-9]+(s[0-9]+)*$`, at most 32 bytes) is used **only** for read-only `diskutil info` on partitions (APFS stores). Opens and unmounts still require `isWholeDisk`.
+- **Fixtures** (`Tests/ImageWriterCoreTests/Fixtures/diskutil/`):
+  - Real captures from this machine (macOS 26.3.1, M3 Max), with the SMART dictionary removed: `info-root`, `info-disk0`, `info-disk3`, `info-disk0s2`, `info-missing`.
+  - **Hand-written** from the real key set (no hardware was available): `list` (the composed fixture machine), `info-disk4` (USB stick), `info-disk5` (Thunderbolt SSD, `BusProtocol = PCI-Express`), `info-disk6` (its APFS container), `info-disk7` (SD card, `Secure Digital`, `Internal = false`), `info-disk8` (disk image). The machine is described in `DiskutilFixtures.swift`.
+- **Deviations:**
+  1. `devicePath`/`rawDevicePath` are computed from `bsdName`.
+  2. `mediaUUID` is diskutil's `DiskUUID`, which is usually absent on whole disks. T08 must not rely on it; size + media name + block size are what is available.
+  3. Added `isAPFSContainer` and `blockSize`.
+  4. Added `TargetDiskLister`, which is where the "fail closed" acceptance criterion lives, since `listDisks()` itself is unfiltered.
+- **For T12:** the Thunderbolt and SD fixtures are guesses. Built-in SD slots may report `Internal = true`; if so, they are hidden under both settings by design. Record what a real USB stick, SD slot and Thunderbolt disk report.
 
 ---
 
@@ -487,3 +518,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-07 | T01 DONE after Nick's runs; T02, T05, T10 and T12 amended from the findings | Claude |
 | 2026-10-07 | Agents may mark 🧑 tasks DONE once all agent and human steps are complete (section 0, AGENTS.md) | Claude |
 | 2026-10-07 | T02 DONE: DeviceOpener/OpenedDevice, AuthopenOpener, RawDevice, fakes | Claude |
+| 2026-10-07 | T03 DONE: DiskInfo, DiskutilDiscovery, BootDiskResolver, DiskFilter, TargetDiskLister, CommandRunner | Claude |
