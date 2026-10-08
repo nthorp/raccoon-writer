@@ -1,0 +1,52 @@
+name: IsoSword
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+packages:
+  ImageWriterCore:
+    path: .
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    SWIFT_STRICT_CONCURRENCY: targeted
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+targets:
+  IsoSword:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+        excludes:
+          - Info.plist
+          - IsoSword.entitlements
+    dependencies:
+      - package: ImageWriterCore
+        product: ImageWriterCore
+    settings:
+      base:
+        PRODUCT_NAME: IsoSword
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.isosword
+        INFOPLIST_FILE: App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App/IsoSword.entitlements
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        ENABLE_HARDENED_RUNTIME: NO
+        ARCHS: "arm64 x86_64"
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+      configs:
+        Debug:
+          ONLY_ACTIVE_ARCH: YES
+        Release:
+          ONLY_ACTIVE_ARCH: NO
+schemes:
+  IsoSword:
+    build:
+      targets:
+        IsoSword: all
+    run:
+      config: Debug
+    archive:
+      config: Release
