@@ -105,7 +105,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | --- | --- | --- | --- | --- | --- |
 | T00 | Scaffolding: repo, package, XcodeGen, scripts | none | DONE | 2026-10-07 | Claude |
 | T01 | 🧑 Spike: authopen fd passing | T00 | DONE | 2026-10-07 | Claude (prep) / Nick (run) |
-| T02 | DeviceOpener protocol, AuthopenOpener, fakes | T01 | TODO | | |
+| T02 | DeviceOpener protocol, AuthopenOpener, fakes | T01 | DONE | 2026-10-07 | Claude |
 | T03 | Disk model and discovery with filtering | T00 | TODO | | |
 | T04 | ImageInspector | T00 | TODO | | |
 | T05 | WriteEngine | T02 | TODO | | |
@@ -226,7 +226,41 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - `AuthopenOpener` compiles and is covered only by tests that do not invoke authopen (e.g., error mapping from exit statuses, fd-parsing from a canned `recvmsg` over a local socketpair).
 - No test invokes `authopen`.
 
-**Handoff notes:** _(empty)_
+**Handoff notes:**
+- **Done 2026-10-07.** `scripts/test.sh` passes 49 tests. `scripts/build.sh` and `--release` succeed for `x86_64 arm64` with no compiler warnings.
+- **Files** (all in `Sources/ImageWriterCore/`): `DeviceOpener`, `OpenedDevice` (protocols); `AuthopenOpener` (production opener); `DescriptorReceiver` (`SCM_RIGHTS` receive, from the spike); `RawDevice` (production handle); `SyncMethod` (`F_FULLFSYNC` → `fsync` fallback); `AlignedBuffer`; `BlockMath`; `BSDName`; `PosixIO` (EINTR-retrying `pread`/`pwrite`); `DeviceOpenError`, `DeviceIOError`; `Fakes/FileBackedDevice`, `Fakes/FakeDeviceOpener`.
+- **API shape for T05/T06:**
+  - `OpenedDevice` is `AnyObject & Sendable`. `read(into: UnsafeMutableRawBufferPointer, at: UInt64) -> Int` and `write(from: UnsafeRawBufferPointer, at: UInt64) -> Int` make **one** call and return the byte count. `read` returns 0 at the end of the device. `write` may return less than requested, so **T05 owns the retry loop**. Treat a 0-byte return for a non-empty request as an error, or the loop never ends. `byteCount` is a protocol extension.
+  - `fullSync()` is `@discardableResult` and returns `SyncMethod` (`.fullFsync` / `.fsyncFallback`). `RawDevice` logs which method it used (`os.Logger`, subsystem `com.example.isosword`, category `device`). T12 can read it with `log stream --predicate 'subsystem == "com.example.isosword"' --info`.
+  - `close()` is idempotent. Any I/O after it throws `DeviceIOError.closed`. `RawDevice` also closes in `deinit`.
+  - `AlignedBuffer(count:blockSize:)` aligns to `max(pagesize, blockSize)` and starts zero-filled. `zero(_ range:)` handles the final-block padding. `bytes` exposes it as a raw buffer.
+  - I/O errors are `DeviceIOError.posix(operation:code:)`. T11 can check `code` for `ENXIO`/`EIO` (drive removed).
+- **`AuthopenOpener`:**
+  - Validates the name with `BSDName.isWholeDisk` (an ASCII-only `^disk[0-9]+$`, reusable by T07) before anything runs.
+  - Runs authopen on a GCD thread, so the password prompt doesn't block the cooperative pool. Cancellation is honored only before the spawn.
+  - Wraps the received fd in `RawDevice(fd:)`, which reads the geometry ioctls and sets `F_NOCACHE`. **T05 step 4 is therefore already done.**
+  - Kept `posix_spawn` instead of `Process`. With `POSIX_SPAWN_CLOEXEC_DEFAULT` the child gets only stdin=`/dev/null`, stdout=socket and stderr=pipe. The parent's ends are `FD_CLOEXEC`, so a concurrent `Process` launch (diskutil) can't hold the socket open and stall `recvmsg`. A test proves an inheritable fd doesn't leak into the child, and it fails if the spawn flag is removed (checked by mutation).
+  - If an fd arrives but authopen exits nonzero, the fd is closed and an error is thrown.
+- **Error mapping** (`AuthopenOpener.failure(for:stderr:)`), checked in this order:
+  1. "canceled/cancelled by the user" → `userCancelled`
+  2. signal → `authopenTerminated(signal:)`
+  3. "busy" → `deviceBusy`
+  4. "not permitted" or "denied" → `permissionDenied`
+  5. anything else → `authopenFailed(status:message:)`, including exit 0 with no fd
+  Only the cancel text was seen in T01; the busy and denied texts are guesses. stderr is logged under category `authopen`.
+- **`RawDevice` holds its lock across each I/O call,** so `close()` can't free the fd number mid-call. A reused number could otherwise point at an unrelated file. The cost is that `close()` waits for an in-flight chunk, which matters for T09 cancel.
+- **`FileBackedDevice` semantics:**
+  - Creates a zero-filled temp file of `blockSize × blockCount` bytes, deleted on `deinit`. `contents()` works after `close()`.
+  - A length or offset that isn't a block multiple fails with `EINVAL`.
+  - At the end of the device: a read returns 0, or is clamped if it crosses the end. A write at or past the end fails with `ENOSPC`. A write that crosses the end is clamped, which looks like a short write.
+  - `Faults`: `failWrite`/`failRead` (`call:` is 1-based, `code:` defaults to `EIO`; use `ENXIO` for removal), `shortWriteOnCall` (writes half the request, rounded down to blocks, at least one block), `syncError`, `fullFsyncUnsupported` (`ENOTTY`, which exercises the real fallback code). `faults` can be changed at runtime.
+  - Counters: `writeCallCount`, `readCallCount`, `syncCallCount`, `closeCallCount`, `isClosed`, `lastSyncMethod` (the last *successful* sync; T05's cancel test can assert it is nil).
+- **`FakeDeviceOpener`** takes `init(device:)`, `init(error:)` or `init(factory:)`. It applies the same name validation as production, and `openAttempts` records each attempt.
+- **Deviations:**
+  1. `permissionDenied` and `deviceBusy` carry no payload, as the plan lists them. The stderr text goes to the log.
+  2. Added `invalidDiskName`, `authopenTerminated` and `posix` cases to `DeviceOpenError`.
+  3. The fakes live in the library, not the test target, and are **not** wrapped in `#if DEBUG`, because T10's Simulate mode needs them in the app. They only touch temp files. T10 should gate its use of them behind `#if DEBUG`.
+  4. The process tests run `/bin/sh` stand-in scripts through the internal `AuthopenOpener(executable:)` to cover spawn, argv, stderr capture, cancel, exit 0 without an fd, a signal and `ENOENT`. The public `init()` always uses `/usr/libexec/authopen`.
 
 ---
 
@@ -452,3 +486,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-07 | T01 spike written; NEEDS_HUMAN for the authopen run | Claude |
 | 2026-10-07 | T01 DONE after Nick's runs; T02, T05, T10 and T12 amended from the findings | Claude |
 | 2026-10-07 | Agents may mark 🧑 tasks DONE once all agent and human steps are complete (section 0, AGENTS.md) | Claude |
+| 2026-10-07 | T02 DONE: DeviceOpener/OpenedDevice, AuthopenOpener, RawDevice, fakes | Claude |
