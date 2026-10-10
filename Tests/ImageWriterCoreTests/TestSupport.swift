@@ -1,4 +1,5 @@
 import Foundation
+import os
 @testable import ImageWriterCore
 
 /// Runs `body` and returns the errno of the `DeviceIOError.posix` it throws, or nil otherwise.
@@ -36,4 +37,26 @@ extension OpenedDevice {
         let n = try bytes.withUnsafeMutableBytes { try read(into: $0, at: offset) }
         return Array(bytes.prefix(n))
     }
+}
+
+/// A fake clock that advances by `step` seconds each time it is read.
+func steppingClock(step: TimeInterval, start: TimeInterval = 1000) -> MonotonicClock {
+    let time = OSAllocatedUnfairLock(initialState: start)
+    return MonotonicClock {
+        time.withLock { now in
+            defer { now += step }
+            return now
+        }
+    }
+}
+
+/// Collects values handed over on another thread.
+final class Recorder<Value: Sendable>: Sendable {
+    private let state = OSAllocatedUnfairLock<[Value]>(initialState: [])
+
+    func append(_ value: Value) {
+        state.withLock { $0.append(value) }
+    }
+
+    var values: [Value] { state.withLock { $0 } }
 }

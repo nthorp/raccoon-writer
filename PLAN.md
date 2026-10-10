@@ -108,7 +108,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T02 | DeviceOpener protocol, AuthopenOpener, fakes | T01 | DONE | 2026-10-07 | Claude |
 | T03 | Disk model and discovery with filtering | T00 | DONE | 2026-10-07 | Claude |
 | T04 | ImageInspector | T00 | DONE | 2026-10-09 | Claude |
-| T05 | WriteEngine | T02 | TODO | | |
+| T05 | WriteEngine | T02 | DONE | 2026-10-09 | Claude |
 | T06 | Verifier | T05 | TODO | | |
 | T07 | Unmount and eject | T03 | TODO | | |
 | T08 | SafetyGuard and debug test mode | T03, T07 | TODO | | |
@@ -369,7 +369,25 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - Injected write failure and short write handled.
 - Speed calculation unit-tested with a fake clock.
 
-**Handoff notes:** _(empty)_
+**Handoff notes:**
+- **Done 2026-10-09.** `scripts/test.sh` passes 159 tests (38 new). `scripts/build.sh` and `--release` succeed for `x86_64 arm64` with no compiler warnings. The engine tests were run 8 times with no flakes. Two mutations were caught: removing the padding zero-fill and removing the pre-sync cancel check.
+- **Files** (in `Sources/ImageWriterCore/`): `WriteEngine`, `WriteEngineError`, `WriteResult`; shared with T06: `TransferProgress` (plus `typealias WriteProgress`), `SpeedEstimator`, `ProgressMeter`, `MonotonicClock`, `CancellationFlag`, `ImageSource`, `ImageSourceError`. Test helpers: `steppingClock`/`Recorder` in `TestSupport.swift`; `Gate`, `GatedDevice`, `ZeroWriteDevice` in `TestDevices.swift`.
+- **API:** `WriteEngine(chunkSize: = 4 MiB, clock: = .system)`. The chunk is rounded down to a multiple of the device block size, minimum one block. There are two entry points:
+  - `write(image:to:) -> AsyncThrowingStream<WriteProgress, Error>`, the plan's shape. Ending the iteration or cancelling the consumer cancels the write, but the in-flight chunk finishes in the background after the stream has ended.
+  - `write(image:to:onProgress:) async throws -> WriteResult`, which returns or throws **only once the device is idle**. `onProgress` runs on the I/O thread. **T09 should use this one**, so the handle is not closed under a running chunk. Closing is still safe, because `RawDevice` locks per call.
+  - Both run the synchronous `run(image:device:isCancelled:onProgress:)` on a GCD thread. `withTaskCancellationHandler` sets a `CancellationFlag` that the loop checks before each chunk and once more before `fullSync()`.
+- **Progress:** `TransferProgress` has `completedBytes`, `totalBytes`, `bytesPerSecond?`, and computed `fractionComplete`/`estimatedSecondsRemaining`.
+  - Speed is an EMA (newest window weighted 0.3) over windows that close at the first sample ≥ 1 s after they open. It is **nil for roughly the first second**, so T10 should show "—" until then.
+  - Updates are throttled to one per 0.1 s. The 0-byte update and the one reaching `totalBytes` are always published.
+  - The 100 % update goes out **before** `fullSync()`, which can take seconds on a USB stick. T09/T10 should show something like "Finishing…" until the call returns.
+- **Errors:** pre-check `imageTooLarge` (nothing written); `write(DeviceIOError)` (T11: `ENXIO`/`EIO` = removal); `stalled(atOffset:)` for a 0-byte write; `sync(DeviceIOError)`; `ImageSourceError.changed` (size or type differs from `ImageInfo`, checked at open with `fstat`) and `.truncated(atOffset:)` (file ended early); `CancellationError` for cancel. Errors that are not `DeviceIOError` pass through unwrapped.
+- **`WriteResult`:** `bytesWritten` (image bytes, without padding), `syncMethod`, `elapsedSeconds`.
+- **For T06:** reuse `ImageSource.readFully`, `ProgressMeter`, `CancellationFlag`, `MonotonicClock` and the same GCD + cancellation-handler shape. Declare `typealias VerifyProgress = TransferProgress`.
+- **Deviations:**
+  1. One shared `TransferProgress` struct, with `completedBytes` instead of the plan's `bytesWritten`, so the verifier can reuse it.
+  2. `fractionComplete` and `estimatedSecondsRemaining` are computed properties.
+  3. Added the `onProgress` overload, `WriteResult`, `stalled`, and `ImageSourceError`.
+  4. Step 4 (`F_NOCACHE`) was already done in T02 by `RawDevice`.
 
 ---
 
@@ -537,3 +555,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-07 | T02 DONE: DeviceOpener/OpenedDevice, AuthopenOpener, RawDevice, fakes | Claude |
 | 2026-10-07 | T03 DONE: DiskInfo, DiskutilDiscovery, BootDiskResolver, DiskFilter, TargetDiskLister, CommandRunner | Claude |
 | 2026-10-09 | T04 DONE: ImageInspector, ImageInfo, ImageKind, BootWarning, ImageSignatures | Claude |
+| 2026-10-09 | T05 DONE: WriteEngine, TransferProgress, SpeedEstimator, ProgressMeter, ImageSource | Claude |
