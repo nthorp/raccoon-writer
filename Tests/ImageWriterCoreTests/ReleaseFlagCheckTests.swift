@@ -11,7 +11,10 @@ struct ReleaseFlagCheckTests {
         .deletingLastPathComponent()
         .appendingPathComponent("scripts/check-release-flags.sh")
 
-    static let markers = ["ISOSWORD_ALLOW_VIRTUAL_DISKS", "DebugTestMode", "allowVirtualDisks"]
+    static let markers = [
+        "ISOSWORD_ALLOW_VIRTUAL_DISKS", "DebugTestMode", "allowVirtualDisks",
+        "ISOSWORD_SIMULATE", "SimulationMode", "SimulatedDrive",
+    ]
 
     /// A minimal `.app` whose executable holds `contents`. Removed by the caller.
     func makeBundle(executable contents: Data?, extraFile: (name: String, contents: Data)? = nil) throws -> URL {
@@ -89,6 +92,9 @@ struct ReleaseFlagCheckTests {
 #if DEBUG
         #expect(Self.markers.contains(DebugTestMode.environmentKey))
         #expect(String(describing: DebugTestMode.self) == "DebugTestMode")
+        #expect(Self.markers.contains(SimulationMode.environmentKey))
+        #expect(String(describing: SimulationMode.self) == "SimulationMode")
+        #expect(String(describing: SimulatedDrive.self) == "SimulatedDrive")
 #endif
     }
 }

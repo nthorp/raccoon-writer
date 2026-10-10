@@ -113,7 +113,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T07 | Unmount and eject | T03 | DONE | 2026-10-09 | Claude |
 | T08 | SafetyGuard and debug test mode | T03, T07 | DONE | 2026-10-09 | Claude |
 | T09 | WriteCoordinator (orchestration, state machine) | T04, T06, T07, T08 | DONE | 2026-10-09 | Claude |
-| T10 | SwiftUI shell and screens | T09 | TODO | | |
+| T10 | SwiftUI shell and screens | T09 | DONE | 2026-10-09 | Claude |
 | T11 | Error states, cancel, disconnect handling, polish | T10 | TODO | | |
 | T12 | 🧑 Hardware test checklist and README | T11 | TODO | | |
 
@@ -562,7 +562,40 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - A SwiftUI preview or UI-less snapshot of each step compiles using a fake coordinator state (previews for every state).
 - Walkthrough in the debug app with a fake pipeline (a `#if DEBUG` "Simulate" switch using `FakeDeviceOpener` and a temp file) shows every step including progress, done, and error. Record how to run the simulation in Handoff notes.
 
-**Handoff notes:** _(empty)_
+**Handoff notes:**
+- **Done 2026-10-09.** `scripts/test.sh` passes 301 tests (37 new). `scripts/build.sh` and `--release` succeed for `x86_64 arm64` with no compiler warnings, and the release flag check passes. The new suites were run 6 times with no flakes. Two mutations were caught: dropping the identity check when the list refreshes, and applying a stale drive-list refresh.
+- **How to run the simulation:** `scripts/build.sh` (Debug), then `ISOSWORD_SIMULATE=1 build/IsoSword.app/Contents/MacOS/IsoSword`. A yellow banner says it is a simulation. Choose any `.img`/`.iso` of **at least 30 MB** (e.g. `mkfile -n 300m /tmp/sim.img`), then pick a drive. Each drive has a scripted outcome:
+  - `disk90` works (about 40 MB/s write, 80 MB/s verify, 2 s "password prompt", 1 s flush).
+  - `disk91` is pulled out mid-write (`ENXIO` on write call 6, about 21 MB in).
+  - `disk92` returns bad data on read-back (mismatch at 8 MiB).
+  - `disk93` fails as if the password dialog was cancelled.
+  - `disk94` is 16 MB, so the image is too large.
+  - `disk95` is a Thunderbolt SSD, shown only with "Show all external disks".
+  - `disk0` is the simulated internal boot disk. It is listed by discovery and always filtered out.
+  Nothing calls diskutil or authopen. Devices are sparse temp files, deleted when the run ends.
+- **Walkthrough done by the agent** on the Simulate build, driven through System Events accessibility (screen capture isn't permitted in the agent's session, so the screens were checked through their accessibility text, not visually). Every step was reached: setup (image, drive, toggle), confirm (Cancel goes back), preparing (prompt text), writing with speed and ETA, "Finishing the write" during the flush, verifying, done (duration and average speed), failed (pulled out, verify mismatch, prompt cancelled, too large), and cancelled (during the prompt, the write and the verify). "Write Another" and "Try Again" return to the drive step with the image kept. The live Debug app was also opened read-only and showed "Insert a USB drive" under both settings. **Nick should still look at it once**, for layout and dark mode.
+- **App files** (`App/`): `IsoSwordApp` (a single `Window`, not `WindowGroup`), `AppServices` (wires the coordinator and drive list, live or simulated), `ContentView` (switches on `coordinator.state` and forwards actions), `SetupView` + `ImageSection` + `DriveSection`, `ConfirmView`, `ProgressStepView`, `OutcomeView` (shared layout) + `DoneView`/`FailedView`/`CancelledView`, `ImageFileTypes`, `SimulationBanner` and `PreviewSamples` (both `#if DEBUG`). The step views take plain values and closures. Every state has a `#Preview` (in `#if DEBUG`), covering the 3 setup states, confirm, the 3 preparing stages, writing (speed unknown, normal, flushing), verifying, cancelling, ejecting, done (with and without an eject warning), failed (write, safety check) and cancelled (before and after the write).
+- **Core additions** (`Sources/ImageWriterCore/`):
+  - `DriveListModel` (`@MainActor @Observable`): `drives`, the `filter` they were built with, `showAllExternal`, `errorMessage`, `hasLoaded`, `refresh()`, `setShowAllExternal(_:)`, and `autoRefresh(every: 2 s)` for a view's `.task`, so polling stops off the setup screen. Only the newest refresh is applied. A failed refresh empties the list (fails closed). `onUpdate` is called after each applied refresh.
+  - `WriteCoordinator.refreshSelectedDrive(from:filter:)`: on the drive step, a drive still listed with the same identity takes its fresh entry and the new list's filter. One that vanished or changed is deselected (back to `imageSelected`). `AppServices` connects it to `DriveListModel.onUpdate`, so the selection always matches the visible list and its filter. A test shows the safety check then uses the new filter.
+  - `WriteCoordinator.reset(keepingImage:)`: `true` goes back to `imageSelected`, used by "Try Again", "Start Again" and "Write Another". The drive is always picked again.
+  - `ProgressDisplay(state:isCancelling:)`: progress screen text. The 100 % write update reads "Finishing the write", the prompt stage names the authopen dialog, and the cancel button is disabled while finishing or once a cancel was requested.
+  - `DisplayFormat`: sizes (decimal, as Finder shows them), speed, percent (never 100 % early), duration, time left, mount points. The output doesn't depend on the locale.
+  - `PipelineStage.driveStateNote`: one sentence for the failed and cancelled screens.
+  - `Fakes/StaticDiskDiscovery`, `Fakes/StaticBootDiskResolver` (not gated, like the other fakes).
+  - `Simulation/` (every file is `#if DEBUG`): `SimulationMode` (env key, `makeLister()`, `makeCoordinator()`), `SimulatedDrive`, `SimulatedDevice` (throttled `FileBackedDevice`, optional corrupted read), `SimulatedOpener` (delay, then `FakeDeviceOpener`). `check-release-flags.sh` also checks `ISOSWORD_SIMULATE`, `SimulationMode` and `SimulatedDrive`, and `ReleaseFlagCheckTests` checks they match the code. The only related string left in the Release binary is the `isSimulation` property name, which is always false there.
+- **For T11:**
+  - The failed screen shows `failure.message` (the raw `localizedDescription`) and `stage.driveStateNote`. Seen in the walkthrough: the ENXIO text is technical ("write at offset … Device not configured (errno 6)"), and `imageTooLarge` says "may be partially written" although nothing was written (it fails in the pre-check, at stage `.write`). The error mapping should replace both.
+  - A cancelled prompt currently shows the error screen ("The administrator password prompt was cancelled."), as T09 noted.
+  - Closing the window during a write doesn't stop it, because `Window` doesn't quit on close. Quit is not guarded yet.
+  - The drive list stops polling on the confirm screen, so a drive pulled out there is caught by the safety check, not the UI.
+  - `ContentView.perform` shows a refused coordinator call in an alert. None appeared in the walkthrough.
+- **Deviations:**
+  1. The image and drive steps share one screen, as numbered sections, with the drive list disabled until an image is chosen. The coordinator already allows changing either one there.
+  2. Added `DriveListModel`, `refreshSelectedDrive`, `reset(keepingImage:)`, `ProgressDisplay`, `DisplayFormat` and `driveStateNote` to the core, so the views hold no logic and the behavior is tested.
+  3. Auto-refresh is a 2 s poll (the plan allows it), not DiskArbitration.
+  4. Simulate is an environment variable (`ISOSWORD_SIMULATE=1`, matching `ISOSWORD_ALLOW_VIRTUAL_DISKS`), not an in-app switch. Its opener wraps `FakeDeviceOpener` with a delay, and each simulated drive scripts one outcome, so the error screens can be reached.
+  5. "Write Another" keeps the image.
 
 ---
 
@@ -639,3 +672,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-09 | T07 DONE: DiskManager, DiskutilDiskManager, DiskManagerError, EjectWarning, FakeDiskManager | Claude |
 | 2026-10-09 | T08 DONE: SafetyGuard, SafetyGuardError, DiskIdentityField, DebugTestMode, check-release-flags.sh | Claude |
 | 2026-10-09 | T09 DONE: WriteCoordinator, WriteState, PipelineStage, WriteFailure, WriteSummary, WriteCoordinatorError | Claude |
+| 2026-10-09 | T10 DONE: SwiftUI screens, DriveListModel, ProgressDisplay, DisplayFormat, debug Simulate mode | Claude |

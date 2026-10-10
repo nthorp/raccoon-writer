@@ -103,6 +103,26 @@ public final class WriteCoordinator {
         transition(to: .driveSelected(image, disk))
     }
 
+    /// Keeps the selected drive in step with a refreshed drive list built with `filter`.
+    /// A drive still listed as the same medium is replaced by its fresh entry (mount
+    /// points change) and adopts `filter`; one that vanished or changed identity is
+    /// deselected. Only acts on the drive step; elsewhere the safety check covers it.
+    public func refreshSelectedDrive(from drives: [DiskInfo], filter: DiskFilter) {
+        guard case .driveSelected(let image, let selected) = state else { return }
+        if let fresh = drives.first(where: { $0.bsdName == selected.bsdName }),
+           fresh.identityDifference(from: selected) == nil {
+            selectedFilter = filter
+            if fresh != selected {
+                selectedDrive = fresh
+                transition(to: .driveSelected(image, fresh))
+            }
+        } else {
+            selectedDrive = nil
+            selectedFilter = nil
+            transition(to: .imageSelected(image))
+        }
+    }
+
     /// Moves to the confirm screen. Only `confirmAndStart` can leave it towards a write.
     public func requestConfirmation() throws {
         guard case .driveSelected(let image, let disk) = state else { throw notAllowed(.requestConfirmation) }
@@ -145,15 +165,23 @@ public final class WriteCoordinator {
         }
     }
 
-    /// Back to the start, forgetting the image and drive. Not allowed during a run.
-    public func reset() throws {
+    /// Back to the start, forgetting the drive. With `keepingImage` the selected image
+    /// stays, for "Try again" and "Write another"; the drive is always picked afresh.
+    /// Not allowed during a run.
+    public func reset(keepingImage: Bool = false) throws {
         guard !state.isRunning else { throw notAllowed(.reset) }
-        selectedImage = nil
+        if !keepingImage {
+            selectedImage = nil
+        }
         selectedDrive = nil
         selectedFilter = nil
         runTask = nil
         isCancelling = false
-        transition(to: .idle)
+        if let image = selectedImage {
+            transition(to: .imageSelected(image))
+        } else {
+            transition(to: .idle)
+        }
     }
 
     // MARK: - Pipeline

@@ -5,13 +5,17 @@
 # Exit 2: bad usage or the bundle could not be searched (fails closed).
 set -euo pipefail
 
-# Keep in sync with Sources/ImageWriterCore/DebugTestMode.swift; a unit test checks
-# that the environment key matches. The type and property names catch the code
-# itself leaking even if the key string were to change.
+# Keep in sync with Sources/ImageWriterCore/DebugTestMode.swift and
+# Simulation/SimulationMode.swift; a unit test checks that the environment keys match.
+# The type and property names catch the code itself leaking even if a key string were
+# to change.
 markers=(
     ISOSWORD_ALLOW_VIRTUAL_DISKS
     DebugTestMode
     allowVirtualDisks
+    ISOSWORD_SIMULATE
+    SimulationMode
+    SimulatedDrive
 )
 
 if [[ $# -ne 1 ]]; then

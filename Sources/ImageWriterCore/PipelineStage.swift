@@ -27,4 +27,11 @@ public enum PipelineStage: String, CaseIterable, Equatable, Sendable {
         case .write, .verify: return true
         }
     }
+
+    /// What the user should know about the drive after a run stopped here.
+    public var driveStateNote: String {
+        mayHaveModifiedDrive
+            ? "The drive may be partially written and will not boot. Write the image again, or erase the drive in Disk Utility before using it."
+            : "Nothing was written to the drive."
+    }
 }

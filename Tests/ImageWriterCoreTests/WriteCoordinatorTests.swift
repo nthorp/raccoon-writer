@@ -538,6 +538,129 @@ final class WriteCoordinatorTests {
         #expect(log.states.isEmpty)
     }
 
+    // MARK: - Keeping the image
+
+    @Test func resetKeepingTheImageReturnsToTheDriveStep() async throws {
+        let image = try image()
+        let (coordinator, _) = coordinator(opener: FakeDeviceOpener(device: try device()))
+
+        try await runToEnd(coordinator, image: image)
+        try coordinator.reset(keepingImage: true)
+
+        #expect(coordinator.state == .imageSelected(image))
+        #expect(coordinator.selectedImage == image)
+        #expect(coordinator.selectedDrive == nil)
+        // The drive must be picked again, so confirming straight away is impossible.
+        #expect(throws: WriteCoordinatorError.notAllowed(.requestConfirmation, in: .imageSelected)) {
+            try coordinator.requestConfirmation()
+        }
+    }
+
+    @Test func resetKeepingTheImageAfterAFailureAllowsANewRun() async throws {
+        let image = try image()
+        let (coordinator, _) = coordinator(opener: FakeDeviceOpener(error: .deviceBusy))
+
+        try await runToEnd(coordinator, image: image)
+        #expect(coordinator.state.phase == .failed)
+        try coordinator.reset(keepingImage: true)
+        try coordinator.selectDrive(disk, filter: filter)
+
+        #expect(coordinator.state == .driveSelected(image, disk))
+    }
+
+    @Test func resetKeepingTheImageWithNoImageGoesIdle() throws {
+        let (coordinator, _) = coordinator(opener: FakeDeviceOpener(device: try device()))
+
+        try coordinator.reset(keepingImage: true)
+
+        #expect(coordinator.state == .idle)
+    }
+
+    // MARK: - Drive list refresh
+
+    @Test func refreshKeepsAStillListedDriveAndTakesItsFreshEntry() throws {
+        let image = try image()
+        let (coordinator, log) = coordinator(opener: FakeDeviceOpener(device: try device()))
+        try coordinator.selectImage(image)
+        try coordinator.selectDrive(disk, filter: filter)
+        var remounted = disk
+        remounted.mountPoints = ["/Volumes/OTHER"]
+
+        coordinator.refreshSelectedDrive(from: [.usbStick("disk9"), disk], filter: filter)
+        #expect(log.states.count == 2)
+        coordinator.refreshSelectedDrive(from: [remounted], filter: filter)
+
+        #expect(coordinator.state == .driveSelected(image, remounted))
+        #expect(coordinator.selectedDrive == remounted)
+    }
+
+    @Test func refreshDeselectsADriveThatVanished() throws {
+        let image = try image()
+        let (coordinator, _) = coordinator(opener: FakeDeviceOpener(device: try device()))
+        try coordinator.selectImage(image)
+        try coordinator.selectDrive(disk, filter: filter)
+
+        coordinator.refreshSelectedDrive(from: [.usbStick("disk9")], filter: filter)
+
+        #expect(coordinator.state == .imageSelected(image))
+        #expect(coordinator.selectedDrive == nil)
+        #expect(throws: WriteCoordinatorError.notAllowed(.requestConfirmation, in: .imageSelected)) {
+            try coordinator.requestConfirmation()
+        }
+    }
+
+    @Test func refreshDeselectsADriveWhoseMediumChanged() throws {
+        let image = try image()
+        let (coordinator, _) = coordinator(opener: FakeDeviceOpener(device: try device()))
+        try coordinator.selectImage(image)
+        try coordinator.selectDrive(disk, filter: filter)
+        var swapped = disk
+        swapped.sizeBytes += 512
+
+        coordinator.refreshSelectedDrive(from: [swapped], filter: filter)
+
+        #expect(coordinator.state == .imageSelected(image))
+    }
+
+    @Test func refreshAdoptsTheNewListsFilterForTheSafetyCheck() async throws {
+        // Picked under "Show all external disks", then the list is rebuilt under the
+        // default setting while the drive is still in it: the safety check must use the
+        // default filter, which rejects this non-USB disk.
+        var thunderbolt = disk
+        thunderbolt.busProtocol = "PCI-Express"
+        let image = try image()
+        let opener = FakeDeviceOpener(device: try device())
+        let (coordinator, _) = coordinator(listed: [thunderbolt], opener: opener)
+        try coordinator.selectImage(image)
+        try coordinator.selectDrive(thunderbolt, filter: DiskFilter(showAllExternal: true))
+
+        coordinator.refreshSelectedDrive(from: [thunderbolt], filter: DiskFilter(showAllExternal: false))
+        try coordinator.requestConfirmation()
+        try await coordinator.confirmAndStart().value
+
+        #expect(coordinator.state == .failed(WriteFailure(
+            stage: .safetyCheck,
+            error: SafetyGuardError.forbiddenTarget(bsdName: "disk4", reason: .notUSB)
+        )))
+        #expect(opener.openAttempts.isEmpty)
+    }
+
+    @Test func refreshOutsideTheDriveStepChangesNothing() async throws {
+        let image = try image()
+        let (coordinator, log) = coordinator(opener: FakeDeviceOpener(device: try device()))
+        coordinator.refreshSelectedDrive(from: [], filter: filter)
+        try coordinator.selectImage(image)
+        coordinator.refreshSelectedDrive(from: [], filter: filter)
+        try coordinator.selectDrive(disk, filter: filter)
+        try coordinator.requestConfirmation()
+        let before = log.states.count
+
+        coordinator.refreshSelectedDrive(from: [], filter: filter)
+
+        #expect(coordinator.state == .awaitingConfirmation(image, disk))
+        #expect(log.states.count == before)
+    }
+
     // MARK: - Failure equality
 
     @Test func failuresCompareByStageAndError() {
