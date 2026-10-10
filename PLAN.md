@@ -107,7 +107,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T01 | 🧑 Spike: authopen fd passing | T00 | DONE | 2026-10-07 | Claude (prep) / Nick (run) |
 | T02 | DeviceOpener protocol, AuthopenOpener, fakes | T01 | DONE | 2026-10-07 | Claude |
 | T03 | Disk model and discovery with filtering | T00 | DONE | 2026-10-07 | Claude |
-| T04 | ImageInspector | T00 | TODO | | |
+| T04 | ImageInspector | T00 | DONE | 2026-10-09 | Claude |
 | T05 | WriteEngine | T02 | TODO | | |
 | T06 | Verifier | T05 | TODO | | |
 | T07 | Unmount and eject | T03 | TODO | | |
@@ -331,7 +331,24 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - Tests cover: valid hybrid ISO, ISO-only (warning), plain `.img` with MBR, `.img` with GPT, wrong extension, empty file, missing file, file shorter than 64 KiB.
 - Does not read the whole file.
 
-**Handoff notes:** _(empty)_
+**Handoff notes:**
+- **Done 2026-10-09.** `scripts/test.sh` passes 121 tests (23 new test functions in `ImageInspectorTests`). `scripts/build.sh` and `--release` succeed for `x86_64 arm64` with no compiler warnings.
+- **Files** (in `Sources/ImageWriterCore/`): `ImageInspector`, `ImageInfo`, `ImageKind`, `BootWarning`, `ImageSignatures` (internal, pure detection on a byte array), `ImageInspectorError`.
+- **API:** `ImageInspector()` is a `Sendable` struct; call `inspect(url:)` (synchronous, `throws`) off the main actor. `BootWarning.message` is the user-facing text for T10. `ImageInspectorError` conforms to `LocalizedError`.
+- **Order of checks:**
+  1. Not a `file:` URL gives `notAFileURL`.
+  2. The extension is checked **before any I/O**. A wrong extension gives `unsupportedExtension` even when the file is missing.
+  3. The file is opened with `O_RDONLY | O_NONBLOCK`, so a FIFO cannot hang the open. `ENOENT`/`ENOTDIR` give `notFound` and `EACCES`/`EPERM` give `permissionDenied`.
+  4. The file type is checked with `fstat` on that descriptor, so there is no check-then-open race. A directory gives `isDirectory`; a device node, FIFO or socket gives `notRegularFile`.
+  5. Size 0 gives `empty`.
+  6. Then at most 64 KiB is read with `pread`.
+- Symlinks are followed. `fileName` is the name the user picked (the link's name), not the target's.
+- **Detection:** short files are fine. A signature is present only if all its bytes fit in the file. The warning depends only on the signatures, not the extension: a renamed ISO-only `.img` also gets `.mayNotBootFromUSB`. A plain `.img` without `CD001` never does.
+- **Deviations:**
+  1. Added `notAFileURL`, `notRegularFile` and `posix` error cases beyond the plan's list.
+  2. GPT is checked only at offset 512, as the plan says, not at 4096 (4Kn images). `hasGPT` only affects the ISO warning, and a 4Kn ISO is not a realistic input.
+- **"Does not read the whole file"** is shown two ways. `readHeader` returns exactly 64 KiB from a 1 MiB file. A 1 TiB sparse file is inspected in well under the 5 s limit.
+- **For T05/T09:** `ImageInfo.sizeBytes` is the true image length (`st_size`). It is captured at inspect time, so T05 should still treat a short read before that length as an error (the file changed), not as EOF.
 
 ---
 
@@ -519,3 +536,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-07 | Agents may mark 🧑 tasks DONE once all agent and human steps are complete (section 0, AGENTS.md) | Claude |
 | 2026-10-07 | T02 DONE: DeviceOpener/OpenedDevice, AuthopenOpener, RawDevice, fakes | Claude |
 | 2026-10-07 | T03 DONE: DiskInfo, DiskutilDiscovery, BootDiskResolver, DiskFilter, TargetDiskLister, CommandRunner | Claude |
+| 2026-10-09 | T04 DONE: ImageInspector, ImageInfo, ImageKind, BootWarning, ImageSignatures | Claude |
