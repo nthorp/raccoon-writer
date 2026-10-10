@@ -112,7 +112,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T06 | Verifier | T05 | DONE | 2026-10-09 | Claude |
 | T07 | Unmount and eject | T03 | DONE | 2026-10-09 | Claude |
 | T08 | SafetyGuard and debug test mode | T03, T07 | DONE | 2026-10-09 | Claude |
-| T09 | WriteCoordinator (orchestration, state machine) | T04, T06, T07, T08 | TODO | | |
+| T09 | WriteCoordinator (orchestration, state machine) | T04, T06, T07, T08 | DONE | 2026-10-09 | Claude |
 | T10 | SwiftUI shell and screens | T09 | TODO | | |
 | T11 | Error states, cancel, disconnect handling, polish | T10 | TODO | | |
 | T12 | 🧑 Hardware test checklist and README | T11 | TODO | | |
@@ -514,7 +514,31 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 **Acceptance criteria**
 - Tests with all fakes: happy path state sequence; each stage failing yields `.failed` with the stage identified; cancel during write and during verify; handle closed in every path; start without confirmation is impossible.
 
-**Handoff notes:** _(empty)_
+**Handoff notes:**
+- **Done 2026-10-09.** `scripts/test.sh` passes 264 tests (31 new). `scripts/build.sh` and `--release` succeed for `x86_64 arm64` with no compiler warnings, and the release flag check passes. The coordinator tests were run 8 times with no flakes. Four mutations were caught: removing the `defer` close, removing the cancel check after the open, treating an error after a cancel request as a failure, and skipping the safety guard.
+- **Files** (in `Sources/ImageWriterCore/`): `WriteCoordinator`, `WriteState` (with `Phase` and `isRunning`), `PipelineStage`, `WriteFailure`, `WriteSummary`, `WriteCoordinatorError`. Tests: `WriteCoordinatorTests` (with `StateLog`, `EjectProbe`, `GatedOpener`, `CorruptingDevice`).
+- **Shape:** `@MainActor @Observable final class`, so T10 binds to it directly (Observation is not SwiftUI, so the core stays UI-free). The slow work runs off the main thread inside the services. Observable properties: `state`, `selectedImage`, `selectedDrive` (both kept through the run and its result, so progress and done screens can name them) and `isCancelling` (show "Cancelling…" and disable the button).
+- **Wiring:** `WriteCoordinator.live()` is the production setup (one `ProcessCommandRunner` shared by `SafetyGuard` and `DiskutilDiskManager`, plus `AuthopenOpener`). The designated init has **no defaults** for `safetyGuard`, `diskManager` or `opener`, so a test or Simulate setup can't reach diskutil or authopen by forgetting one. Engine, verifier, inspector and clock have defaults.
+- **API and transitions** (an illegal call throws `WriteCoordinatorError.notAllowed(action, in: phase)` and changes nothing):
+  - `selectImage(_:)` / `selectImage(at:) async throws` (inspects off main; throws `ImageInspectorError` and leaves the state alone): from idle, imageSelected or driveSelected. A drive already selected stays selected.
+  - `selectDrive(_:filter:)`: from imageSelected or driveSelected. **Pass the same `DiskFilter` the list was built with**; it is stored and handed to `SafetyGuard.validate`.
+  - `requestConfirmation()`: driveSelected → `awaitingConfirmation(image, disk)`.
+  - `confirmAndStart()`: only from `awaitingConfirmation`. Returns the run's `Task` (`@discardableResult`); tests await it, the UI can ignore it.
+  - `cancel()`: on the confirm screen it goes back to driveSelected. During preparing, writing or verifying it requests a stop; repeating it is a no-op. It throws while finishing (the drive is already verified) and in non-running states.
+  - `reset()`: from any non-running state → idle, clearing the image, drive and filter.
+- **Pipeline:** `preparing(.safetyCheck)` → `preparing(.unmount)` → `preparing(.open)` → `writing` → `verifying` → `finishing` → `finished`. `Task.checkCancellation()` runs after each preparing step. The **fresh** `DiskInfo` from `SafetyGuard` is what gets unmounted and opened. The device is closed explicitly before the eject, and a `defer` closes it on every other path. The eject uses `ejectAfterWrite`, and a failure only sets `WriteSummary.ejectWarning`.
+- **Progress:** `.writing`/`.verifying` start at 0 bytes, then follow the engines' throttled updates. These hop to the main actor in their own tasks, so `apply` drops one from an older run (`runID`), from a pass that has ended, or one that is older than the current value. As T05 noted, the 100 % write update arrives **before** `fullSync()`. T10 should show "Finishing…" while `state` is `.writing` with `fractionComplete == 1`.
+- **Cancel semantics:**
+  - `.cancelled(stage)` tells T11 whether the drive was touched (`PipelineStage.mayHaveModifiedDrive`, true for `.write` and `.verify`).
+  - Once a cancel was requested, **any** error that ends the run counts as `.cancelled` (logged under category `coordinator`). This covers authopen's `userCancelled` when the user clicked Cancel in the app and then dismissed the prompt.
+  - A cancel that lands after the verifier compared its last chunk loses, and the run finishes. Every byte matched, so calling the drive undefined would be wrong (T06 left this to T09).
+  - authopen ignores a cancel once its prompt is up. When the prompt returns an fd, the next check throws and the `defer` closes it (tested with `GatedOpener`).
+- **For T11:** `.failed(WriteFailure)` carries `stage` and the original typed `error` (`SafetyGuardError`, `DiskManagerError`, `DeviceOpenError`, `WriteEngineError`, `VerifierError`, `ImageSourceError`, `CommandRunnerError`). `message` is just `localizedDescription`. T11 owns mapping these to user text and drive-state sentences. **Prompt cancel without an in-app cancel is currently `.failed(stage: .open, error: DeviceOpenError.userCancelled)`.** T11 step 3 should turn it into a return to the confirm step. The "image larger than drive" pre-check (T11 step 6) is not in the coordinator yet; the engine still catches it at the write stage.
+- **Deviations:**
+  1. `awaitingConfirmation` carries `(ImageInfo, DiskInfo)`, `preparing` carries a `PipelineStage` (safety check, unmount or admin prompt), and `cancelled` carries the stage it stopped in. The plan listed these without payloads.
+  2. The plan's `Summary` is `WriteSummary`. It has image and drive names, BSD name, bytes, write/verify/total seconds, sync method and eject warning. "Average speed" is `averageWriteBytesPerSecond`: bytes over the write pass, flush included.
+  3. Illegal calls throw rather than being ignored. `WriteFailure` is `Equatable` by stage plus `String(reflecting: error)`, so `WriteState` is `Equatable`.
+  4. Added `selectImage(at:)`, `live()`, `isCancelling`, `selectedImage`/`selectedDrive`, `WriteState.phase`/`isRunning` and an internal `onTransition` test hook.
 
 ---
 
@@ -614,3 +638,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-09 | T06 DONE: Verifier, VerifierError, VerifyResult; FileBackedDevice short-read fault | Claude |
 | 2026-10-09 | T07 DONE: DiskManager, DiskutilDiskManager, DiskManagerError, EjectWarning, FakeDiskManager | Claude |
 | 2026-10-09 | T08 DONE: SafetyGuard, SafetyGuardError, DiskIdentityField, DebugTestMode, check-release-flags.sh | Claude |
+| 2026-10-09 | T09 DONE: WriteCoordinator, WriteState, PipelineStage, WriteFailure, WriteSummary, WriteCoordinatorError | Claude |
