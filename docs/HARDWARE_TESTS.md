@@ -59,7 +59,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | macOS version | 26.3.1 (25D2128) | |
 | Xcode version | 26.6 (17F113) | |
 | Commit tested | 2df5b29 (app code unchanged since T11, 57fc215) | |
-| USB stick 1 (make, model, size, USB 2/3) | | |
+| USB stick 1 (make, model, size, USB 2/3) | SanDisk Cruzer Glide, 31.4 GB, USB 2.0 link (480 Mb/s) through a GenesysLogic USB 2.1 hub | |
 | USB stick 2 / spare (make, model, size) | | |
 | Boot test machine | | |
 
@@ -317,3 +317,4 @@ Change `disk4` to the disk's number first. Paste each output below, and note whe
 
 **Result:**
 **Notes:**
+- **USB stick 1, `disk7` on 2026-10-09** (read by the agent): MediaName `Cruzer Glide`, BusProtocol `USB`, Internal `false`, Removable `true`, RemovableMedia `true`, Ejectable `true`, VirtualOrPhysical `Physical`, DeviceBlockSize `512`, TotalSize `31406948352`. This matches the hand-written USB fixture's rules (T03): shown in the default list.
