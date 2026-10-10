@@ -54,11 +54,11 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 
 | | Run A | Run B (optional) |
 | --- | --- | --- |
-| Date | | |
-| Mac model and chip | | |
-| macOS version | | |
-| Xcode version | | |
-| Commit tested | | |
+| Date | 2026-10-09 | |
+| Mac model and chip | MacBook Pro (Mac15,10), Apple M3 Max, 36 GB | |
+| macOS version | 26.3.1 (25D2128) | |
+| Xcode version | 26.6 (17F113) | |
+| Commit tested | 2df5b29 (app code unchanged since T11, 57fc215) | |
 | USB stick 1 (make, model, size, USB 2/3) | | |
 | USB stick 2 / spare (make, model, size) | | |
 | Boot test machine | | |
