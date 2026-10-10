@@ -74,12 +74,12 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H5 | Cancel the password prompt | Release | PASS | Back to confirm screen; volume and file intact after replug |
 | H6 | Hybrid Linux ISO, boots on test machine; flush method | Release | PASS | Fedora 44 Live booted on a 2017 Intel Mac; `fsync fallback`; 4.7 MB/s, 11 min 30 s |
 | H7 | `.img` write | Release | PASS | FreeBSD `.img` booted on a 2017 Intel Mac |
-| H8 | Cancel during write | Release | | |
-| H9 | Cancel during verify | Release | | |
+| H8 | Cancel during write | Release | PASS | |
+| H9 | Cancel during verify | Release | PASS | |
 | H10 | Quit and close during a write | Release | | |
 | H11 | Pull the stick out mid-write | Release | | |
 | H12 | Drive in use (unmount refused) | Release | | |
-| H13 | Intel Mac run | Release | | |
+| H13 | Intel Mac run | Release | Not possible | Intel Mac runs macOS 13.7.8; app needs 14+ |
 | H14 | What real disks report (read-only) | none | | |
 
 **Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09)
@@ -237,8 +237,8 @@ The main end-to-end test. Also records the flush method on a real stick.
 - **Start Again** returns to the setup screen with the image kept, and the drive must be picked again.
 - Writing again to the same stick then succeeds (it can be combined with H9).
 
-**Result:**
-**Notes:**
+**Result:** PASS
+**Notes:** 2026-10-09, Release build, Fedora 44 ISO, cancelled partway through the write. Nick reports every expected result. Writing to the same stick again afterwards worked (H9).
 
 ### H9 — Cancel during verify
 
@@ -249,8 +249,8 @@ The main end-to-end test. Also records the flush method on a real stick.
 - "Cancelled", "Stopped while: verifying." and "The image was written but could not be checked, so the drive may not boot…".
 - If the cancel lands just after the last chunk was compared, the run may finish as a success instead. That is correct: every byte matched. Note it if it happens.
 
-**Result:**
-**Notes:**
+**Result:** PASS
+**Notes:** 2026-10-09, Release build, FreeBSD `.img`, cancelled during the verify. Nick reports every expected result.
 
 ### H10 — Quit and close during a write
 
@@ -306,8 +306,8 @@ The main end-to-end test. Also records the flush method on a real stick.
 **Expected**
 - The app launches, and H3 and H6 give the same results as on Apple Silicon. Record the flush method there too.
 
-**Result:**
-**Notes:**
+**Result:** Not possible on Intel hardware
+**Notes:** The only Intel Mac available (2017) runs macOS Ventura 13.7.8, and ISO Sword requires macOS 14 or later (it uses the Observation framework), so the app can't run there. The 2017 Intel Mac was still used as the boot machine for H6 and H7.
 
 ### H14 — What real disks report (read-only)
 
