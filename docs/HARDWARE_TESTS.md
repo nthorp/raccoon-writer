@@ -69,7 +69,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | --- | --- | --- | --- | --- |
 | H1 | Simulate mode: layout and dark mode | Debug | PASS | |
 | H2 | RAM-disk dry run with password prompt | Debug | PASS | Prompt shown; `fsync fallback` as expected for a RAM disk |
-| H3 | Boot and internal disks never listed | Debug + Release | Part 1 PASS, part 2 pending | Debug: only `disk7` (stick) and `disk9` (RAM disk) listed |
+| H3 | Boot and internal disks never listed | Debug + Release | PASS so far (deselect check and step 5 pending) | Debug: only `disk7` and `disk9`; Release: only `disk7`; hot-plug works |
 | H4 | Image bigger than the stick | Release | | |
 | H5 | Cancel the password prompt | Release | | |
 | H6 | Hybrid Linux ISO, boots on test machine; flush method | Release | | |
@@ -150,9 +150,10 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 - The stick appears or disappears within about 2 seconds. When the selected stick is removed, it is deselected.
 - Note what an SD card in a built-in slot does. It may report itself as internal, in which case it is hidden by design.
 
-**Result:** Part 1 (Debug, step 4) PASS · Part 2 (Release, steps 2, 3 and 5) pending
+**Result:** Part 1 (Debug, step 4) PASS · Part 2 (Release, steps 2 and 3) PASS so far; removing the stick while it is selected, and step 5, not yet reported
 **Notes:**
 - **Part 1, 2026-10-09, Debug build with `ISOSWORD_ALLOW_VIRTUAL_DISKS=1`.** `diskutil list` showed: `disk0` internal SSD; `disk3` boot APFS container (synthesized, store `disk0s2`); `disk5` iOS 26.5 Simulator image, mounted through its APFS container `disk6`; `disk7` USB stick (SanDisk Cruzer Glide, 31.4 GB); `disk8` mounted `TestDMG` `.dmg`; `disk9` unmounted 33.6 MB RAM disk (the control). The app listed **only `disk7` and `disk9`**, as expected: the internal disk, the boot container, both mounted disk images and the simulator's container were hidden, and the RAM disk showing confirms the debug flag was active.
+- **Part 2, 2026-10-09, Release build, no debug flag.** Only the USB stick (`disk7`) was listed, with "Show all external disks" both off and on: no internal disk, boot container, simulator image or other disk image. Unplugging the stick removed it from the list, and plugging it back in brought it back.
 
 ### H4 — Image bigger than the stick
 
