@@ -70,7 +70,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H1 | Simulate mode: layout and dark mode | Debug | PASS | |
 | H2 | RAM-disk dry run with password prompt | Debug | PASS | Prompt shown; `fsync fallback` as expected for a RAM disk |
 | H3 | Boot and internal disks never listed | Debug + Release | PASS | Debug: only `disk7` and `disk9`; Release: only `disk7`; hot-plug and deselect work; built-in SD slot reports internal, so hidden |
-| H4 | Image bigger than the stick | Release | | |
+| H4 | Image bigger than the stick | Release | PASS | 40 GB image vs 31.4 GB stick |
 | H5 | Cancel the password prompt | Release | | |
 | H6 | Hybrid Linux ISO, boots on test machine; flush method | Release | | |
 | H7 | `.img` write | Release | | |
@@ -166,8 +166,8 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 - A message says the image is larger than the drive and how big a drive is needed.
 - Continue is disabled. Nothing was unmounted (the stick's volumes are still in Finder).
 
-**Result:**
-**Notes:**
+**Result:** PASS
+**Notes:** 2026-10-09, Release build. The first attempt used a 20 GB file, which fits on the 31.4 GB stick, so the app correctly allowed it. That was a test-setup mistake, not a bug. With a 40 GB sparse `too-big.img`, the stick's row showed "Too small for this image".
 
 ### H5 — Cancel the password prompt
 
