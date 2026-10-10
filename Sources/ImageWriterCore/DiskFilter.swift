@@ -9,8 +9,30 @@ import Foundation
 public struct DiskFilter: Sendable {
     public var showAllExternal: Bool
 
+#if DEBUG
+    /// Debug builds only: also accept disk images with nothing mounted, under either
+    /// setting. Every other rule still applies.
+    public var allowVirtualDisks: Bool
+
+    public init(showAllExternal: Bool = false, allowVirtualDisks: Bool = false) {
+        self.showAllExternal = showAllExternal
+        self.allowVirtualDisks = allowVirtualDisks
+    }
+#else
     public init(showAllExternal: Bool = false) {
         self.showAllExternal = showAllExternal
+    }
+#endif
+
+    /// The filter the app should use: in Debug builds it honors
+    /// `ISOSWORD_ALLOW_VIRTUAL_DISKS=1` (see `DebugTestMode`); in Release builds it is
+    /// the plain filter.
+    public static func configured(showAllExternal: Bool) -> DiskFilter {
+#if DEBUG
+        DiskFilter(showAllExternal: showAllExternal, allowVirtualDisks: DebugTestMode.allowsVirtualDisks())
+#else
+        DiskFilter(showAllExternal: showAllExternal)
+#endif
     }
 
     public func targets(from disks: [DiskInfo], bootDisks: BootDiskSet) -> [DiskInfo] {
@@ -25,13 +47,24 @@ public struct DiskFilter: Sendable {
         guard !bootDisks.contains(disk.bsdName) else { return .bootDisk }
         guard !disk.mountPoints.contains(where: Self.isSystemMountPoint) else { return .systemVolume }
         guard !disk.isAPFSContainer else { return .apfsContainer }
-        guard !disk.isVirtual else { return .virtualDisk }
+        guard !disk.isVirtual || acceptsVirtual(disk) else { return .virtualDisk }
         guard disk.sizeBytes > 0 else { return .noMedia }
-        if !showAllExternal {
+        // A disk image is never on the USB bus, so the default-mode rules would hide it.
+        if !showAllExternal && !disk.isVirtual {
             guard disk.busProtocol == "USB" else { return .notUSB }
             guard disk.isRemovable || disk.isEjectable else { return .notRemovable }
         }
         return nil
+    }
+
+    private func acceptsVirtual(_ disk: DiskInfo) -> Bool {
+#if DEBUG
+        // A mounted image is probably in use (an Xcode or simulator runtime image, say).
+        // Test disks are attached with -nomount.
+        allowVirtualDisks && disk.mountPoints.isEmpty
+#else
+        false
+#endif
     }
 
     // A second line of defense behind boot-disk resolution.

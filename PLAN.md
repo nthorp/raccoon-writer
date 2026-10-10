@@ -111,7 +111,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T05 | WriteEngine | T02 | DONE | 2026-10-09 | Claude |
 | T06 | Verifier | T05 | DONE | 2026-10-09 | Claude |
 | T07 | Unmount and eject | T03 | DONE | 2026-10-09 | Claude |
-| T08 | SafetyGuard and debug test mode | T03, T07 | TODO | | |
+| T08 | SafetyGuard and debug test mode | T03, T07 | DONE | 2026-10-09 | Claude |
 | T09 | WriteCoordinator (orchestration, state machine) | T04, T06, T07, T08 | TODO | | |
 | T10 | SwiftUI shell and screens | T09 | TODO | | |
 | T11 | Error states, cancel, disconnect handling, polish | T10 | TODO | | |
@@ -475,7 +475,27 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - Tests: unchanged disk passes; swapped disk (same BSD name, different size or UUID) is rejected; boot disk rejected; internal rejected; query error rejected.
 - The release check passes on a Release build and would fail if the flag leaked.
 
-**Handoff notes:** _(empty)_
+**Handoff notes:**
+- **Done 2026-10-09.** `scripts/test.sh` passes 233 tests (36 new). `scripts/build.sh` and `--release` succeed for `x86_64 arm64` with no compiler warnings, and `--release` now ends with "Release flag check passed". Run against the **Debug** app, the check finds all three markers in `IsoSword.debug.dylib` and exits 1. The Release binary still contains `DiskFilter`, `SafetyGuard` and `showAllExternal`, so the markers are gone because of `#if DEBUG`, not because unused code was stripped. Two mutations were caught: skipping the identity comparison, and accepting mounted disk images in debug mode.
+- **Files** (in `Sources/ImageWriterCore/`): `SafetyGuard`, `SafetyGuardError`, `DiskIdentityField` (plus `DiskInfo.identityDifference(from:)`), `DebugTestMode` (the whole file is `#if DEBUG`). Changed: `DiskFilter` (debug-only `allowVirtualDisks`, `configured(showAllExternal:)`), `DiskRejection` (`explanation` text), `TargetDiskLister` (`targets(filter:)`). Script: `scripts/check-release-flags.sh`. Tests: `SafetyGuardTests`, `DebugTestModeTests` (`#if DEBUG`), `ReleaseFlagCheckTests`.
+- **API for T09/T10:**
+  - Build one filter with `DiskFilter.configured(showAllExternal:)` and use it for both `TargetDiskLister.targets(filter:)` and `SafetyGuard(runner:).validate(confirmed:filter:)`. `validate` takes the filter because the plan requires the disk to still be in the list "under the setting the user used". `targets(showAllExternal:)` still works and uses `configured` internally.
+  - `validate` returns the freshly queried `DiskInfo` (`@discardableResult`). Its mount points may differ from the confirmed snapshot, so T09 can pass the fresh one on.
+  - Order: invalid name (nothing run) → re-resolve boot disks → `listDisks` → exactly one entry with that name → identity → filter. It is the same diskutil query as the drive list (one `list` plus one `info` per disk), usually well under a second.
+- **Errors** (`SafetyGuardError`, all mean nothing was unmounted or written):
+  - `diskMissing(bsdName:)`: not listed any more (removed, or its `info` failed and discovery left it out).
+  - `diskChanged(bsdName:field:)`: the first `DiskIdentityField` that differs. The fields are size, media name, block size, bus protocol and `DiskUUID`. Optionals are compared strictly, so a UUID that appears or vanishes counts as a change. Mount points and volume names are not identity.
+  - `forbiddenTarget(bsdName:reason: DiskRejection)`: the fresh disk fails the filter, including `.bootDisk` from the fresh resolution and `.notUSB` when the setting no longer allows it. `DiskRejection.explanation` is a user-facing sentence, which T11 can reuse.
+  - `queryFailed(reason:)`: any boot-resolution or discovery error, `CommandRunnerError` included, and a disk listed twice. `CancellationError` passes through unwrapped.
+  - Refusals are logged under category `safety`.
+- **Debug test mode:** run a Debug build with `ISOSWORD_ALLOW_VIRTUAL_DISKS=1` (exactly `1`), e.g. `ISOSWORD_ALLOW_VIRTUAL_DISKS=1 build/IsoSword.app/Contents/MacOS/IsoSword`. Under both settings the filter then also accepts **unmounted** disk images, such as `hdiutil attach -nomount ram://65536`. Every other rule still applies (internal, boot, APFS container, size 0). Virtual disks skip only the default-mode USB/removable rules, since an image is never on the USB bus. In Release, `DebugTestMode` and `DiskFilter.allowVirtualDisks` don't exist, and `configured` returns the plain filter.
+- **`check-release-flags.sh <App.app>`** greps every file in the bundle for `ISOSWORD_ALLOW_VIRTUAL_DISKS`, `DebugTestMode` and `allowVirtualDisks`. It exits 1 on a leak and 2 (fails closed) if the bundle is missing, has no executable, or can't be searched. `build.sh --release` already called it when it existed, so `build.sh` was not changed. `ReleaseFlagCheckTests` runs it on fake bundles (clean, each marker, a marker in a non-executable file, missing or empty) and checks that the script lists `DebugTestMode.environmentKey`.
+- **Deviations:**
+  1. Added `diskMissing` and `queryFailed` beyond the plan's `diskChanged`/`forbiddenTarget`, so T11 can word a removal and a query failure differently.
+  2. `validate(confirmed:filter:)` takes the filter (see above).
+  3. Debug mode accepts only **unmounted** disk images. A mounted image is probably in use: on this machine, the iOS Simulator runtime is a mounted `Virtual` disk (seen in T01). The fixture `disk8` (mounted) stays hidden even with the switch on.
+  4. Identity also compares block size and bus protocol, which are cheap and stable. Per T03, `DiskUUID` is usually absent on whole disks, so in practice the check rests on size, name, block size and bus.
+  5. Added `DiskRejection.explanation` and `TargetDiskLister.targets(filter:)`.
 
 ---
 
@@ -593,3 +613,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-09 | T05 DONE: WriteEngine, TransferProgress, SpeedEstimator, ProgressMeter, ImageSource | Claude |
 | 2026-10-09 | T06 DONE: Verifier, VerifierError, VerifyResult; FileBackedDevice short-read fault | Claude |
 | 2026-10-09 | T07 DONE: DiskManager, DiskutilDiskManager, DiskManagerError, EjectWarning, FakeDiskManager | Claude |
+| 2026-10-09 | T08 DONE: SafetyGuard, SafetyGuardError, DiskIdentityField, DebugTestMode, check-release-flags.sh | Claude |

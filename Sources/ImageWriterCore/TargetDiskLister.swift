@@ -17,9 +17,15 @@ public struct TargetDiskLister: Sendable {
         self.init(discovery: DiskutilDiscovery(runner: runner), bootResolver: BootDiskResolver(runner: runner))
     }
 
+    /// Uses `DiskFilter.configured`, so Debug builds honor the virtual-disk test mode.
     public func targets(showAllExternal: Bool) async throws -> [DiskInfo] {
+        try await targets(filter: .configured(showAllExternal: showAllExternal))
+    }
+
+    /// Pass the same `filter` to `SafetyGuard.validate` for the disk the user picks.
+    public func targets(filter: DiskFilter) async throws -> [DiskInfo] {
         let bootDisks = try await bootResolver.resolveBootDisks()
         let disks = try await discovery.listDisks()
-        return DiskFilter(showAllExternal: showAllExternal).targets(from: disks, bootDisks: bootDisks)
+        return filter.targets(from: disks, bootDisks: bootDisks)
     }
 }

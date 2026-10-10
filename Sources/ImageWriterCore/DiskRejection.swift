@@ -18,3 +18,21 @@ public enum DiskRejection: Equatable, Sendable {
     /// Default mode only.
     case notRemovable
 }
+
+extension DiskRejection {
+    /// One sentence for the user, ending with a period.
+    public var explanation: String {
+        switch self {
+        case .invalidName: return "its name is not a whole-disk name."
+        case .notWholeDisk: return "it is a partition, not a whole disk."
+        case .internalDisk: return "it is an internal disk."
+        case .bootDisk: return "macOS is running from it."
+        case .systemVolume: return "a macOS system volume is mounted from it."
+        case .apfsContainer: return "it is an APFS container, not a physical disk."
+        case .virtualDisk: return "it is a disk image."
+        case .noMedia: return "it has no media inserted."
+        case .notUSB: return "it is not a USB drive. Turn on \"Show all external disks\" to use it."
+        case .notRemovable: return "it is not a removable drive. Turn on \"Show all external disks\" to use it."
+        }
+    }
+}
