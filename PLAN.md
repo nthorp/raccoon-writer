@@ -114,7 +114,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T08 | SafetyGuard and debug test mode | T03, T07 | DONE | 2026-10-09 | Claude |
 | T09 | WriteCoordinator (orchestration, state machine) | T04, T06, T07, T08 | DONE | 2026-10-09 | Claude |
 | T10 | SwiftUI shell and screens | T09 | DONE | 2026-10-09 | Claude |
-| T11 | Error states, cancel, disconnect handling, polish | T10 | TODO | | |
+| T11 | Error states, cancel, disconnect handling, polish | T10 | DONE | 2026-10-09 | Claude |
 | T12 | 🧑 Hardware test checklist and README | T11 | TODO | | |
 
 Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
@@ -616,7 +616,30 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - Unit tests for the error-to-message mapping and the "image too large" pre-check.
 - Fault-injection tests through the coordinator: removal mid-write, sync failure, verification mismatch, prompt cancelled.
 
-**Handoff notes:** _(empty)_
+**Handoff notes:**
+- **Done 2026-10-09.** `scripts/test.sh` passes 338 tests (37 new). `scripts/build.sh` and `--release` succeed for `x86_64 arm64` with no compiler warnings, and the release flag check passes. The suite was run 5 times with no flakes. Five mutations were caught: not ending the sleep activity, not returning to the confirm screen on a cancelled prompt, skipping the too-small check, and a `stopAndWait` that doesn't cancel or doesn't wait.
+- **Core files** (`Sources/ImageWriterCore/`):
+  - `FailureExplanation(_ failure:)`: `title`, `message`, `drive: DriveCondition` and optional `details` (the raw `localizedDescription`, only where it adds errno, diskutil output or authopen status). Every case of `SafetyGuardError`, `DiskManagerError`, `DeviceOpenError`, `WriteEngineError`, `VerifierError`, `ImageSourceError`, `DeviceIOError` and `CommandRunnerError` has its own wording; anything else falls back to the stage. A stage before the write always reports `.untouched`. A test checks that no title or message contains jargon (errno, exit status, authopen, posix).
+  - `DriveCondition`: `.untouched`, `.partiallyWritten`, `.unverified` (written, read-back didn't finish), `.doesNotMatch` (mismatch, or the drive ended early), each with a `note`. `init(stoppedIn:)` is used by the cancelled screen and the quit alert. **Replaces `PipelineStage.driveStateNote`**, which is gone. A cancel during verify now says "unverified", not "partially written": the write and flush had finished.
+  - Removal: `ENXIO`/`ENODEV` reads "The drive was disconnected"; `EIO` reads "The drive stopped responding" (removed or faulty). Both say the write was not retried. The coordinator never retried; a fault test now also checks that there is exactly one open, no flush, no verify, no eject, and that "Try Again" requires picking the drive again.
+  - `DriveTooSmall` (from `ImageInfo.sizeBytes` vs `DiskInfo.sizeBytes`): `WriteCoordinator.driveTooSmall` is set on the drive step, and `requestConfirmation()` throws `WriteCoordinatorError.driveTooSmall(_)` (new case). The engine's own check stays as a backstop.
+  - Prompt cancelled: `DeviceOpenError.userCancelled` at the open stage **without** an in-app cancel now returns to `.awaitingConfirmation`, with `WriteCoordinator.notice = .passwordPromptCancelled` (`WriteNotice`, cleared by the next state change). The drive is shown with no mount points, because the unmount before the prompt succeeded. With an in-app cancel first it is still `.cancelled(.open)`. The volumes are **not** remounted (see below).
+  - `SleepPreventer` protocol, `ProcessInfoSleepPreventer` (`beginActivity([.userInitiated, .idleSystemSleepDisabled])`, display sleep still allowed) and `Fakes/FakeSleepPreventer`. The coordinator takes it as an init parameter (default: the real one) and holds one activity per run, from the safety check until the run ends, on every path. Visible as `PreventUserIdleSystemSleep named: "Writing <image> to diskN"` in `pmset -g assertions`.
+  - `WriteCoordinator.stopAndWait()`: cancels a run that can still be cancelled, then waits for it to end; a run that is finishing (eject) is left to complete. `WriteState.cancellableStage` gives the stage a cancel would stop in (nil while finishing).
+- **App files** (`App/`): `FailedView` shows the explanation (title, message, drive note, stage, selectable details). `ConfirmView` shows the notice. `SetupView` shows the too-small message and disables Continue; `DriveSection` marks rows "Too small for this image". New `AppDelegate` (via `@NSApplicationDelegateAdaptor`) and `WindowCloseGuard`. `AppServices.shared` is now the single instance used by the window and the delegate.
+- **Quit and close:**
+  - Close: while `state.isRunning`, `WindowCloseGuard` removes `.closable` from the window's style mask, so the close button is greyed out and ⌘W does nothing. It comes back when the run ends.
+  - Quit (⌘Q, menu, logout): during preparing/writing/verifying an alert asks "Keep Writing" (default) or "Stop and Quit" (destructive), with the drive note for that stage. Stop and Quit cancels, replies `.terminateLater`, and quits once `stopAndWait()` returns, so the device is closed by the coordinator. During finishing it waits for the eject without asking. If the authopen dialog is up, the quit waits until the user answers it (authopen can't be interrupted); the alert says so.
+  - New: closing the window when no run is in progress now quits the app (`applicationShouldTerminateAfterLastWindowClosed`). Before, the app kept running with no window.
+- **Walkthrough by the agent** on the Simulate build, through System Events (accessibility text, not visually): the too-small message and disabled Continue (disk94), the prompt cancel back to the confirm screen with the notice and "Mounted volumes: none" (disk93), the close button disabled during the run and enabled after, ⌘W ignored mid-write, ⌘Q alert → Keep Writing (the run continued into verify) → ⌘Q → Stop and Quit (the app exited, no temp device files left), the removal failure screen (disk91), the sleep assertion present only during the run, and ⌘W quitting the idle app. **Simulate outcomes changed:** disk93 now returns to the confirm screen, and disk94 can't be confirmed, so the engine's "image too large" failure is no longer reachable from the UI.
+- **For T12 / Nick:**
+  - Check the quit alert and the greyed-out close button with a real write, and that the Mac doesn't idle-sleep during a long one.
+  - The window opened on another Space when launched from a terminal while a full-screen app was in front. This is normal macOS behavior, not a T11 change.
+- **Deviations:**
+  1. Quit is confirmed with an alert (the plan allowed either); window close is disabled.
+  2. Added `applicationShouldTerminateAfterLastWindowClosed` (single-window app).
+  3. After a cancelled prompt the drive's volumes stay unmounted and the notice says so. Remounting would need a new `DiskManager.mount` call; left out as not needed for safety.
+  4. Step 7 (app icon, About box) skipped, as the plan allows.
 
 ---
 
@@ -673,3 +696,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-09 | T08 DONE: SafetyGuard, SafetyGuardError, DiskIdentityField, DebugTestMode, check-release-flags.sh | Claude |
 | 2026-10-09 | T09 DONE: WriteCoordinator, WriteState, PipelineStage, WriteFailure, WriteSummary, WriteCoordinatorError | Claude |
 | 2026-10-09 | T10 DONE: SwiftUI screens, DriveListModel, ProgressDisplay, DisplayFormat, debug Simulate mode | Claude |
+| 2026-10-09 | T11 DONE: FailureExplanation, DriveCondition, DriveTooSmall, prompt cancel to confirm, sleep prevention, quit and close guards | Claude |

@@ -16,7 +16,7 @@ struct CancelledView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Stopped while: \(stage.label.lowercased()).")
                     .foregroundStyle(.secondary)
-                Label(stage.driveStateNote, systemImage: "externaldrive")
+                Label(DriveCondition(stoppedIn: stage).note, systemImage: "externaldrive")
             }
         }
     }

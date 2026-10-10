@@ -48,4 +48,15 @@ public enum WriteState: Equatable, Sendable {
         default: return false
         }
     }
+
+    /// The stage a cancel would stop the run in, so the UI can say what stopping now
+    /// leaves on the drive. Nil when no run can be stopped (finishing included).
+    public var cancellableStage: PipelineStage? {
+        switch self {
+        case .preparing(let stage): return stage
+        case .writing: return .write
+        case .verifying: return .verify
+        default: return nil
+        }
+    }
 }

@@ -20,6 +20,9 @@ public final class WriteCoordinator {
     public private(set) var selectedDrive: DiskInfo?
     /// True once the user asked to cancel a run, until it has stopped.
     public private(set) var isCancelling = false
+    /// Set when a run returned to the confirm screen instead of failing; cleared by the
+    /// next state change.
+    public private(set) var notice: WriteNotice?
 
     @ObservationIgnored private let safetyGuard: SafetyGuard
     @ObservationIgnored private let diskManager: any DiskManager
@@ -28,6 +31,7 @@ public final class WriteCoordinator {
     @ObservationIgnored private let verifier: Verifier
     @ObservationIgnored private let inspector: ImageInspector
     @ObservationIgnored private let clock: MonotonicClock
+    @ObservationIgnored private let sleepPreventer: any SleepPreventer
 
     /// The filter the selected drive was listed under; the safety check must use the same one.
     @ObservationIgnored private var selectedFilter: DiskFilter?
@@ -47,7 +51,8 @@ public final class WriteCoordinator {
         writeEngine: WriteEngine = WriteEngine(),
         verifier: Verifier = Verifier(),
         inspector: ImageInspector = ImageInspector(),
-        clock: MonotonicClock = .system
+        clock: MonotonicClock = .system,
+        sleepPreventer: any SleepPreventer = ProcessInfoSleepPreventer()
     ) {
         self.safetyGuard = safetyGuard
         self.diskManager = diskManager
@@ -56,6 +61,7 @@ public final class WriteCoordinator {
         self.verifier = verifier
         self.inspector = inspector
         self.clock = clock
+        self.sleepPreventer = sleepPreventer
     }
 
     /// diskutil for the safety check and unmount/eject, authopen for the open.
@@ -123,9 +129,21 @@ public final class WriteCoordinator {
         }
     }
 
+    /// Set on the drive step when the selected image is larger than the selected drive,
+    /// which then can't be confirmed.
+    public var driveTooSmall: DriveTooSmall? {
+        guard case .driveSelected(let image, let disk) = state else { return nil }
+        return DriveTooSmall(image: image, drive: disk)
+    }
+
     /// Moves to the confirm screen. Only `confirmAndStart` can leave it towards a write.
+    /// Throws `driveTooSmall` for an image that can't fit, so the user hears about it
+    /// before being asked to erase anything.
     public func requestConfirmation() throws {
         guard case .driveSelected(let image, let disk) = state else { throw notAllowed(.requestConfirmation) }
+        if let problem = DriveTooSmall(image: image, drive: disk) {
+            throw WriteCoordinatorError.driveTooSmall(problem)
+        }
         transition(to: .awaitingConfirmation(image, disk))
     }
 
@@ -157,12 +175,28 @@ public final class WriteCoordinator {
         case .awaitingConfirmation(let image, let disk):
             transition(to: .driveSelected(image, disk))
         case .preparing, .writing, .verifying:
-            guard !isCancelling else { return }
-            isCancelling = true
-            runTask?.cancel()
+            requestStop()
         default:
             throw notAllowed(.cancel)
         }
+    }
+
+    /// For quitting: cancels a run if one can still be stopped, then returns once it has
+    /// ended, so the device is closed and the state final. A run that is already
+    /// finishing (verified, ejecting) is left to complete. Returns at once if idle.
+    /// While the admin prompt is up this waits for the user to answer it, since authopen
+    /// can't be interrupted.
+    public func stopAndWait() async {
+        if state.cancellableStage != nil {
+            requestStop()
+        }
+        await runTask?.value
+    }
+
+    private func requestStop() {
+        guard !isCancelling else { return }
+        isCancelling = true
+        runTask?.cancel()
     }
 
     /// Back to the start, forgetting the drive. With `keepingImage` the selected image
@@ -191,6 +225,8 @@ public final class WriteCoordinator {
         var device: (any OpenedDevice)?
         // Every exit path, cancel and error included, releases the descriptor.
         defer { device?.close() }
+        let activity = sleepPreventer.preventSleep(reason: "Writing \(image.fileName) to \(disk.bsdName)")
+        defer { activity.end() }
 
         do {
             // The fresh disk, not the confirmed snapshot, is what gets unmounted and opened.
@@ -242,6 +278,15 @@ public final class WriteCoordinator {
                 syncMethod: written.syncMethod,
                 ejectWarning: warning
             )))
+        } catch DeviceOpenError.userCancelled where stage == .open && !isCancelling {
+            // Dismissing the password dialog is a change of mind, not a failure: back to
+            // the confirm screen. The unmount before it succeeded, so no volumes are mounted.
+            Self.log.notice("Admin prompt cancelled; back to the confirm screen")
+            var unmounted = disk
+            unmounted.mountPoints = []
+            selectedDrive = unmounted
+            transition(to: .awaitingConfirmation(image, unmounted))
+            notice = .passwordPromptCancelled
         } catch {
             // Once the user has asked to stop, whatever unwinds the run (usually a
             // CancellationError, sometimes authopen's "canceled by the user") is a cancel.
@@ -288,6 +333,7 @@ public final class WriteCoordinator {
     }
 
     private func transition(to newState: WriteState) {
+        notice = nil
         state = newState
         onTransition?(newState)
     }

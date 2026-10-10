@@ -85,19 +85,13 @@ final class SimulationModeTests {
         #expect(failure.error as? VerifierError == .verificationFailed(atOffset: 8 * 1024 * 1024))
     }
 
-    @Test func cancelledPromptFailsAtOpen() async throws {
-        let failure = try #require(failure(try await run(on: .promptCancelled)))
-        #expect(failure.stage == .open)
-        #expect(failure.error as? DeviceOpenError == .userCancelled)
+    @Test func cancelledPromptReturnsToTheConfirmScreen() async throws {
+        let state = try await run(on: .promptCancelled)
+        #expect(state.phase == .awaitingConfirmation)
     }
 
-    @Test func smallDriveRejectsTheImage() async throws {
-        let failure = try #require(failure(try await run(on: .tooSmall)))
-        #expect(failure.stage == .write)
-        guard case WriteEngineError.imageTooLarge = failure.error else {
-            Issue.record("Unexpected error \(failure.error)")
-            return
-        }
+    @Test func smallDriveCannotBeConfirmed() async throws {
+        await #expect(throws: WriteCoordinatorError.self) { try await self.run(on: .tooSmall) }
     }
 
     @Test func leavesNoDeviceFilesBehind() async throws {

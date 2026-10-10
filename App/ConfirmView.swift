@@ -5,6 +5,8 @@ import ImageWriterCore
 struct ConfirmView: View {
     let image: ImageInfo
     let disk: DiskInfo
+    /// Why the run came back here, e.g. the password dialog was cancelled.
+    let notice: WriteNotice?
     let onCancel: () -> Void
     let onConfirm: () -> Void
 
@@ -13,6 +15,12 @@ struct ConfirmView: View {
             Label("Erase this drive?", systemImage: "exclamationmark.triangle.fill")
                 .font(.title2.bold())
                 .foregroundStyle(.red)
+
+            if let notice {
+                Label(notice.message, systemImage: "info.circle")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             // Built from pieces rather than Markdown, so a drive name is never parsed.
             (Text("You are about to erase ")
@@ -58,7 +66,13 @@ struct ConfirmView: View {
 
 #if DEBUG
 #Preview("Awaiting confirmation") {
-    ConfirmView(image: PreviewSamples.image, disk: PreviewSamples.stick, onCancel: {}, onConfirm: {})
+    ConfirmView(image: PreviewSamples.image, disk: PreviewSamples.stick, notice: nil, onCancel: {}, onConfirm: {})
+        .padding(24)
+        .frame(width: 580, height: 500)
+}
+
+#Preview("Back after the password dialog was cancelled") {
+    ConfirmView(image: PreviewSamples.image, disk: PreviewSamples.unmountedStick, notice: .passwordPromptCancelled, onCancel: {}, onConfirm: {})
         .padding(24)
         .frame(width: 580, height: 500)
 }

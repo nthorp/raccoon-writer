@@ -27,6 +27,7 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(minWidth: 540, idealWidth: 580, maxWidth: 760, minHeight: 460, idealHeight: 500, maxHeight: 900)
+        .background(WindowCloseGuard(isBlocked: coordinator.state.isRunning))
         .fileImporter(isPresented: $isPickingImage, allowedContentTypes: ImageFileTypes.allowed) { result in
             switch result {
             case .success(let url):
@@ -53,6 +54,7 @@ struct ContentView: View {
                 image: coordinator.selectedImage,
                 imageError: imageError,
                 selectedDrive: coordinator.state.phase == .driveSelected ? coordinator.selectedDrive : nil,
+                driveTooSmall: coordinator.driveTooSmall,
                 drives: driveList.drives,
                 hasLoadedDrives: driveList.hasLoaded,
                 driveListError: driveList.errorMessage,
@@ -72,6 +74,7 @@ struct ContentView: View {
             ConfirmView(
                 image: image,
                 disk: disk,
+                notice: coordinator.notice,
                 onCancel: { perform { try coordinator.cancel() } },
                 onConfirm: { perform { try coordinator.confirmAndStart() } }
             )

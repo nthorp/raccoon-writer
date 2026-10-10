@@ -5,6 +5,8 @@ import ImageWriterCore
 @MainActor
 struct AppServices {
     static let windowTitle = AppInfo.displayName
+    /// One instance for the window and the app delegate's quit guard.
+    static let shared = make()
 
     let coordinator: WriteCoordinator
     let driveList: DriveListModel

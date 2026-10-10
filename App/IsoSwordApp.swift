@@ -2,7 +2,8 @@ import SwiftUI
 
 @main
 struct IsoSwordApp: App {
-    @State private var services = AppServices.make()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    private let services = AppServices.shared
 
     var body: some Scene {
         // A single window: two windows driving one coordinator would only confuse.

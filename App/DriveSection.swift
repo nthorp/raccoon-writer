@@ -5,6 +5,8 @@ import ImageWriterCore
 /// error states. Disabled until an image is chosen.
 struct DriveSection: View {
     let drives: [DiskInfo]
+    /// The chosen image, so drives too small for it can be marked.
+    let image: ImageInfo?
     let selected: DiskInfo?
     let isEnabled: Bool
     let hasLoaded: Bool
@@ -55,7 +57,7 @@ struct DriveSection: View {
             )
         } else {
             List(drives, selection: selection) { disk in
-                DriveRow(disk: disk)
+                DriveRow(disk: disk, isTooSmall: image.flatMap { DriveTooSmall(image: $0, drive: disk) } != nil)
             }
             .listStyle(.bordered(alternatesRowBackgrounds: false))
         }
@@ -84,6 +86,7 @@ struct DriveSection: View {
 
 private struct DriveRow: View {
     let disk: DiskInfo
+    let isTooSmall: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -96,6 +99,11 @@ private struct DriveRow: View {
                 Text(details)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if isTooSmall {
+                    Text("Too small for this image")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
             }
         }
         .padding(.vertical, 2)
@@ -111,7 +119,7 @@ private struct DriveRow: View {
 #if DEBUG
 #Preview("Loading") {
     DriveSection(
-        drives: [], selected: nil, isEnabled: true, hasLoaded: false, errorMessage: nil,
+        drives: [], image: nil, selected: nil, isEnabled: true, hasLoaded: false, errorMessage: nil,
         showAllExternal: .constant(false), onSelect: { _ in }, onRefresh: {}
     )
     .padding()
@@ -120,7 +128,7 @@ private struct DriveRow: View {
 
 #Preview("Error") {
     DriveSection(
-        drives: [], selected: nil, isEnabled: true, hasLoaded: true,
+        drives: [], image: nil, selected: nil, isEnabled: true, hasLoaded: true,
         errorMessage: "The boot disk could not be identified.",
         showAllExternal: .constant(false), onSelect: { _ in }, onRefresh: {}
     )

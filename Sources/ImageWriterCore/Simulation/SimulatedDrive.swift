@@ -10,7 +10,7 @@ public enum SimulatedDrive: String, CaseIterable, Sendable {
     case removedMidWrite
     case verifyMismatch
     case promptCancelled
-    /// Smaller than most images, for the "image too large" failure.
+    /// Smaller than most images, for the "drive too small" check before the confirm screen.
     case tooSmall
     /// Not USB, so it appears only with "Show all external disks".
     case thunderbolt

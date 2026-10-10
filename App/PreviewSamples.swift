@@ -24,10 +24,22 @@ enum PreviewSamples {
         isVirtual: false, isWholeDisk: true, mountPoints: ["/Volumes/STICK"], volumeNames: ["STICK"]
     )
 
+    static var unmountedStick: DiskInfo {
+        var disk = stick
+        disk.mountPoints = []
+        return disk
+    }
+
     static let ssd = DiskInfo(
         bsdName: "disk5", mediaName: "Samsung T7", sizeBytes: 500_107_862_016, blockSize: 512,
         busProtocol: "PCI-Express", isInternal: false, isRemovable: false, isEjectable: true,
         isVirtual: false, isWholeDisk: true, mountPoints: ["/Volumes/Backup"], volumeNames: ["Backup"]
+    )
+
+    static let tinyStick = DiskInfo(
+        bsdName: "disk6", mediaName: "Kingston DataTraveler", sizeBytes: 2_000_683_008, blockSize: 512,
+        busProtocol: "USB", isInternal: false, isRemovable: true, isEjectable: true,
+        isVirtual: false, isWholeDisk: true, mountPoints: ["/Volumes/OLD"], volumeNames: ["OLD"]
     )
 
     static let drives = [stick, ssd]
@@ -51,6 +63,11 @@ enum PreviewSamples {
     static let writeFailure = WriteFailure(
         stage: .write,
         error: WriteEngineError.write(.posix(operation: "write at offset 104857600", code: ENXIO))
+    )
+
+    static let verifyFailure = WriteFailure(
+        stage: .verify,
+        error: VerifierError.verificationFailed(atOffset: 8_388_608)
     )
 
     static let safetyFailure = WriteFailure(

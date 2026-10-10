@@ -71,11 +71,9 @@ struct ProgressDisplayTests {
         #expect(display.cancelTitle == "Cancelling…")
     }
 
-    @Test func driveStateNoteFollowsWhetherTheDriveWasTouched() {
+    @Test func cancelledDriveConditionFollowsWhetherTheDriveWasTouched() {
         for stage in PipelineStage.allCases {
-            let note = stage.driveStateNote
-            #expect(note.contains("partially written") == stage.mayHaveModifiedDrive)
-            #expect(note.contains("Nothing was written") == !stage.mayHaveModifiedDrive)
+            #expect((DriveCondition(stoppedIn: stage) == .untouched) == !stage.mayHaveModifiedDrive)
         }
     }
 }

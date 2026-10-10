@@ -1,31 +1,51 @@
 import SwiftUI
 import ImageWriterCore
 
+/// The wording comes from `FailureExplanation`, so every error's text is unit-tested.
 struct FailedView: View {
-    let failure: WriteFailure
+    let explanation: FailureExplanation
+    let stage: PipelineStage
     let onTryAgain: () -> Void
+
+    init(failure: WriteFailure, onTryAgain: @escaping () -> Void) {
+        explanation = FailureExplanation(failure)
+        stage = failure.stage
+        self.onTryAgain = onTryAgain
+    }
 
     var body: some View {
         OutcomeView(
             systemImage: "xmark.octagon.fill",
             tint: .red,
-            title: "The write failed",
+            title: explanation.title,
             buttonTitle: "Try Again",
             action: onTryAgain
         ) {
             VStack(alignment: .leading, spacing: 12) {
-                Text(failure.message)
-                Text("Failed while: \(failure.stage.label.lowercased()).")
+                Text(explanation.message)
+                Label(explanation.drive.note, systemImage: "externaldrive")
+                Text("Stopped while: \(stage.label.lowercased()).")
                     .foregroundStyle(.secondary)
-                Label(failure.stage.driveStateNote, systemImage: "externaldrive")
+                if let details = explanation.details {
+                    Text("Details: \(details)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
             }
         }
     }
 }
 
 #if DEBUG
-#Preview("Failed during write") {
+#Preview("Failed: drive removed") {
     FailedView(failure: PreviewSamples.writeFailure, onTryAgain: {})
+        .padding(24)
+        .frame(width: 580, height: 500)
+}
+
+#Preview("Failed: verification") {
+    FailedView(failure: PreviewSamples.verifyFailure, onTryAgain: {})
         .padding(24)
         .frame(width: 580, height: 500)
 }
