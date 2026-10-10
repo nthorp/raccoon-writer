@@ -67,8 +67,8 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 
 | ID | Test | Build | Result | Notes / issue |
 | --- | --- | --- | --- | --- |
-| H1 | Simulate mode: layout and dark mode | Debug | | |
-| H2 | RAM-disk dry run with password prompt | Debug | | |
+| H1 | Simulate mode: layout and dark mode | Debug | PASS | |
+| H2 | RAM-disk dry run with password prompt | Debug | PASS | Prompt shown; `fsync fallback` as expected for a RAM disk |
 | H3 | Boot and internal disks never listed | Debug + Release | Part 1 PASS, part 2 pending | Debug: only `disk7` (stick) and `disk9` (RAM disk) listed |
 | H4 | Image bigger than the stick | Release | | |
 | H5 | Cancel the password prompt | Release | | |
@@ -103,8 +103,8 @@ Nothing touches a disk. This is a visual check of every screen, which agents cou
 - Text is readable and nothing is clipped or overlapping, in Light and Dark Mode.
 - The window is a sensible size, and resizing it doesn't break the layout.
 
-**Result:**
-**Notes:**
+**Result:** PASS
+**Notes:** 2026-10-09, Debug build. Nick reports every expected result, in Light and Dark Mode.
 
 ### H2 — RAM-disk dry run (debug flag)
 
@@ -131,8 +131,8 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 - The log shows `fullSync used fsync fallback` (RAM disks don't support `F_FULLFSYNC`, see T01).
 - Either the RAM disk was ejected, or the done screen says "Finished, but the drive is still attached". Note which one.
 
-**Result:**
-**Notes:**
+**Result:** PASS
+**Notes:** 2026-10-09, Debug build, 512 MiB RAM disk with `root:operator` nodes. Nick reports every expected result, including the authopen password dialog and the `fullSync used fsync fallback` log line. Afterwards the agent checked `hdiutil info`: the 512 MiB RAM disk was no longer attached. The agent also found that `log show` afterwards returned no lines from the app, because info-level lines aren't stored, so the flush method can only be seen live with `log stream`.
 
 ### H3 — Boot and internal disks never listed
 
