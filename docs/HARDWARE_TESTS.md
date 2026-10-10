@@ -61,7 +61,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | Commit tested | 2df5b29 (app code unchanged since T11, 57fc215) | |
 | USB stick 1 (make, model, size, USB 2/3) | SanDisk Cruzer Glide, 31.4 GB, USB 2.0 link (480 Mb/s) through a GenesysLogic USB 2.1 hub | |
 | USB stick 2 / spare (make, model, size) | | |
-| Boot test machine | | |
+| Boot test machine | 2017 Intel Mac | |
 
 ## Summary
 
@@ -72,7 +72,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H3 | Boot and internal disks never listed | Debug + Release | PASS | Debug: only `disk7` and `disk9`; Release: only `disk7`; hot-plug and deselect work; built-in SD slot reports internal, so hidden |
 | H4 | Image bigger than the stick | Release | PASS | 40 GB image vs 31.4 GB stick |
 | H5 | Cancel the password prompt | Release | PASS | Back to confirm screen; volume and file intact after replug |
-| H6 | Hybrid Linux ISO, boots on test machine; flush method | Release | Steps 2–4 PASS, boot pending | Fedora 44 Live; `fsync fallback`; 4.7 MB/s, 11 min 30 s |
+| H6 | Hybrid Linux ISO, boots on test machine; flush method | Release | PASS | Fedora 44 Live booted on a 2017 Intel Mac; `fsync fallback`; 4.7 MB/s, 11 min 30 s |
 | H7 | `.img` write | Release | | |
 | H8 | Cancel during write | Release | | |
 | H9 | Cancel during verify | Release | | |
@@ -205,11 +205,12 @@ The main end-to-end test. Also records the flush method on a real stick.
 - The test machine boots to the distro's boot menu or live desktop.
 - **Record** the flush method (`F_FULLFSYNC` or `fsync fallback`), the average write speed and the total time.
 
-**Result:** Steps 2–4 PASS · boot test (step 6) pending
+**Result:** PASS
 **Notes:**
 - 2026-10-09, Release build, `Fedora-Workstation-Live-44-1.7.x86_64.iso` to the SanDisk Cruzer Glide (`disk7`, USB 2.0). Nick reports every expected result for steps 2–4: no boot warning; the confirm screen matched; the close button was greyed out and ⌘W ignored during the write; the sleep assertion was present during the run and gone after; progress went through writing, "Finishing the write" and verifying; "Finished. You can remove the drive." and the stick ejected.
 - **Flush method: `fsync fallback`.** Log: `2026-10-09 22:04:46.084688-0500 … IsoSword: [com.example.isosword:device] fullSync used fsync fallback`. This stick does not support `F_FULLFSYNC` (open question from T01). The write still verified. The cache is bypassed (`F_NOCACHE`), and the eject that follows has macOS flush the drive.
 - **Average write speed 4.7 MB/s, total time 11 min 30 s** (write, flush, verify and eject). This is slow but in line with this stick, a USB 2.0 Cruzer Glide on a 480 Mb/s link through a hub. Writing is the stick's bottleneck.
+- **Boot test PASS:** the stick booted Fedora 44 Live on a 2017 Intel Mac.
 
 ### H7 — `.img` write
 
