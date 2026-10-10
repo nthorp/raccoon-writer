@@ -73,7 +73,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H4 | Image bigger than the stick | Release | PASS | 40 GB image vs 31.4 GB stick |
 | H5 | Cancel the password prompt | Release | PASS | Back to confirm screen; volume and file intact after replug |
 | H6 | Hybrid Linux ISO, boots on test machine; flush method | Release | PASS | Fedora 44 Live booted on a 2017 Intel Mac; `fsync fallback`; 4.7 MB/s, 11 min 30 s |
-| H7 | `.img` write | Release | | |
+| H7 | `.img` write | Release | PASS | FreeBSD `.img` booted on a 2017 Intel Mac |
 | H8 | Cancel during write | Release | | |
 | H9 | Cancel during verify | Release | | |
 | H10 | Quit and close during a write | Release | | |
@@ -223,8 +223,8 @@ The main end-to-end test. Also records the flush method on a real stick.
 - The write and verify finish, and the stick ejects.
 - The stick boots, or its partitions mount and look right.
 
-**Result:**
-**Notes:**
+**Result:** PASS
+**Notes:** 2026-10-09, Release build. A FreeBSD `.img` was written to the SanDisk Cruzer Glide; the write and verify finished and the stick ejected. It booted the 2017 Intel Mac.
 
 ### H8 — Cancel during write
 
