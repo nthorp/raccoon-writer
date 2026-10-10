@@ -72,6 +72,7 @@ Select image → Select drive → Confirm → safety re-check → diskutil unmou
 - **Windows installer ISOs are not supported.** They need their files extracted onto a formatted drive, not a raw copy.
 - **No compressed images.** Decompress `.xz`, `.gz` or `.zip` images first (for example `xz -dk image.img.xz`).
 - **One drive at a time.** No persistence partitions.
+- **SD cards in a Mac's built-in slot are not listed.** macOS reports the built-in reader as an internal disk, and ISO Sword never shows internal disks. Use a USB card reader instead.
 - **A password prompt on every write.** macOS doesn't cache the authorization across `authopen` runs.
 - **The dialog names `authopen`, not ISO Sword.**
 - **After a cancelled password prompt the drive stays unmounted.** Unplug and reinsert it to get its volumes back.

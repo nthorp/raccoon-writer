@@ -69,7 +69,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | --- | --- | --- | --- | --- |
 | H1 | Simulate mode: layout and dark mode | Debug | PASS | |
 | H2 | RAM-disk dry run with password prompt | Debug | PASS | Prompt shown; `fsync fallback` as expected for a RAM disk |
-| H3 | Boot and internal disks never listed | Debug + Release | PASS so far (deselect check and step 5 pending) | Debug: only `disk7` and `disk9`; Release: only `disk7`; hot-plug works |
+| H3 | Boot and internal disks never listed | Debug + Release | PASS | Debug: only `disk7` and `disk9`; Release: only `disk7`; hot-plug and deselect work; built-in SD slot reports internal, so hidden |
 | H4 | Image bigger than the stick | Release | | |
 | H5 | Cancel the password prompt | Release | | |
 | H6 | Hybrid Linux ISO, boots on test machine; flush method | Release | | |
@@ -150,10 +150,11 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 - The stick appears or disappears within about 2 seconds. When the selected stick is removed, it is deselected.
 - Note what an SD card in a built-in slot does. It may report itself as internal, in which case it is hidden by design.
 
-**Result:** Part 1 (Debug, step 4) PASS · Part 2 (Release, steps 2 and 3) PASS so far; removing the stick while it is selected, and step 5, not yet reported
+**Result:** PASS
 **Notes:**
 - **Part 1, 2026-10-09, Debug build with `ISOSWORD_ALLOW_VIRTUAL_DISKS=1`.** `diskutil list` showed: `disk0` internal SSD; `disk3` boot APFS container (synthesized, store `disk0s2`); `disk5` iOS 26.5 Simulator image, mounted through its APFS container `disk6`; `disk7` USB stick (SanDisk Cruzer Glide, 31.4 GB); `disk8` mounted `TestDMG` `.dmg`; `disk9` unmounted 33.6 MB RAM disk (the control). The app listed **only `disk7` and `disk9`**, as expected: the internal disk, the boot container, both mounted disk images and the simulator's container were hidden, and the RAM disk showing confirms the debug flag was active.
-- **Part 2, 2026-10-09, Release build, no debug flag.** Only the USB stick (`disk7`) was listed, with "Show all external disks" both off and on: no internal disk, boot container, simulator image or other disk image. Unplugging the stick removed it from the list, and plugging it back in brought it back.
+- **Part 2, 2026-10-09, Release build, no debug flag.** Only the USB stick (`disk7`) was listed, with "Show all external disks" both off and on: no internal disk, boot container, simulator image or other disk image. Unplugging the stick removed it from the list, and plugging it back in brought it back. Unplugging it while it was selected removed it, cleared the selection and disabled Continue.
+- **Step 5:** an SD card in the MacBook Pro's built-in slot (`disk4`) mounted in Finder but was **not listed** in either toggle position. The slot reports `Internal = true` (details in H14), so it is hidden by design. This confirms the T03 guess. Write SD cards through a USB card reader instead (now in the README's known limitations).
 
 ### H4 — Image bigger than the stick
 
@@ -320,3 +321,4 @@ Change `disk4` to the disk's number first. Paste each output below, and note whe
 **Result:**
 **Notes:**
 - **USB stick 1, `disk7` on 2026-10-09** (read by the agent): MediaName `Cruzer Glide`, BusProtocol `USB`, Internal `false`, Removable `true`, RemovableMedia `true`, Ejectable `true`, VirtualOrPhysical `Physical`, DeviceBlockSize `512`, TotalSize `31406948352`. This matches the hand-written USB fixture's rules (T03): shown in the default list.
+- **SD card in the built-in SDXC slot, `disk4` on 2026-10-09** (read by the agent): MediaName `Built In SDXC Reader`, BusProtocol `Secure Digital`, Internal **`true`**, Removable `true`, RemovableMedia `true`, Ejectable `true`, VirtualOrPhysical `Physical`, DeviceBlockSize `512`, TotalSize `64021856256`. Hidden under both settings because it reports internal. The T03 fixture `info-disk7` guessed `Internal = false` for an SD card; a real built-in slot says `true`. Not seen in ISO Sword with the toggle off or on.
