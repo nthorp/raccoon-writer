@@ -109,7 +109,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T03 | Disk model and discovery with filtering | T00 | DONE | 2026-10-07 | Claude |
 | T04 | ImageInspector | T00 | DONE | 2026-10-09 | Claude |
 | T05 | WriteEngine | T02 | DONE | 2026-10-09 | Claude |
-| T06 | Verifier | T05 | TODO | | |
+| T06 | Verifier | T05 | DONE | 2026-10-09 | Claude |
 | T07 | Unmount and eject | T03 | TODO | | |
 | T08 | SafetyGuard and debug test mode | T03, T07 | TODO | | |
 | T09 | WriteCoordinator (orchestration, state machine) | T04, T06, T07, T08 | TODO | | |
@@ -405,7 +405,25 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - Tests: matching data passes; a single flipped byte at the start, middle and last byte of the image is detected with the right offset; cancellation works.
 - If T01 found that same-fd read-back does not work, amend this task (for example, re-open read-only through `authopen` and accept a second prompt) before proceeding, and note it here.
 
-**Handoff notes:** _(empty)_
+**Handoff notes:**
+- **Done 2026-10-09.** `scripts/test.sh` passes 177 tests (18 new). `scripts/build.sh` and `--release` succeed for `x86_64 arm64` with no compiler warnings. T01 confirmed same-fd read-back, so the task needed no amendment. The verifier tests were run 8 times with no flakes. Three mutations were caught: comparing the padding too, removing the per-chunk cancel check, and reporting the mismatch index without the chunk's offset.
+- **Files** (in `Sources/ImageWriterCore/`): `Verifier` (with `typealias VerifyProgress = TransferProgress`), `VerifierError`, `VerifyResult`. Tests: `VerifierTests`. `GatedDevice` (in `TestDevices.swift`) can now hold a read call (`gatedRead:`). Both of its gates are optional.
+- **API:** it mirrors `WriteEngine`. `Verifier(chunkSize: = 4 MiB, clock: = .system)` has two entry points:
+  - `verify(image:against:) -> AsyncThrowingStream<VerifyProgress, Error>`
+  - `verify(image:against:onProgress:) async throws -> VerifyResult`. **T09 should use this one**, for the same reason as the write: it returns only once the device is idle.
+  - `VerifyResult` has `bytesVerified` and `elapsedSeconds`.
+  - The verifier never writes, syncs or closes the device. It opens the image again through `ImageSource`, so a file that changed size since it was selected throws `ImageSourceError.changed`.
+- **Comparison:** each chunk reads the image bytes, then reads the device rounded up to whole blocks, and compares only the image length. The final block's padding is ignored, and the tests fill it with `0xEE` to prove that. `memcmp` decides whether a chunk matches, and only a mismatching chunk is scanned byte by byte to find the offset.
+- **Errors** (`VerifierError`):
+  - `imageTooLarge` is a pre-check, made before any read.
+  - `read(DeviceIOError)`: for T11, `ENXIO`/`EIO` means the drive was removed.
+  - `deviceEnded(atOffset:)`: a 0-byte read inside the device's size.
+  - `verificationFailed(atOffset:)`: the image offset of the first differing byte.
+  - `CancellationError` on cancel. Short reads are retried.
+- **Cancellation** is checked before each chunk. A cancel that lands after the last chunk still returns success, because every byte was already compared (the write engine differs here, since it must not report a flush that didn't happen). T09 should check for cancellation itself after `verify` returns, if it wants a late cancel to win.
+- **`FileBackedDevice`:** added `Faults.shortReadOnCall`, which returns half the request like `shortWriteOnCall`. It has its own test.
+- **Deviations:**
+  1. Added the `onProgress` overload, `VerifyResult`, and the `imageTooLarge`, `read` and `deviceEnded` error cases.
 
 ---
 
@@ -556,3 +574,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-07 | T03 DONE: DiskInfo, DiskutilDiscovery, BootDiskResolver, DiskFilter, TargetDiskLister, CommandRunner | Claude |
 | 2026-10-09 | T04 DONE: ImageInspector, ImageInfo, ImageKind, BootWarning, ImageSignatures | Claude |
 | 2026-10-09 | T05 DONE: WriteEngine, TransferProgress, SpeedEstimator, ProgressMeter, ImageSource | Claude |
+| 2026-10-09 | T06 DONE: Verifier, VerifierError, VerifyResult; FileBackedDevice short-read fault | Claude |

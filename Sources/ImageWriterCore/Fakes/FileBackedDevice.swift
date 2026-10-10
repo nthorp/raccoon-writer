@@ -20,6 +20,8 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
         /// On this write call (1-based), write about half the request, rounded down to a
         /// block multiple and at least one block. A one-block request is written in full.
         public var shortWriteOnCall: Int?
+        /// The same as `shortWriteOnCall`, for read calls.
+        public var shortReadOnCall: Int?
         /// errno returned by every sync attempt.
         public var syncError: Int32?
         /// Make `F_FULLFSYNC` fail with `ENOTTY`, like the T01 RAM disk, to exercise the fallback.
@@ -29,12 +31,14 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
             failWrite: InjectedFailure? = nil,
             failRead: InjectedFailure? = nil,
             shortWriteOnCall: Int? = nil,
+            shortReadOnCall: Int? = nil,
             syncError: Int32? = nil,
             fullFsyncUnsupported: Bool = false
         ) {
             self.failWrite = failWrite
             self.failRead = failRead
             self.shortWriteOnCall = shortWriteOnCall
+            self.shortReadOnCall = shortReadOnCall
             self.syncError = syncError
             self.fullFsyncUnsupported = fullFsyncUnsupported
         }
@@ -117,8 +121,11 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
             if let failure = currentFaults.failRead, failure.call == reads {
                 throw DeviceIOError.posix(operation: "read at offset \(offset)", code: failure.code)
             }
-            let length = clampedLength(buffer.count, at: offset)
+            var length = clampedLength(buffer.count, at: offset)
             guard length > 0 else { return 0 }
+            if currentFaults.shortReadOnCall == reads, length > blockSize {
+                length = Self.shortened(length, blockSize: blockSize)
+            }
             return try PosixIO.pread(fd, into: UnsafeMutableRawBufferPointer(rebasing: buffer[..<length]), at: offset)
         }
     }
@@ -137,7 +144,7 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
                 throw DeviceIOError.posix(operation: "write at offset \(offset)", code: ENOSPC)
             }
             if currentFaults.shortWriteOnCall == writes, length > blockSize {
-                length = max(blockSize, length / 2 / blockSize * blockSize)
+                length = Self.shortened(length, blockSize: blockSize)
             }
             return try PosixIO.pwrite(fd, from: UnsafeRawBufferPointer(rebasing: buffer[..<length]), at: offset)
         }
@@ -177,6 +184,11 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
         guard BlockMath.isAligned(offset, to: blockSize), BlockMath.isAligned(length, to: blockSize) else {
             throw DeviceIOError.posix(operation: "\(operation) at offset \(offset)", code: EINVAL)
         }
+    }
+
+    /// About half of `length`, rounded down to a block multiple and at least one block.
+    private static func shortened(_ length: Int, blockSize: Int) -> Int {
+        max(blockSize, length / 2 / blockSize * blockSize)
     }
 
     /// How much of a request at `offset` lies inside the device.

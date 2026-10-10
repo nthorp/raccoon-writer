@@ -84,6 +84,17 @@ struct FileBackedDeviceTests {
         #expect(try device.write([UInt8](repeating: 1, count: 512), at: 0) == 512)
     }
 
+    @Test(arguments: [512, 4096])
+    func injectedShortRead(_ blockSize: Int) throws {
+        let device = try FileBackedDevice(blockSize: blockSize, blockCount: 16)
+        let bytes = pattern(count: 5 * blockSize)
+        #expect(try device.write(bytes, at: 0) == bytes.count)
+        device.faults.shortReadOnCall = 1
+        let first = try device.read(count: bytes.count, at: 0)
+        #expect(first == Array(bytes[..<(2 * blockSize)]))
+        #expect(try device.read(count: bytes.count, at: 0) == bytes)
+    }
+
     @Test func syncPaths() throws {
         let device = try FileBackedDevice(blockSize: 512, blockCount: 4)
         #expect(device.lastSyncMethod == nil)

@@ -26,24 +26,33 @@ final class Gate: @unchecked Sendable {
     }
 }
 
-/// Forwards to a `FileBackedDevice`, but holds write call `gatedWrite` (1-based) at `gate`.
+/// Forwards to a `FileBackedDevice`, but holds write call `gatedWrite` or read call
+/// `gatedRead` (1-based, counted from creation) at `gate`. Nil gates nothing.
 final class GatedDevice: OpenedDevice, @unchecked Sendable {
     let inner: FileBackedDevice
     let gate = Gate()
-    private let gatedWrite: Int
+    private let gatedWrite: Int?
+    private let gatedRead: Int?
     private let lock = NSLock()
     private var writes = 0
+    private var reads = 0
 
-    init(inner: FileBackedDevice, gatedWrite: Int) {
+    init(inner: FileBackedDevice, gatedWrite: Int? = nil, gatedRead: Int? = nil) {
         self.inner = inner
         self.gatedWrite = gatedWrite
+        self.gatedRead = gatedRead
     }
 
     var blockSize: Int { inner.blockSize }
     var blockCount: UInt64 { inner.blockCount }
 
     func read(into buffer: UnsafeMutableRawBufferPointer, at offset: UInt64) throws -> Int {
-        try inner.read(into: buffer, at: offset)
+        let call = lock.withLock {
+            reads += 1
+            return reads
+        }
+        if call == gatedRead { gate.pass() }
+        return try inner.read(into: buffer, at: offset)
     }
 
     func write(from buffer: UnsafeRawBufferPointer, at offset: UInt64) throws -> Int {
