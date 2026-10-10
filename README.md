@@ -26,11 +26,15 @@ After a cancelled or failed write, the drive's contents are undefined. The app s
 ## Build and run
 
 ```sh
-scripts/test.sh             # unit tests for ImageWriterCore (swift test)
-scripts/build.sh            # Debug build: generates IsoSword.xcodeproj, builds a universal build/IsoSword.app
-scripts/build.sh --release  # Release build, plus a check that no debug-only test switches are in it
+scripts/test.sh
+scripts/build.sh
+scripts/build.sh --release
 open build/IsoSword.app
 ```
+
+- `scripts/test.sh` runs the unit tests for ImageWriterCore (`swift test`).
+- `scripts/build.sh` generates `IsoSword.xcodeproj` and builds a universal Debug `build/IsoSword.app`.
+- `scripts/build.sh --release` builds Release, then checks that no debug-only test switches are in it.
 
 The Xcode project is generated from `project.yml` and is not checked in. The app is ad-hoc signed only (see Limitations).
 

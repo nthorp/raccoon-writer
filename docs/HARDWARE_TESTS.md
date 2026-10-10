@@ -20,17 +20,15 @@ A test passes only if every **Expected** item happened. If one item differs but 
 - Images. Keep them in `~/iso-sword-test/`:
   - **A hybrid Linux ISO**, for example Fedora Workstation Live or Ubuntu Desktop (both are hybrid). At least 2 GB, so that H8 and H9 have time to click Cancel.
   - **An uncompressed `.img`**, for example a FreeBSD `memstick.img`, or a Raspberry Pi OS image unpacked with `xz -dk`. ISO Sword can't read `.xz`, `.gz` or `.zip`.
-  - **An image bigger than your stick.** A sparse file is enough, for example on a 16 GB stick: `mkfile -n 20g ~/iso-sword-test/too-big.img`.
+  - **An image bigger than your stick.** A sparse file is enough. For a 16 GB stick: `mkfile -n 20g ~/iso-sword-test/too-big.img` (use a size larger than your stick).
   - **Random test data for the RAM disk:** `head -c 200000000 /dev/urandom > ~/iso-sword-test/ram-test.img` (200 MB).
 
 ### Builds
 
 Both builds go to `build/IsoSword.app`, so rebuild when a test needs the other one.
 
-```sh
-scripts/build.sh            # Debug: needed for H1, H2 and part of H3
-scripts/build.sh --release  # Release: use for every real-stick test (H3–H13)
-```
+- Debug, needed for H1, H2 and part of H3: `scripts/build.sh`
+- Release, used for every real-stick test (H3–H13): `scripts/build.sh --release`
 
 Record the commit you tested: `git rev-parse --short HEAD`.
 
@@ -311,13 +309,11 @@ The disk list's filter rules were partly written from hand-made fixtures (T03). 
 **Steps:** for each disk you have (USB stick, SD card in a built-in slot, SD card in a USB reader, Thunderbolt/USB-C SSD), find its `diskN` with `diskutil list` and run:
 
 ```sh
-D=disk4   # change this
-for k in MediaName BusProtocol Internal Removable RemovableMedia Ejectable VirtualOrPhysical DeviceBlockSize TotalSize; do
-  printf '%s: ' "$k"; diskutil info -plist "$D" | plutil -extract "$k" raw -o - - 2>/dev/null || echo '(absent)'
-done
+D=disk4
+for k in MediaName BusProtocol Internal Removable RemovableMedia Ejectable VirtualOrPhysical DeviceBlockSize TotalSize; do printf '%s: ' "$k"; diskutil info -plist "$D" | plutil -extract "$k" raw -o - - 2>/dev/null || echo absent; done
 ```
 
-Paste each output below, and note whether the disk appeared in ISO Sword with the toggle off and on.
+Change `disk4` to the disk's number first. Paste each output below, and note whether the disk appeared in ISO Sword with the toggle off and on.
 
 **Result:**
 **Notes:**
