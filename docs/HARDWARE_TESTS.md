@@ -72,7 +72,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H3 | Boot and internal disks never listed | Debug + Release | PASS | Debug: only `disk7` and `disk9`; Release: only `disk7`; hot-plug and deselect work; built-in SD slot reports internal, so hidden |
 | H4 | Image bigger than the stick | Release | PASS | 40 GB image vs 31.4 GB stick |
 | H5 | Cancel the password prompt | Release | PASS | Back to confirm screen; volume and file intact after replug |
-| H6 | Hybrid Linux ISO, boots on test machine; flush method | Release | | |
+| H6 | Hybrid Linux ISO, boots on test machine; flush method | Release | Steps 2–4 PASS, boot pending | `fsync fallback` on the Cruzer Glide |
 | H7 | `.img` write | Release | | |
 | H8 | Cancel during write | Release | | |
 | H9 | Cancel during verify | Release | | |
@@ -82,7 +82,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H13 | Intel Mac run | Release | | |
 | H14 | What real disks report (read-only) | none | | |
 
-**Flush method on the USB stick (from H6):** `F_FULLFSYNC` / `fsync fallback` (circle one)
+**Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09)
 
 ---
 
@@ -205,8 +205,11 @@ The main end-to-end test. Also records the flush method on a real stick.
 - The test machine boots to the distro's boot menu or live desktop.
 - **Record** the flush method (`F_FULLFSYNC` or `fsync fallback`), the average write speed and the total time.
 
-**Result:**
+**Result:** Steps 2–4 PASS · boot test (step 6) pending
 **Notes:**
+- 2026-10-09, Release build, SanDisk Cruzer Glide (`disk7`, USB 2.0). Nick reports every expected result for steps 2–4: no boot warning; the confirm screen matched; the close button was greyed out and ⌘W ignored during the write; the sleep assertion was present during the run and gone after; progress went through writing, "Finishing the write" and verifying; "Finished. You can remove the drive." and the stick ejected.
+- **Flush method: `fsync fallback`.** Log: `2026-10-09 22:04:46.084688-0500 … IsoSword: [com.example.isosword:device] fullSync used fsync fallback`. This stick does not support `F_FULLFSYNC` (open question from T01). The write still verified. The cache is bypassed (`F_NOCACHE`), and the eject that follows has macOS flush the drive.
+- Average write speed and total time: not recorded yet.
 
 ### H7 — `.img` write
 
