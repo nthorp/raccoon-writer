@@ -71,7 +71,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H2 | RAM-disk dry run with password prompt | Debug | PASS | Prompt shown; `fsync fallback` as expected for a RAM disk |
 | H3 | Boot and internal disks never listed | Debug + Release | PASS | Debug: only `disk7` and `disk9`; Release: only `disk7`; hot-plug and deselect work; built-in SD slot reports internal, so hidden |
 | H4 | Image bigger than the stick | Release | PASS | 40 GB image vs 31.4 GB stick |
-| H5 | Cancel the password prompt | Release | | |
+| H5 | Cancel the password prompt | Release | PASS | Back to confirm screen; volume and file intact after replug |
 | H6 | Hybrid Linux ISO, boots on test machine; flush method | Release | | |
 | H7 | `.img` write | Release | | |
 | H8 | Cancel during write | Release | | |
@@ -181,8 +181,8 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 - "Mounted volumes" now reads none, and the volume has left Finder.
 - After the stick is reinserted, its volume and files are intact.
 
-**Result:**
-**Notes:**
+**Result:** PASS
+**Notes:** 2026-10-09, Release build, stick formatted ExFAT/GPT as `TESTSTICK` with one test file. Clicking Cancel in the authopen dialog returned the app to the confirm screen with the notice, not an error screen. "Mounted volumes" read none and `TESTSTICK` left Finder. After a replug, `TESTSTICK` remounted. The agent checked read-only afterwards: `disk7` still had its GPT layout (EFI + `TESTSTICK`) and the test file was intact.
 
 ### H6 — Hybrid Linux ISO, boots on a test machine
 
