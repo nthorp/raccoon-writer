@@ -115,7 +115,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T09 | WriteCoordinator (orchestration, state machine) | T04, T06, T07, T08 | DONE | 2026-10-09 | Claude |
 | T10 | SwiftUI shell and screens | T09 | DONE | 2026-10-09 | Claude |
 | T11 | Error states, cancel, disconnect handling, polish | T10 | DONE | 2026-10-09 | Claude |
-| T12 | 🧑 Hardware test checklist and README | T11 | TODO | | |
+| T12 | 🧑 Hardware test checklist and README | T11 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -656,7 +656,18 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 
 **Acceptance criteria:** checklist completed by Nick; README accurate.
 
-**Handoff notes:** _(empty)_
+**Handoff notes:**
+- **Agent prep done 2026-10-09, now `NEEDS_HUMAN`.** `scripts/test.sh` passes 338 tests. `scripts/build.sh` and `--release` succeed for `x86_64 arm64`, and the release flag check passes. No code changed. The agent wrote to no disk; the only disk command run was a read-only `diskutil info -plist disk0`, to check the H14 snippet.
+- **Nick: work through [`docs/HARDWARE_TESTS.md`](docs/HARDWARE_TESTS.md).** Fill in the environment table, each test's Result and Notes, the summary table and the flush-method line, and file issues for failures. Then tell the agent, who records the outcome here and marks T12 `DONE` if every test passed (or the failures are filed and accepted).
+- **Checklist** (H1–H14): every item from agent step 1, plus the checks earlier tasks asked T12 for:
+  - Layout and dark mode in Simulate (T10): H1.
+  - Close button greyed out, quit alert and idle-sleep assertion during a real write (T11): H6 and H10.
+  - What real USB, SD and Thunderbolt disks report (T03): H14, a read-only `diskutil info` snippet.
+  - A drive-in-use test (H12), which is cheap and checks the busy wording and dissenter name from T07.
+  - **`F_FULLFSYNC` vs fallback:** no new code was needed. `RawDevice` already logs `fullSync used F_FULLFSYNC` / `fullSync used fsync fallback` at info level under category `device` (T02). The checklist has Nick keep `log stream --predicate 'subsystem == "com.example.isosword"' --info` open. Info messages are not kept in the log store by default, so `log show` afterwards may miss them; it must be streamed live.
+  - The RAM-disk run (H2) `chown`s the nodes to `root:operator`, as in T01 run 2, so the real password prompt appears.
+- **README** rewritten: what it is, status, safety (what is erased and which checks prevent a wrong-disk write), requirements, build and run, the two debug-only modes, logs, how it works, known limitations, roadmap, layout. Limitations include the authopen-named dialog, one prompt per write, volumes left unmounted after a cancelled prompt (T11 deviation 3), and the quarantine workaround for the ad-hoc-signed app.
+- **Deviations:** added H1 (Simulate look-through), H12 (drive in use) and H14 (disk reports) beyond the plan's list, so the requests from T03, T07, T10 and T11 have a place to be recorded.
 
 ---
 
@@ -697,3 +708,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-09 | T09 DONE: WriteCoordinator, WriteState, PipelineStage, WriteFailure, WriteSummary, WriteCoordinatorError | Claude |
 | 2026-10-09 | T10 DONE: SwiftUI screens, DriveListModel, ProgressDisplay, DisplayFormat, debug Simulate mode | Claude |
 | 2026-10-09 | T11 DONE: FailureExplanation, DriveCondition, DriveTooSmall, prompt cancel to confirm, sleep prevention, quit and close guards | Claude |
+| 2026-10-09 | T12 prep: docs/HARDWARE_TESTS.md checklist (H1–H14) and README; NEEDS_HUMAN for the hardware run | Claude |
