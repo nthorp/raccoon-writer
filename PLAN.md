@@ -110,7 +110,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T04 | ImageInspector | T00 | DONE | 2026-10-09 | Claude |
 | T05 | WriteEngine | T02 | DONE | 2026-10-09 | Claude |
 | T06 | Verifier | T05 | DONE | 2026-10-09 | Claude |
-| T07 | Unmount and eject | T03 | TODO | | |
+| T07 | Unmount and eject | T03 | DONE | 2026-10-09 | Claude |
 | T08 | SafetyGuard and debug test mode | T03, T07 | TODO | | |
 | T09 | WriteCoordinator (orchestration, state machine) | T04, T06, T07, T08 | TODO | | |
 | T10 | SwiftUI shell and screens | T09 | TODO | | |
@@ -440,7 +440,24 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - Tests with a fake `CommandRunner` for success, busy, already unmounted, eject failure.
 - Only `/dev/diskN` whole-disk names matching `^disk[0-9]+$` are accepted; anything else throws before running a command (no path injection).
 
-**Handoff notes:** _(empty)_
+**Handoff notes:**
+- **Done 2026-10-09.** `scripts/test.sh` passes 197 tests (20 new). `scripts/build.sh` and `--release` succeed for `x86_64 arm64` with no compiler warnings. Two mutations were caught: removing the name check and removing the dissent-text busy detection.
+- **Files** (in `Sources/ImageWriterCore/`): `DiskManager` (protocol plus the `ejectAfterWrite` extension), `DiskutilDiskManager`, `DiskManagerError`, `EjectWarning`, `Fakes/FakeDiskManager`. Tests: `DiskutilDiskManagerTests` (includes `FakeDiskManagerTests`).
+- **Real diskutil output.** It was captured on macOS 26.3.1 from a scratch file-backed `.dmg` (`hdiutil create`/`attach`). The script checked `BusProtocol == Disk Image` before each diskutil call, then detached and deleted the image. No real disk was touched. The texts are used verbatim in the tests:
+  - **unmountDisk success, and already unmounted:** exit 0, stdout `Unmount of all volumes on diskN was successful`. Idempotency needs no extra code.
+  - **Busy (unmountDisk and eject alike):** exit 1, stderr `Unmount of diskN failed: at least one volume could not be unmounted` / `Unmount was dissented by PID 57474 (/bin/sleep)` / `Dissenter parent PPID …`. **The word "busy" does not appear**, so the plan's "parse … busy" was widened: "dissented by", "could not be unmounted" or "busy" all map to `busy(dissenter:)`. The dissenter is the process path from the "dissented by PID" line, and the error message shows its last path component.
+  - **Missing disk, unmountDisk:** exit 1, stderr only `Unmount failed for /dev/diskN`. This is mapped to `notFound` only when it is the **entire** output for **this** disk. Anything else is `commandFailed`.
+  - **Missing disk, eject:** exit 1, stderr `Failed to find disk /dev/diskN`. This maps to `notFound`, as do `unable to find disk` and `could not find disk`.
+  - **eject success:** exit 0, stdout `Disk /dev/diskN ejected`.
+  - Both commands write text, not a plist, so failures are recognized from stdout and stderr combined (each trimmed, joined with a newline). `commandFailed.output` carries that text.
+- **API:** `DiskutilDiskManager(runner: = ProcessCommandRunner())` runs `/usr/sbin/diskutil unmountDisk|eject /dev/diskN`. Exit 0 is success, whatever the text says. Failures are logged under category `diskmanager`. `CommandRunnerError` (launch failure, 30 s timeout) propagates unwrapped, as it does in discovery.
+- **Step 3 (eject failure is a warning):** `DiskManager.ejectAfterWrite(bsdName:) async -> EjectWarning?` never throws. **T09 should use it for the final eject** and put the warning in the summary. `EjectWarning` is `Equatable` and carries `bsdName`, `reason` (the error's description) and `message` (done-screen text).
+- **`FakeDiskManager`** is in the library for T09 tests and T10 Simulate mode. It takes `unmountError:`/`ejectError:` (both settable at runtime), records `calls` (`.unmount`/`.eject`), and validates names like production.
+- **For T11:** `busy` during unmount means the user should close files or apps. `notFound` means the drive was removed between confirm and start. T08's SafetyGuard runs before unmount, so it should catch most removals first.
+- **Deviations:**
+  1. `busy` carries `dissenter: String?`, `notFound` carries `bsdName`, and `commandFailed` carries `command`, `status` and `output`. Added `invalidDiskName`.
+  2. Busy detection matches the real dissent text, not just "busy" (see above).
+  3. Added `ejectAfterWrite`, `EjectWarning` and `FakeDiskManager`.
 
 ---
 
@@ -575,3 +592,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-09 | T04 DONE: ImageInspector, ImageInfo, ImageKind, BootWarning, ImageSignatures | Claude |
 | 2026-10-09 | T05 DONE: WriteEngine, TransferProgress, SpeedEstimator, ProgressMeter, ImageSource | Claude |
 | 2026-10-09 | T06 DONE: Verifier, VerifierError, VerifyResult; FileBackedDevice short-read fault | Claude |
+| 2026-10-09 | T07 DONE: DiskManager, DiskutilDiskManager, DiskManagerError, EjectWarning, FakeDiskManager | Claude |
