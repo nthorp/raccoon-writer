@@ -123,7 +123,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T14 | Rename to Red Delicious Media Writer | T13 | DONE | 2026-10-12 | Claude |
 | T15 | App icon | T14 | DONE | 2026-10-12 | Claude |
 | T16 | 🧑 Password prompt before the safety check; size check after open | T15 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
-| T17 | 🧑 Layered app icon (Icon Composer) with dark variant | T15 | TODO | | Claude (prep) / Nick (check) |
+| T17 | 🧑 Layered app icon (Icon Composer) with dark variant | T15 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
 
 Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -915,6 +915,7 @@ This also removes the README limitation "after a cancelled password prompt the d
 1. Open `App/AppIcon.icon` in Icon Composer (`/Applications/Xcode.app/Contents/Applications/Icon Composer.app`). Check the cutout edges and preview Default, Dark, Clear and Tinted. Adjust if you like and save. If you change anything, tell the agent so it rebuilds.
 2. `scripts/build.sh --release`, then copy `build/RedDelicious.app` somewhere new (for example `~/Applications`) and open it there. This avoids the stale icon cache. Under System Settings › Appearance, switch the icon style through Default, Dark, Clear and Tinted. Check that the Dock and Finder icon follows each one, and that in Dark it sits on the dark background like the other apps.
 3. Optional, if you have a macOS 14 or 15 machine: check that the icon still shows there.
+4. While the app is open, start a write to a RAM disk or the test stick and look at the password dialog. If it shows the apple, the README's "The password dialog has no custom icon yet" limitation can go (left over from T15). Cancel the dialog.
 
 **Acceptance criteria**
 - In Dark icon style on macOS 26 the icon has a dark background, and in Default it looks like the T15 icon.
@@ -925,6 +926,12 @@ This also removes the README limitation "after a cancelled password prompt the d
 **Files:** `App/AppIcon.icon/`, `App/Assets.xcassets/AppIcon.appiconset/` (kept or removed per step 4), `project.yml`, `PLAN.md`
 
 **Handoff notes:**
+- **Agent prep done 2026-10-12, now `NEEDS_HUMAN`.** `scripts/test.sh` passes 371 tests. `scripts/build.sh --release` succeeds for `x86_64 arm64` with no asset warnings, and the release flag check passes. `build/` holds the Release build.
+- **Foreground:** Nick's original apple artwork (1024 px, transparent background, no ground shadow), so no cutout was needed. The background removal had left the body about 98% opaque (alpha 224–254 on ~570k pixels). Those pixels were un-premultiplied and set to fully opaque, so the fill can't show through. The anti-aliased edge is unchanged. Stored as `App/AppIcon.icon/Assets/apple.png`.
+- **`icon.json`:** written by hand. Solid fill `srgb:0.976,0.957,0.910`, sampled from the T15 cream tile. One layer at scale 0.8, with `glass` off and group translucency off so the apple stays opaque, and a neutral shadow. There's no dark fill specialization: the Dark rendition gets a dark background automatically. `ictool` (inside Icon Composer.app) rendered Default, Dark, ClearLight, ClearDark, TintedLight and TintedDark for macOS, and all six look right: cream tile in Default, dark tile in Dark, apple shape in Clear and Tinted.
+- **Project:** XcodeGen 2.46 adds `AppIcon.icon` as a single `wrapper.icon` file reference in Resources, so `project.yml` is unchanged. `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` now resolves to it.
+- **Pre-26 fallback (step 4):** `actool` renders the legacy icons from the `.icon` file. With both sources present, the `.icns` (16–256 px) and the 7 flat `Assets.car` images (32–1024 px) were renders of the new icon, not the T15 PNGs. Removing the set left the `.icns` byte-identical and the same 7 images. Their digests changed, but they also change between two compiles of the same input, so the renders aren't byte-stable. The `.car` also has layered stacks for Aqua, DarkAqua and Tintable. So `App/Assets.xcassets` (it held only the icon) was deleted.
+- **Deviation:** none from the steps. Step 3's `project.yml` edit turned out not to be needed.
 
 ---
 
@@ -977,3 +984,4 @@ This also removes the README limitation "after a cancelled password prompt the d
 | 2026-10-12 | T16 added from a review finding (disk swapped during the password dialog) and prepped: prompt before the safety check, size check after open; NEEDS_HUMAN. T12's remaining tests run on the T16 build | Claude |
 | 2026-10-12 | T16 DONE after Nick's runs: one dialog per write, H15 swap refused, H5 leaves the drive mounted, real-stick write and verify pass | Claude |
 | 2026-10-12 | T17 added: layered Icon Composer icon so the app follows the macOS 26 Dark, Clear and Tinted icon styles | Claude |
+| 2026-10-12 | T17 prep: `App/AppIcon.icon` from Nick's apple artwork replaces the T15 PNG set; NEEDS_HUMAN for the Dock and Finder check | Claude |
