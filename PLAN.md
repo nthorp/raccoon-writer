@@ -123,6 +123,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T14 | Rename to Red Delicious Media Writer | T13 | DONE | 2026-10-12 | Claude |
 | T15 | App icon | T14 | DONE | 2026-10-12 | Claude |
 | T16 | 🧑 Password prompt before the safety check; size check after open | T15 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
+| T17 | 🧑 Layered app icon (Icon Composer) with dark variant | T15 | TODO | | Claude (prep) / Nick (check) |
 
 Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -897,6 +898,36 @@ This also removes the README limitation "after a cancelled password prompt the d
 
 ---
 
+### T17 — 🧑 Layered app icon (Icon Composer) with dark variant
+
+**Goal:** the icon follows the macOS 26 icon style (Default, Dark, Clear, Tinted) like Nick's other apps. Today it doesn't: the T15 PNGs have a cream rounded square painted in, so macOS 26 can't recolour them and shows the same cream tile in Dark mode. The fix is an Icon Composer `.icon` file, with the apple as a transparent foreground layer and the background as a fill that the system can swap. macOS 14 and 15 must still get a working icon.
+
+**Artwork:** the `.icon` file needs the apple without the square and without its baked-in drop shadow, because Icon Composer adds its own shadow. If Nick has the original artwork, use it. Otherwise the agent cuts the apple out of `icon_512x512@2x.png` (1024 px) and Nick approves the result in step 1 below. Edges may need cleanup.
+
+**Agent steps**
+1. Get the foreground: Nick's original, or a cutout from the 1024 px PNG with transparent background, no square, no ground shadow. Keep the source PNG under `App/AppIcon.icon/Assets/`, not loose in the repo.
+2. Draft `App/AppIcon.icon` (the `icon.json` and `Assets/` bundle Icon Composer writes): one layer with the apple and a background fill that matches the current cream tile, so the Default look is unchanged. If you can't produce a bundle that `actool` accepts, stop and ask Nick to create it in Icon Composer from the foreground PNG instead.
+3. Wire it up in `project.yml`. The `.icon` file has to be a single file reference in the Resources phase, not a group, so check how XcodeGen 2.46 adds it and set its `type`/`buildPhase` explicitly if needed. Keep `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon`, which now names the `.icon` file.
+4. Pre-26 fallback: build, then inspect `Assets.car` (`assetutil --info`) and `AppIcon.icns`. If Xcode generates legacy renditions from the `.icon` file, delete `AppIcon.appiconset`. If not, keep the set as the macOS 14/15 icon, and make sure the two don't clash under the same name. Record which one applied in the Handoff notes.
+5. `scripts/test.sh` and `scripts/build.sh --release` pass. Write instructions for Nick, set `NEEDS_HUMAN`, stop.
+
+**Human steps (Nick)**
+1. Open `App/AppIcon.icon` in Icon Composer (`/Applications/Xcode.app/Contents/Applications/Icon Composer.app`). Check the cutout edges and preview Default, Dark, Clear and Tinted. Adjust if you like and save. If you change anything, tell the agent so it rebuilds.
+2. `scripts/build.sh --release`, then copy `build/RedDelicious.app` somewhere new (for example `~/Applications`) and open it there. This avoids the stale icon cache. Under System Settings › Appearance, switch the icon style through Default, Dark, Clear and Tinted. Check that the Dock and Finder icon follows each one, and that in Dark it sits on the dark background like the other apps.
+3. Optional, if you have a macOS 14 or 15 machine: check that the icon still shows there.
+
+**Acceptance criteria**
+- In Dark icon style on macOS 26 the icon has a dark background, and in Default it looks like the T15 icon.
+- Clear and Tinted show the apple shape, not a solid tile.
+- The bundle still carries an icon that macOS 14/15 can use (`AppIcon.icns` or legacy renditions in `Assets.car`).
+- `scripts/test.sh` and `scripts/build.sh --release` pass.
+
+**Files:** `App/AppIcon.icon/`, `App/Assets.xcassets/AppIcon.appiconset/` (kept or removed per step 4), `project.yml`, `PLAN.md`
+
+**Handoff notes:**
+
+---
+
 ## 4. Future work (not in scope)
 
 - Rename the GitHub repo and local folder from `iso-sword` to match the app (T14 left them as they are).
@@ -945,3 +976,4 @@ This also removes the README limitation "after a cancelled password prompt the d
 | 2026-10-12 | T15 DONE: app icon from Nick's artwork in `App/Assets.xcassets` | Claude |
 | 2026-10-12 | T16 added from a review finding (disk swapped during the password dialog) and prepped: prompt before the safety check, size check after open; NEEDS_HUMAN. T12's remaining tests run on the T16 build | Claude |
 | 2026-10-12 | T16 DONE after Nick's runs: one dialog per write, H15 swap refused, H5 leaves the drive mounted, real-stick write and verify pass | Claude |
+| 2026-10-12 | T17 added: layered Icon Composer icon so the app follows the macOS 26 Dark, Clear and Tinted icon styles | Claude |
