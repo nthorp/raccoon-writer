@@ -12,15 +12,14 @@ struct ConfirmView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            // Above the title: coming back here otherwise looks like nothing happened.
+            if let notice {
+                NoticeCallout(message: notice.message)
+            }
+
             Label("Erase this drive?", systemImage: "exclamationmark.triangle.fill")
                 .font(.title2.bold())
                 .foregroundStyle(.red)
-
-            if let notice {
-                Label(notice.message, systemImage: "info.circle")
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
 
             // Built from pieces rather than Markdown, so a drive name is never parsed.
             (Text("You are about to erase ")
@@ -59,6 +58,27 @@ struct ConfirmView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// A tinted box so the notice isn't read as a secondary hint. The text keeps the
+/// primary colour for contrast in both appearances; only the icon carries the tint.
+private struct NoticeCallout: View {
+    let message: String
+
+    var body: some View {
+        Label {
+            Text(message)
+        } icon: {
+            Image(systemName: "info.circle.fill")
+                .foregroundStyle(.blue)
+        }
+        .font(.callout)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.blue.opacity(0.12), in: .rect(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.blue.opacity(0.3)))
     }
 }
 

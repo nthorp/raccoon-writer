@@ -124,7 +124,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T15 | App icon | T14 | DONE | 2026-10-12 | Claude |
 | T16 | 🧑 Password prompt before the safety check; size check after open | T15 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
 | T17 | 🧑 Layered app icon (Icon Composer) with dark variant | T15 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
-| T18 | 🧑 Make the password-cancelled notice stand out | T16 | TODO | | Claude (prep) / Nick (check) |
+| T18 | 🧑 Make the password-cancelled notice stand out | T16 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
 
 Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -967,7 +967,17 @@ Out of scope (Nick chose only these two changes): new wording or a separate titl
 **Files:** `App/ConfirmView.swift`, `PLAN.md`
 
 **Handoff notes:**
-- _(none yet)_
+- **Agent prep done 2026-10-12, now `NEEDS_HUMAN`.** `scripts/test.sh` passes 371 tests. `scripts/build.sh --release` succeeds for `x86_64 arm64` with no Swift warnings, and the release flag check passes. `build/` holds the Release build, so run `scripts/build.sh` first for the Debug-only Simulate mode.
+- **What was built:** a private `NoticeCallout` view in `ConfirmView.swift`, as specified in step 1. It's the first item in the screen's `VStack`, above the title, and only appears when there's a notice, so the screen without one is unchanged. `WriteNotice` and the coordinator are untouched.
+- **Rendering check:** the agent rendered the callout above the title with `ImageRenderer` at 540 pt wide (the minimum window width), in Light and Dark. In both, the text is easy to read, the box is clearly tinted, and the message wraps onto two lines. This was a standalone copy of the view, not the running app, so step 3 below is still needed.
+- **Deviation:** none.
+- **Nick: run these on the T18 commit.**
+  1. `scripts/build.sh`, then `REDDELICIOUS_SIMULATE=1 build/RedDelicious.app/Contents/MacOS/RedDelicious`.
+  2. Choose any `.iso` or `.img` file, for example `~/iso-sword-test/ram-test.img`. Select "Simulated USB Stick (password dialog cancelled)", then Continue… and Erase and Write. The progress screen waits a moment as if the dialog were up, then the confirm screen comes back with the blue box at the top.
+  3. Check that the box catches your eye before the red title. Switch System Settings › Appearance between Light and Dark while the app is open, and drag the window to its narrowest width. The text should stay readable and wrap rather than be cut off.
+  4. Press Cancel, choose the same drive again and Continue…. The confirm screen should have no box and look as it did before T18.
+
+  Then tell the agent the results. If they meet the acceptance criteria, the agent records them here and marks T18 `DONE`.
 
 ---
 
