@@ -1,4 +1,4 @@
-name: IsoSword
+name: RedDelicious
 options:
   bundleIdPrefix: com.example
   deploymentTarget:
@@ -13,23 +13,23 @@ settings:
     SWIFT_STRICT_CONCURRENCY: targeted
     MACOSX_DEPLOYMENT_TARGET: "14.0"
 targets:
-  IsoSword:
+  RedDelicious:
     type: application
     platform: macOS
     sources:
       - path: App
         excludes:
           - Info.plist
-          - IsoSword.entitlements
+          - RedDelicious.entitlements
     dependencies:
       - package: ImageWriterCore
         product: ImageWriterCore
     settings:
       base:
-        PRODUCT_NAME: IsoSword
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.isosword
+        PRODUCT_NAME: RedDelicious
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.reddelicious
         INFOPLIST_FILE: App/Info.plist
-        CODE_SIGN_ENTITLEMENTS: App/IsoSword.entitlements
+        CODE_SIGN_ENTITLEMENTS: App/RedDelicious.entitlements
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Manual
         ENABLE_HARDENED_RUNTIME: NO
@@ -42,10 +42,10 @@ targets:
         Release:
           ONLY_ACTIVE_ARCH: NO
 schemes:
-  IsoSword:
+  RedDelicious:
     build:
       targets:
-        IsoSword: all
+        RedDelicious: all
     run:
       config: Debug
     archive:

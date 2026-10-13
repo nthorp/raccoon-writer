@@ -49,7 +49,7 @@ struct AuthopenOpenerTests {
     // MARK: - Spawning a stand-in
 
     @Test func invalidNameThrowsBeforeSpawning() async throws {
-        let marker = FileManager.default.temporaryDirectory.appendingPathComponent("isosword-marker-\(UUID().uuidString)")
+        let marker = FileManager.default.temporaryDirectory.appendingPathComponent("reddelicious-marker-\(UUID().uuidString)")
         let script = try StandIn("touch '\(marker.path)'; exit 1")
         let standIn = opener(script.path)
         for name in ["disk4s1", "/dev/disk4", "disk4;rm", "rdisk4", ""] {
@@ -112,7 +112,7 @@ struct AuthopenOpenerTests {
 
     @Test func missingExecutableIsSpawnError() async {
         await #expect(throws: DeviceOpenError.posix(operation: "posix_spawn", code: ENOENT)) {
-            _ = try await opener("/nonexistent/isosword/authopen").openForReadWrite(bsdName: "disk4")
+            _ = try await opener("/nonexistent/reddelicious/authopen").openForReadWrite(bsdName: "disk4")
         }
     }
 
@@ -124,7 +124,7 @@ struct AuthopenOpenerTests {
         .authorizationFailed(status: errAuthorizationInternal),
     ])
     func failedAuthorizationNeverSpawns(_ error: DeviceOpenError) async throws {
-        let marker = FileManager.default.temporaryDirectory.appendingPathComponent("isosword-marker-\(UUID().uuidString)")
+        let marker = FileManager.default.temporaryDirectory.appendingPathComponent("reddelicious-marker-\(UUID().uuidString)")
         let script = try StandIn("touch '\(marker.path)'; exit 1")
         let authorizer = FakeDeviceAuthorizer(error: error)
         await #expect(throws: error) {
@@ -201,7 +201,7 @@ struct AuthopenOpenerTests {
     @Test func authorizationIsReleasedOnceWhenTheSpawnFails() async throws {
         let authorizer = FakeDeviceAuthorizer()
         await #expect(throws: DeviceOpenError.posix(operation: "posix_spawn", code: ENOENT)) {
-            _ = try await AuthopenOpener(executable: "/nonexistent/isosword/authopen", authorizer: authorizer)
+            _ = try await AuthopenOpener(executable: "/nonexistent/reddelicious/authopen", authorizer: authorizer)
                 .openForReadWrite(bsdName: "disk4")
         }
         #expect(authorizer.authorizations.map(\.releaseCount) == [1])
@@ -227,7 +227,7 @@ private final class StandIn {
     let path: String
 
     init(_ body: String) throws {
-        path = FileManager.default.temporaryDirectory.appendingPathComponent("isosword-standin-\(UUID().uuidString).sh").path
+        path = FileManager.default.temporaryDirectory.appendingPathComponent("reddelicious-standin-\(UUID().uuidString).sh").path
         try "#!/bin/sh\n\(body)\n".write(toFile: path, atomically: true, encoding: .utf8)
         guard chmod(path, 0o755) == 0 else { throw DeviceIOError.posix(operation: "chmod", code: errno) }
     }

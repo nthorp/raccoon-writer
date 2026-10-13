@@ -8,7 +8,7 @@ final class ImageInspectorTests {
     let inspector = ImageInspector()
 
     init() throws {
-        dir = FileManager.default.temporaryDirectory.appendingPathComponent("isosword-inspect-\(UUID().uuidString)")
+        dir = FileManager.default.temporaryDirectory.appendingPathComponent("reddelicious-inspect-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false)
     }
 

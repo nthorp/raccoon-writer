@@ -1,4 +1,4 @@
-# iso-sword — Implementation Plan
+# Red Delicious Media Writer (repo: iso-sword) — Implementation Plan
 
 > A native macOS app (Swift/SwiftUI) that writes `.iso` / `.img` images to removable USB drives.
 > Similar in function to balenaEtcher and Fedora Media Writer.
@@ -31,8 +31,8 @@
 
 | Area | Decision |
 | --- | --- |
-| App name / folder | **iso-sword** (display name "ISO Sword", target `IsoSword`) |
-| Bundle ID | `com.example.isosword` (placeholder; change before any public release) |
+| App name / folder | **Red Delicious Media Writer**, short name "Red Delicious", target `RedDelicious`. Folder and repo stay `iso-sword`. Was "ISO Sword" / `IsoSword` until T14 |
+| Bundle ID | `com.example.reddelicious` (placeholder; change before any public release). Was `com.example.isosword` until T14 |
 | Language / UI | Swift 5 language mode (targeted concurrency checking on), SwiftUI, Observation framework |
 | Platform | macOS 14+, universal binary (arm64 + x86_64) |
 | Project structure | Swift Package `ImageWriterCore` (UI-free, testable) + thin SwiftUI app target |
@@ -117,7 +117,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T11 | Error states, cancel, disconnect handling, polish | T10 | DONE | 2026-10-09 | Claude |
 | T12 | 🧑 Hardware test checklist and README | T11 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 | T13 | 🧑 Branded password prompt (`authopen -extauth`) | T11 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
-| T14 | Rename to Red Delicious Media Writer | T13 | TODO | | Claude |
+| T14 | Rename to Red Delicious Media Writer | T13 | DONE | 2026-10-12 | Claude |
 
 Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -794,6 +794,15 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 **Files:** `Sources/ImageWriterCore/` (`AppInfo`, `SecurityAuthorizer`, `ProgressDisplay`, `DebugTestMode`, `Simulation/SimulationMode`, `Fakes/FileBackedDevice`, comments), `App/`, `project.yml`, `scripts/`, `Tests/`, `README.md`, `docs/HARDWARE_TESTS.md`, `AGENTS.md`, `PLAN.md`
 
 **Handoff notes:**
+- **Done 2026-10-12.** `scripts/test.sh` passes 355 tests (353 before; the 2 new ones are in `AppInfoTests`). `scripts/build.sh` and `scripts/build.sh --release` succeed for `x86_64 arm64` with no Swift warnings, and the release flag check passes with the `REDDELICIOUS_*` markers. `plutil -p build/RedDelicious.app/Contents/Info.plist` shows the four expected values. No disk was touched.
+- **What changed:** everything in the name mapping above. `AppInfo.shortName` is new. `SecurityAuthorizer.prompt`, `ProgressDisplay`, `ConfirmView` and `AppDelegate` interpolate it instead of a literal, so the next rename only needs `AppInfo` and `Info.plist`. The window title still comes from `AppInfo.displayName`, so it shows the full name. The stale gitignored `IsoSword.xcodeproj` and `build/IsoSword.app` were deleted.
+- **Left as history:** earlier tasks' handoff notes and the change log in this file. In `docs/HARDWARE_TESTS.md`, the recorded results (H3 part 1, the H6 flush log line, the H13 notes, the H14 SD-card entry) keep the old names, and the intro has a line explaining pre-T14 names. `~/iso-sword-test/` is unchanged because it's Nick's local folder. Remaining `git grep -i "iso ?sword|isosword"` matches are only these places, the README "formerly" line and `AGENTS.md`'s repo mention.
+- **Side effects for Nick:**
+  - The new bundle ID makes macOS treat this as a new app, so the removable-volume privacy prompt may appear again.
+  - Log predicates must use `com.example.reddelicious`.
+  - The env vars are now `REDDELICIOUS_SIMULATE` and `REDDELICIOUS_ALLOW_VIRTUAL_DISKS`.
+  - `build/` currently holds the Release build. Run `scripts/build.sh` for Debug.
+- **Deviation:** the plan said to update only the steps of unrun tests in `docs/HARDWARE_TESTS.md`. The commands in the steps of tests already run (H1, H2, H3, H13) also use the new names, so the steps work if someone re-runs them. Only results and notes keep the old names.
 
 ---
 
@@ -841,3 +850,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-12 | T13 prep: DeviceAuthorizer, SecurityAuthorizer, FakeDeviceAuthorizer, `authopen -extauth` in AuthopenOpener; NEEDS_HUMAN for the dialog checks | Claude |
 | 2026-10-12 | T13 DONE after Nick's dialog checks; macOS retries wrong passwords indefinitely (`tries` 10000) | Claude |
 | 2026-10-12 | T14 added: rename to Red Delicious Media Writer; T12's remaining tests run on the T14 build | Claude |
+| 2026-10-12 | T14 DONE: app renamed to Red Delicious Media Writer (`RedDelicious`, `com.example.reddelicious`, `REDDELICIOUS_*`) | Claude |

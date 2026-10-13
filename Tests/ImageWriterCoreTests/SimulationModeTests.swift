@@ -14,7 +14,7 @@ final class SimulationModeTests {
     let dir: URL
 
     init() throws {
-        dir = FileManager.default.temporaryDirectory.appendingPathComponent("isosword-simulate-\(UUID().uuidString)")
+        dir = FileManager.default.temporaryDirectory.appendingPathComponent("reddelicious-simulate-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false)
     }
 
@@ -23,8 +23,8 @@ final class SimulationModeTests {
     }
 
     @Test func enabledOnlyByExactlyOne() {
-        #expect(SimulationMode.isEnabled(environment: ["ISOSWORD_SIMULATE": "1"]))
-        #expect(!SimulationMode.isEnabled(environment: ["ISOSWORD_SIMULATE": "true"]))
+        #expect(SimulationMode.isEnabled(environment: ["REDDELICIOUS_SIMULATE": "1"]))
+        #expect(!SimulationMode.isEnabled(environment: ["REDDELICIOUS_SIMULATE": "true"]))
         #expect(!SimulationMode.isEnabled(environment: [:]))
     }
 
@@ -96,7 +96,7 @@ final class SimulationModeTests {
 
     @Test func leavesNoDeviceFilesBehind() async throws {
         _ = try await run(on: .working)
-        let leftovers = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0.hasPrefix("isosword-fake-") }
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0.hasPrefix("reddelicious-fake-") }
         #expect(leftovers.isEmpty)
     }
 }

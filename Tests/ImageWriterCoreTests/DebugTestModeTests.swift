@@ -16,7 +16,7 @@ struct DebugTestModeTests {
 
     @Test func environmentSwitchIsExactlyOne() {
         let key = DebugTestMode.environmentKey
-        #expect(key == "ISOSWORD_ALLOW_VIRTUAL_DISKS")
+        #expect(key == "REDDELICIOUS_ALLOW_VIRTUAL_DISKS")
         #expect(DebugTestMode.allowsVirtualDisks(environment: [key: "1"]))
         for value in ["", "0", "true", "yes", " 1", "1 "] {
             #expect(!DebugTestMode.allowsVirtualDisks(environment: [key: value]))

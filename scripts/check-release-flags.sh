@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fails if a debug-only test switch made it into a built app bundle.
-# Usage: scripts/check-release-flags.sh path/to/IsoSword.app
+# Usage: scripts/check-release-flags.sh path/to/RedDelicious.app
 # Called by scripts/build.sh --release. Exit 0: clean. Exit 1: a marker was found.
 # Exit 2: bad usage or the bundle could not be searched (fails closed).
 set -euo pipefail
@@ -10,10 +10,10 @@ set -euo pipefail
 # The type and property names catch the code itself leaking even if a key string were
 # to change.
 markers=(
-    ISOSWORD_ALLOW_VIRTUAL_DISKS
+    REDDELICIOUS_ALLOW_VIRTUAL_DISKS
     DebugTestMode
     allowVirtualDisks
-    ISOSWORD_SIMULATE
+    REDDELICIOUS_SIMULATE
     SimulationMode
     SimulatedDrive
 )

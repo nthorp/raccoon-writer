@@ -4,7 +4,7 @@ import Security
 /// Shows the admin dialog through Security.framework, in the app's own process, so
 /// the dialog names the app. The app still never runs as root: authopen does the open.
 public struct SecurityAuthorizer: DeviceAuthorizer {
-    static let prompt = "\(AppInfo.displayName) needs your password to erase and write the selected drive."
+    static let prompt = "\(AppInfo.shortName) needs your password to erase and write the selected drive."
 
     public init() {}
 

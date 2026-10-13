@@ -69,7 +69,7 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
               let size = off_t(exactly: blockCount * UInt64(blockSize)) else {
             throw DeviceIOError.invalidGeometry(blockSize: blockSize, blockCount: blockCount)
         }
-        let url = directory.appendingPathComponent("isosword-fake-\(UUID().uuidString).img")
+        let url = directory.appendingPathComponent("reddelicious-fake-\(UUID().uuidString).img")
         let fd = open(url.path, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
         guard fd >= 0 else { throw DeviceIOError.posix(operation: "open", code: errno) }
         guard ftruncate(fd, size) == 0 else {

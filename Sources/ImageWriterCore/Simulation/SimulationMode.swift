@@ -1,12 +1,12 @@
 #if DEBUG
 import Foundation
 
-/// Debug builds only. With `ISOSWORD_SIMULATE=1` the app runs the whole flow against
+/// Debug builds only. With `REDDELICIOUS_SIMULATE=1` the app runs the whole flow against
 /// fakes: a fixed list of `SimulatedDrive`s, no diskutil, no authopen, and temp files
 /// in place of devices. The whole type is compiled out of Release builds, and
 /// `scripts/check-release-flags.sh` fails a Release build that still contains it.
 public enum SimulationMode {
-    public static let environmentKey = "ISOSWORD_SIMULATE"
+    public static let environmentKey = "REDDELICIOUS_SIMULATE"
 
     /// True only when the variable is exactly `1`.
     public static func isEnabled(

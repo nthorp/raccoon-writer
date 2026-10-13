@@ -1,6 +1,6 @@
-# iso-sword
+# Red Delicious Media Writer
 
-**ISO Sword** is a native macOS app (Swift/SwiftUI) that writes `.iso` and `.img` disk images to USB drives, for example to make a bootable Linux installer. It does the same job as balenaEtcher and Fedora Media Writer: pick an image, pick a drive, confirm, and it writes the image, reads it back to verify it, then ejects the drive.
+**Red Delicious Media Writer** (Red Delicious for short; formerly ISO Sword, which is why the repo is `iso-sword`) is a native macOS app (Swift/SwiftUI) that writes `.iso` and `.img` disk images to USB drives, for example to make a bootable Linux installer. It does the same job as balenaEtcher and Fedora Media Writer: pick an image, pick a drive, confirm, and it writes the image, reads it back to verify it, then ejects the drive.
 
 > **Status:** v1 is feature-complete and covered by unit tests. It has not yet been tested on real USB hardware. That test is under way, using [`docs/HARDWARE_TESTS.md`](docs/HARDWARE_TESTS.md). Until it is done, use only drives whose contents you don't need. See [`PLAN.md`](PLAN.md) for progress.
 
@@ -13,7 +13,7 @@ Several checks keep the wrong disk from being written:
 - **The drive list hides disks that are never safe targets.** The boot disk (including its APFS container and the physical disk behind it) and every internal disk never appear, under any setting. By default only external, removable USB drives are listed. "Show all external disks" adds other external disks, such as Thunderbolt SSDs. If the app can't work out which disk is the boot disk, the list stays empty.
 - **A confirm screen** shows the drive's name, size, `/dev/diskN` and mounted volumes, and requires a click on **Erase and Write**.
 - **A safety check right before writing** queries the disk again and stops if it has disappeared, changed (different size, name, block size or bus), or no longer passes the filter.
-- **macOS asks for an administrator password** before every write, in a dialog that names ISO Sword. The app hands the resulting authorization to `authopen`, the macOS tool that opens the disk and passes it back. The app itself never runs as root.
+- **macOS asks for an administrator password** before every write, in a dialog that names Red Delicious. The app hands the resulting authorization to `authopen`, the macOS tool that opens the disk and passes it back. The app itself never runs as root.
 
 After a cancelled or failed write, the drive's contents are undefined. The app says so and tells you what state the drive was left in.
 
@@ -29,11 +29,11 @@ After a cancelled or failed write, the drive's contents are undefined. The app s
 scripts/test.sh
 scripts/build.sh
 scripts/build.sh --release
-open build/IsoSword.app
+open build/RedDelicious.app
 ```
 
 - `scripts/test.sh` runs the unit tests for ImageWriterCore (`swift test`).
-- `scripts/build.sh` generates `IsoSword.xcodeproj` and builds a universal Debug `build/IsoSword.app`.
+- `scripts/build.sh` generates `RedDelicious.xcodeproj` and builds a universal Debug `build/RedDelicious.app`.
 - `scripts/build.sh --release` builds Release, then checks that no debug-only test switches are in it.
 
 The Xcode project is generated from `project.yml` and is not checked in. The app is ad-hoc signed only (see Limitations).
@@ -42,27 +42,27 @@ The Xcode project is generated from `project.yml` and is not checked in. The app
 
 These exist only in Debug builds. The Release build check fails if any of them leaks into a Release app.
 
-- `ISOSWORD_SIMULATE=1 build/IsoSword.app/Contents/MacOS/IsoSword` runs the whole UI against simulated drives backed by temp files. It never calls `diskutil` or `authopen`. Each simulated drive scripts one outcome (success, drive pulled out, verification mismatch, password prompt cancelled, drive too small). See T10 in `PLAN.md`.
-- `ISOSWORD_ALLOW_VIRTUAL_DISKS=1 build/IsoSword.app/Contents/MacOS/IsoSword` also lists **unmounted** disk images, so you can test a real write against a RAM disk (`hdiutil attach -nomount ram://1048576`) without a USB stick. See H2 in `docs/HARDWARE_TESTS.md`.
+- `REDDELICIOUS_SIMULATE=1 build/RedDelicious.app/Contents/MacOS/RedDelicious` runs the whole UI against simulated drives backed by temp files. It never calls `diskutil` or `authopen`. Each simulated drive scripts one outcome (success, drive pulled out, verification mismatch, password prompt cancelled, drive too small). See T10 in `PLAN.md`.
+- `REDDELICIOUS_ALLOW_VIRTUAL_DISKS=1 build/RedDelicious.app/Contents/MacOS/RedDelicious` also lists **unmounted** disk images, so you can test a real write against a RAM disk (`hdiutil attach -nomount ram://1048576`) without a USB stick. See H2 in `docs/HARDWARE_TESTS.md`.
 
 ### Logs
 
-The app logs to the unified log under subsystem `com.example.isosword`:
+The app logs to the unified log under subsystem `com.example.reddelicious`:
 
 ```sh
-log stream --predicate 'subsystem == "com.example.isosword"' --info
+log stream --predicate 'subsystem == "com.example.reddelicious"' --info
 ```
 
 ## How it works
 
 ```
 Select image → Select drive → Confirm → safety re-check → diskutil unmountDisk
-  → password prompt (Security.framework, names ISO Sword)
+  → password prompt (Security.framework, names Red Delicious)
   → authopen -extauth (opens the disk, returns an open file descriptor)
   → write to /dev/rdiskN → flush → read back and compare → diskutil eject → Done
 ```
 
-- One password prompt covers the write and the verify, because both use the same file descriptor. The app creates the authorization for `sys.openfile.readwrite./dev/rdiskN` itself and passes it to `authopen` on stdin (`-extauth`), so the dialog names ISO Sword.
+- One password prompt covers the write and the verify, because both use the same file descriptor. The app creates the authorization for `sys.openfile.readwrite./dev/rdiskN` itself and passes it to `authopen` on stdin (`-extauth`), so the dialog names Red Delicious.
 - Writes go to the raw device (`/dev/rdiskN`) in about 4 MiB chunks, with aligned buffers and the system cache bypassed. The final flush uses `F_FULLFSYNC`, or `fsync` on devices that don't support it.
 - Verification is always on. It compares every byte of the image with what the drive returns.
 - The Mac is kept from idle-sleeping during a write. The window can't be closed mid-write, and quitting asks first, then stops the write cleanly.
@@ -73,11 +73,11 @@ Select image → Select drive → Confirm → safety re-check → diskutil unmou
 - **Windows installer ISOs are not supported.** They need their files extracted onto a formatted drive, not a raw copy.
 - **No compressed images.** Decompress `.xz`, `.gz` or `.zip` images first (for example `xz -dk image.img.xz`).
 - **One drive at a time.** No persistence partitions.
-- **SD cards in a Mac's built-in slot are not listed.** macOS reports the built-in reader as an internal disk, and ISO Sword never shows internal disks. Use a USB card reader instead.
+- **SD cards in a Mac's built-in slot are not listed.** macOS reports the built-in reader as an internal disk, and Red Delicious never shows internal disks. Use a USB card reader instead.
 - **A password prompt on every write.** The app discards the authorization after each write, so the next one asks again.
 - **The password dialog has no custom icon yet.** macOS also adds its own headline above the app's message, which can't be removed.
 - **After a cancelled password prompt the drive stays unmounted.** Unplug and reinsert it to get its volumes back.
-- **Not signed or notarized.** Build from source. A copy downloaded or AirDropped from elsewhere is blocked by Gatekeeper until you remove the quarantine flag (`xattr -dr com.apple.quarantine IsoSword.app`).
+- **Not signed or notarized.** Build from source. A copy downloaded or AirDropped from elsewhere is blocked by Gatekeeper until you remove the quarantine flag (`xattr -dr com.apple.quarantine RedDelicious.app`).
 - English only. No drag-and-drop and no checksum display.
 
 ## Roadmap

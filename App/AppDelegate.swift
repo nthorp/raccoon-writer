@@ -36,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.messageText = stage.mayHaveModifiedDrive ? "Stop writing and quit?" : "Cancel and quit?"
         var info = DriveCondition(stoppedIn: stage).note
         if stage == .open {
-            info += " If the password dialog is open, ISO Sword quits once you answer it."
+            info += " If the password dialog is open, \(AppInfo.shortName) quits once you answer it."
         }
         alert.informativeText = info
         alert.addButton(withTitle: "Keep Writing")

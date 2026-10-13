@@ -1,4 +1,4 @@
-# AGENTS.md — iso-sword
+# AGENTS.md — Red Delicious Media Writer (repo: iso-sword)
 
 Native macOS app (Swift/SwiftUI) that writes `.iso` / `.img` images to USB drives. Read this file, then `PLAN.md`, at the start of every session.
 

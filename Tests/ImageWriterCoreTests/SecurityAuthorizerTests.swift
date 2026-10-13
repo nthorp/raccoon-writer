@@ -20,7 +20,7 @@ struct SecurityAuthorizerTests {
     }
 
     @Test func promptNamesTheApp() {
-        #expect(SecurityAuthorizer.prompt.hasPrefix("ISO Sword "))
+        #expect(SecurityAuthorizer.prompt.hasPrefix("Red Delicious "))
         #expect(!SecurityAuthorizer.prompt.contains("authopen"))
     }
 

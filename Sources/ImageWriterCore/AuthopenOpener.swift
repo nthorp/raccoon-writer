@@ -4,7 +4,7 @@ import os
 /// Opens raw disks through `/usr/libexec/authopen`, which passes back an open
 /// descriptor, so the app never runs as root. The app shows the admin prompt itself
 /// (`DeviceAuthorizer`) and hands the authorization over with `-extauth`, so the
-/// dialog names ISO Sword. Each call authorizes afresh and prompts again.
+/// dialog names Red Delicious. Each call authorizes afresh and prompts again.
 public struct AuthopenOpener: DeviceOpener {
     static let defaultExecutable = "/usr/libexec/authopen"
     private static let log = Logger(subsystem: AppInfo.bundleIdentifier, category: "authopen")

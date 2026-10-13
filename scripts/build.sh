@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generates the Xcode project with XcodeGen and builds a universal IsoSword.app
+# Generates the Xcode project with XcodeGen and builds a universal RedDelicious.app
 # into build/. Usage: scripts/build.sh [--release]
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -26,8 +26,8 @@ xcodegen generate --quiet
 
 derived=build/DerivedData
 xcodebuild \
-    -project IsoSword.xcodeproj \
-    -scheme IsoSword \
+    -project RedDelicious.xcodeproj \
+    -scheme RedDelicious \
     -configuration "$config" \
     -destination 'generic/platform=macOS' \
     -derivedDataPath "$derived" \
@@ -36,12 +36,12 @@ xcodebuild \
     CODE_SIGN_IDENTITY=- \
     build
 
-app_src="$derived/Build/Products/$config/IsoSword.app"
-rm -rf build/IsoSword.app
-cp -R "$app_src" build/IsoSword.app
+app_src="$derived/Build/Products/$config/RedDelicious.app"
+rm -rf build/RedDelicious.app
+cp -R "$app_src" build/RedDelicious.app
 
-archs="$(lipo -archs build/IsoSword.app/Contents/MacOS/IsoSword)"
-echo "Built build/IsoSword.app ($config) — architectures: $archs"
+archs="$(lipo -archs build/RedDelicious.app/Contents/MacOS/RedDelicious)"
+echo "Built build/RedDelicious.app ($config) — architectures: $archs"
 for required in arm64 x86_64; do
     if [[ " $archs " != *" $required "* ]]; then
         echo "error: binary is missing architecture $required" >&2
@@ -50,5 +50,5 @@ for required in arm64 x86_64; do
 done
 
 if [[ "$config" == Release && -x scripts/check-release-flags.sh ]]; then
-    scripts/check-release-flags.sh build/IsoSword.app
+    scripts/check-release-flags.sh build/RedDelicious.app
 fi

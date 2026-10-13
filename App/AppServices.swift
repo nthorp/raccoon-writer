@@ -1,7 +1,7 @@
 import ImageWriterCore
 
 /// The coordinator and drive list the window binds to, wired together. Debug builds
-/// started with `ISOSWORD_SIMULATE=1` get the fake pipeline instead of diskutil and authopen.
+/// started with `REDDELICIOUS_SIMULATE=1` get the fake pipeline instead of diskutil and authopen.
 @MainActor
 struct AppServices {
     static let windowTitle = AppInfo.displayName

@@ -8,7 +8,7 @@ final class WriteEngineTests {
     let dir: URL
 
     init() throws {
-        dir = FileManager.default.temporaryDirectory.appendingPathComponent("isosword-write-\(UUID().uuidString)")
+        dir = FileManager.default.temporaryDirectory.appendingPathComponent("reddelicious-write-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false)
     }
 

@@ -1,6 +1,6 @@
 # Hardware test checklist (T12)
 
-The first real-world check of ISO Sword. Every test here is run by a person (Nick), never by an agent. Agents must not write to real disks.
+The first real-world check of Red Delicious Media Writer. Builds before T14 were called ISO Sword (`build/IsoSword.app`, env vars `ISOSWORD_*`, log subsystem `com.example.isosword`); the recorded results below keep the names of the build they ran on. Every test here is run by a person (Nick), never by an agent. Agents must not write to real disks.
 
 **Most of these tests erase a USB stick.** Use sticks that hold nothing you need. H11 pulls a stick out mid-write. That is almost always harmless, but use a spare stick you don't mind losing.
 
@@ -19,13 +19,13 @@ A test passes only if every **Expected** item happened. If one item differs but 
 - A PC (or Intel Mac) that can boot from USB, for H6 and H7.
 - Images. Keep them in `~/iso-sword-test/`:
   - **A hybrid Linux ISO**, for example Fedora Workstation Live or Ubuntu Desktop (both are hybrid). At least 2 GB, so that H8 and H9 have time to click Cancel.
-  - **An uncompressed `.img`**, for example a FreeBSD `memstick.img`, or a Raspberry Pi OS image unpacked with `xz -dk`. ISO Sword can't read `.xz`, `.gz` or `.zip`.
+  - **An uncompressed `.img`**, for example a FreeBSD `memstick.img`, or a Raspberry Pi OS image unpacked with `xz -dk`. Red Delicious can't read `.xz`, `.gz` or `.zip`.
   - **An image bigger than your stick.** A sparse file is enough. For a 16 GB stick: `mkfile -n 20g ~/iso-sword-test/too-big.img` (use a size larger than your stick).
   - **Random test data for the RAM disk:** `head -c 200000000 /dev/urandom > ~/iso-sword-test/ram-test.img` (200 MB).
 
 ### Builds
 
-Both builds go to `build/IsoSword.app`, so rebuild when a test needs the other one.
+Both builds go to `build/RedDelicious.app`, so rebuild when a test needs the other one.
 
 - Debug, needed for H1, H2 and part of H3: `scripts/build.sh`
 - Release, used for every real-stick test (H3–H13): `scripts/build.sh --release`
@@ -37,7 +37,7 @@ Record the commit you tested: `git rev-parse --short HEAD`.
 Keep this running in a second Terminal window during every test. It shows which flush method was used (H6), authopen's error text, and why disks were filtered out:
 
 ```sh
-log stream --predicate 'subsystem == "com.example.isosword"' --info
+log stream --predicate 'subsystem == "com.example.reddelicious"' --info
 ```
 
 ### Identifying the stick
@@ -96,7 +96,7 @@ Nothing touches a disk. This is a visual check of every screen, which agents cou
 
 **Steps**
 1. `scripts/build.sh`, then `mkfile -n 300m /tmp/sim.img`.
-2. `ISOSWORD_SIMULATE=1 build/IsoSword.app/Contents/MacOS/IsoSword`
+2. `REDDELICIOUS_SIMULATE=1 build/RedDelicious.app/Contents/MacOS/RedDelicious`
 3. Choose `/tmp/sim.img`. Write to `disk90` (success), `disk91` (pulled out mid-write) and `disk92` (verify mismatch). Try `disk93` (cancelled password prompt) and `disk94` (too small).
 4. Switch to Dark Mode (System Settings → Appearance) and look at the setup, progress and done screens again.
 
@@ -121,14 +121,14 @@ A full write, verify and eject against a RAM disk, with the real password prompt
    sudo chown root:operator "$DISK" "$RAW"
    echo "$DISK"
    ```
-3. `ISOSWORD_ALLOW_VIRTUAL_DISKS=1 build/IsoSword.app/Contents/MacOS/IsoSword`
+3. `REDDELICIOUS_ALLOW_VIRTUAL_DISKS=1 build/RedDelicious.app/Contents/MacOS/RedDelicious`
 4. Choose `~/iso-sword-test/ram-test.img`. Pick the RAM disk (its `diskN` is the one echoed above, named "Disk Image"). Click Continue, then **Erase and Write**.
 5. Enter your password in the macOS dialog.
 6. Afterwards, clean up if the disk is still attached ("no such disk" is fine): `hdiutil detach "$DISK" || sudo hdiutil detach "$DISK"`
 
 **Expected**
 - The confirm screen shows the RAM disk's name, 537 MB and `/dev/diskN`.
-- The dialog says "authopen wants to make changes" (builds before T13; from T13 on it names ISO Sword, see T13).
+- The dialog says "authopen wants to make changes" (builds before T13; from T13 on it names the app, see T13).
 - The progress screen goes through writing, "Finishing the write" and verifying, then shows "Finished. You can remove the drive." with the size, total time and average write speed.
 - The log shows `fullSync used fsync fallback` (RAM disks don't support `F_FULLFSYNC`, see T01).
 - Either the RAM disk was ejected, or the done screen says "Finished, but the drive is still attached". Note which one.
@@ -142,7 +142,7 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 1. Run `diskutil list` and note every internal disk and the boot disk's APFS container (for example `disk0` and `disk3`). Mount any `.dmg` you have (or leave one mounted).
 2. **Release build**, with a USB stick inserted: look at the drive list with "Show all external disks" off, then on.
 3. Insert and remove the stick while the drive list is showing. Do the same while the stick is selected.
-4. **Debug build** with `ISOSWORD_ALLOW_VIRTUAL_DISKS=1`: repeat step 2.
+4. **Debug build** with `REDDELICIOUS_ALLOW_VIRTUAL_DISKS=1`: repeat step 2.
 5. If you have an SD card slot, a card reader or a Thunderbolt/USB-C SSD, attach it and repeat step 2 with the Release build.
 
 **Expected**
@@ -176,7 +176,7 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 **Steps**
 1. Make sure the stick has a mounted volume (format it in Disk Utility first if needed).
 2. Choose any image and the stick, click Continue, then **Erase and Write**.
-3. In the password dialog, click **Cancel**. From T13 on the dialog names ISO Sword; earlier builds showed "authopen wants to make changes".
+3. In the password dialog, click **Cancel**. From T13 on the dialog names the app; earlier builds showed "authopen wants to make changes".
 
 **Expected**
 - The app returns to the confirm screen, not an error screen, with the notice: "The password dialog was cancelled, so nothing was written. The drive's volumes have been unmounted; reinsert the drive to get them back."
@@ -260,12 +260,12 @@ The main end-to-end test. Also records the flush method on a real stick.
 1. Start a write. While it is writing, press ⌘Q.
 2. Click **Keep Writing**. Check that the write continues.
 3. Press ⌘Q again and click **Stop and Quit**.
-4. Start another write, and while the ISO Sword password dialog is up press ⌘Q, then **Stop and Quit**, then answer the dialog (either button). Note which button you used.
+4. Start another write, and while the Red Delicious password dialog is up press ⌘Q, then **Stop and Quit**, then answer the dialog (either button). Note which button you used.
 
 **Expected**
 - The alert says "Stop writing and quit?" with the drive note. "Keep Writing" is the default button.
 - Keep Writing: the run continues normally.
-- Stop and Quit: the app quits within a few seconds. `ps aux | grep -i IsoSword` shows nothing left running.
+- Stop and Quit: the app quits within a few seconds. `ps aux | grep -i RedDelicious` shows nothing left running.
 - During the password dialog the alert says "Cancel and quit?" and that the app quits once you answer the dialog, which it does.
 
 **Result:**
@@ -302,7 +302,7 @@ The main end-to-end test. Also records the flush method on a real stick.
 ### H13 — Intel Mac run (if available)
 
 **Steps**
-1. Copy `build/IsoSword.app` (Release) to the Intel Mac. If it was copied by AirDrop or downloaded, clear the quarantine flag first: `xattr -dr com.apple.quarantine IsoSword.app`. The app is only ad-hoc signed.
+1. Copy `build/RedDelicious.app` (Release) to the Intel Mac. If it was copied by AirDrop or downloaded, clear the quarantine flag first: `xattr -dr com.apple.quarantine RedDelicious.app`. The app is only ad-hoc signed.
 2. Repeat H3 and H6 there.
 
 **Expected**
@@ -322,7 +322,7 @@ D=disk4
 for k in MediaName BusProtocol Internal Removable RemovableMedia Ejectable VirtualOrPhysical DeviceBlockSize TotalSize; do printf '%s: ' "$k"; diskutil info -plist "$D" | plutil -extract "$k" raw -o - - 2>/dev/null || echo absent; done
 ```
 
-Change `disk4` to the disk's number first. Paste each output below, and note whether the disk appeared in ISO Sword with the toggle off and on.
+Change `disk4` to the disk's number first. Paste each output below, and note whether the disk appeared in Red Delicious with the toggle off and on.
 
 **Result:**
 **Notes:**

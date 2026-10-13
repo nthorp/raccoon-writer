@@ -1,6 +1,6 @@
 import Foundation
 
-/// The image formats ISO Sword writes. Both are copied to the drive byte for byte.
+/// The image formats Red Delicious writes. Both are copied to the drive byte for byte.
 public enum ImageKind: String, Equatable, Sendable {
     case iso
     case img

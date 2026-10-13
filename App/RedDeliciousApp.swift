@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct IsoSwordApp: App {
+struct RedDeliciousApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     private let services = AppServices.shared
 

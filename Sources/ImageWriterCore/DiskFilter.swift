@@ -25,7 +25,7 @@ public struct DiskFilter: Sendable {
 #endif
 
     /// The filter the app should use: in Debug builds it honors
-    /// `ISOSWORD_ALLOW_VIRTUAL_DISKS=1` (see `DebugTestMode`); in Release builds it is
+    /// `REDDELICIOUS_ALLOW_VIRTUAL_DISKS=1` (see `DebugTestMode`); in Release builds it is
     /// the plain filter.
     public static func configured(showAllExternal: Bool) -> DiskFilter {
 #if DEBUG

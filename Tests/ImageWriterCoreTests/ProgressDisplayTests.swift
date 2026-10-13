@@ -28,7 +28,7 @@ struct ProgressDisplayTests {
 
     @Test func thePromptStageNamesTheAppsOwnDialog() throws {
         let open = try #require(ProgressDisplay(state: .preparing(.open), isCancelling: false))
-        #expect(open.detail?.contains("dialog from ISO Sword") == true)
+        #expect(open.detail?.contains("dialog from Red Delicious") == true)
         #expect(open.detail?.contains("authopen") == false)
     }
 

@@ -23,7 +23,7 @@ public struct ProgressDisplay: Equatable, Sendable {
         case .preparing(let stage):
             title = stage.label
             if stage == .open {
-                detail = "Enter an administrator password in the dialog from ISO Sword."
+                detail = "Enter an administrator password in the dialog from \(AppInfo.shortName)."
             }
         case .writing(let progress) where progress.completedBytes >= progress.totalBytes:
             // The engine reports 100 % before the flush, which can take a while on USB.

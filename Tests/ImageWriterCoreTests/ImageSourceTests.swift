@@ -7,7 +7,7 @@ final class ImageSourceTests {
     let dir: URL
 
     init() throws {
-        dir = FileManager.default.temporaryDirectory.appendingPathComponent("isosword-source-\(UUID().uuidString)")
+        dir = FileManager.default.temporaryDirectory.appendingPathComponent("reddelicious-source-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false)
     }
 

@@ -45,7 +45,7 @@ struct ConfirmView: View {
             Text("All data on this drive will be permanently lost.")
                 .bold()
 
-            Text("ISO Sword will ask for an administrator password.")
+            Text("\(AppInfo.shortName) will ask for an administrator password.")
 
             Spacer()
 
