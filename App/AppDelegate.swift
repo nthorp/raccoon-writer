@@ -35,7 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.alertStyle = .warning
         alert.messageText = stage.mayHaveModifiedDrive ? "Stop writing and quit?" : "Cancel and quit?"
         var info = DriveCondition(stoppedIn: stage).note
-        if stage == .open {
+        if stage == .authorize {
             info += " If the password dialog is open, \(AppInfo.shortName) quits once you answer it."
         }
         alert.informativeText = info

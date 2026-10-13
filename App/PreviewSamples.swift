@@ -24,12 +24,6 @@ enum PreviewSamples {
         isVirtual: false, isWholeDisk: true, mountPoints: ["/Volumes/STICK"], volumeNames: ["STICK"]
     )
 
-    static var unmountedStick: DiskInfo {
-        var disk = stick
-        disk.mountPoints = []
-        return disk
-    }
-
     static let ssd = DiskInfo(
         bsdName: "disk5", mediaName: "Samsung T7", sizeBytes: 500_107_862_016, blockSize: 512,
         busProtocol: "PCI-Express", isInternal: false, isRemovable: false, isEjectable: true,

@@ -251,6 +251,56 @@ struct SafetyGuardTests {
     }
 }
 
+// MARK: - The opened device
+
+/// `checkOpened` compares the device authopen returned with the disk `validate` returned.
+struct SafetyGuardOpenedDeviceTests {
+    let guardian = SafetyGuard(discovery: StubDiscovery(disks: []), bootResolver: StubResolver())
+
+    func disk(sizeBytes: UInt64, blockSize: Int?) -> DiskInfo {
+        var disk = DiskInfo.usbStick(sizeBytes: sizeBytes)
+        disk.blockSize = blockSize
+        return disk
+    }
+
+    @Test(arguments: [512, 4096])
+    func aDeviceOfTheCheckedSizePasses(_ blockSize: Int) throws {
+        let device = try FileBackedDevice(blockSize: blockSize, blockCount: 16)
+        try guardian.checkOpened(device, matches: disk(sizeBytes: UInt64(blockSize * 16), blockSize: blockSize))
+    }
+
+    @Test(arguments: [15, 17, 1_000_000] as [UInt64])
+    func aDeviceOfAnotherSizeIsRefused(_ blockCount: UInt64) throws {
+        let device = try FileBackedDevice(blockSize: 512, blockCount: blockCount)
+        #expect(throws: SafetyGuardError.diskChanged(bsdName: "disk4", field: .size)) {
+            try guardian.checkOpened(device, matches: disk(sizeBytes: 512 * 16, blockSize: 512))
+        }
+    }
+
+    @Test func aDeviceWithAnotherBlockSizeIsRefusedEvenAtTheSameByteCount() throws {
+        let device = try FileBackedDevice(blockSize: 4096, blockCount: 2)
+        #expect(throws: SafetyGuardError.diskChanged(bsdName: "disk4", field: .blockSize)) {
+            try guardian.checkOpened(device, matches: disk(sizeBytes: 8192, blockSize: 512))
+        }
+    }
+
+    @Test func anUnknownBlockSizeStillChecksTheByteCount() throws {
+        let device = try FileBackedDevice(blockSize: 4096, blockCount: 2)
+        try guardian.checkOpened(device, matches: disk(sizeBytes: 8192, blockSize: nil))
+        #expect(throws: SafetyGuardError.diskChanged(bsdName: "disk4", field: .size)) {
+            try guardian.checkOpened(device, matches: disk(sizeBytes: 8704, blockSize: nil))
+        }
+    }
+
+    @Test func anUnknownSizeFailsClosed() throws {
+        // Discovery falls back to 0 when diskutil reports no size.
+        let device = try FileBackedDevice(blockSize: 512, blockCount: 16)
+        #expect(throws: SafetyGuardError.diskChanged(bsdName: "disk4", field: .size)) {
+            try guardian.checkOpened(device, matches: disk(sizeBytes: 0, blockSize: 512))
+        }
+    }
+}
+
 private struct StubDiscovery: DiskDiscovery {
     let disks: [DiskInfo]
     func listDisks() async throws -> [DiskInfo] { disks }

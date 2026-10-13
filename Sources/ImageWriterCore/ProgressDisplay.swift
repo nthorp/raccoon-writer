@@ -22,7 +22,7 @@ public struct ProgressDisplay: Equatable, Sendable {
         switch state {
         case .preparing(let stage):
             title = stage.label
-            if stage == .open {
+            if stage == .authorize {
                 detail = "Enter an administrator password in the dialog from \(AppInfo.shortName)."
             }
         case .writing(let progress) where progress.completedBytes >= progress.totalBytes:

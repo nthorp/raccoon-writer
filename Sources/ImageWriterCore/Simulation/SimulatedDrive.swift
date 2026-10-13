@@ -80,7 +80,6 @@ public enum SimulatedDrive: String, CaseIterable, Sendable {
 
     /// The device an open of this drive returns: a sparse temp file of the drive's size.
     func openDevice(in directory: URL) throws -> any OpenedDevice {
-        if self == .promptCancelled { throw DeviceOpenError.userCancelled }
         var faults = FileBackedDevice.Faults()
         if self == .removedMidWrite {
             faults.failWrite = .init(call: Self.failingWriteCall, code: ENXIO)

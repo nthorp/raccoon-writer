@@ -48,43 +48,53 @@ struct AuthopenOpenerTests {
 
     // MARK: - Spawning a stand-in
 
-    @Test func invalidNameThrowsBeforeSpawning() async throws {
-        let marker = FileManager.default.temporaryDirectory.appendingPathComponent("reddelicious-marker-\(UUID().uuidString)")
-        let script = try StandIn("touch '\(marker.path)'; exit 1")
-        let standIn = opener(script.path)
+    @Test func invalidNameThrowsBeforeTheDialog() async throws {
+        let authorizer = FakeDeviceAuthorizer()
+        let standIn = AuthopenOpener(executable: "/nonexistent/reddelicious/authopen", authorizer: authorizer)
         for name in ["disk4s1", "/dev/disk4", "disk4;rm", "rdisk4", ""] {
             await #expect(throws: DeviceOpenError.invalidDiskName(name)) {
-                _ = try await standIn.openForReadWrite(bsdName: name)
+                _ = try await standIn.authorize(bsdName: name)
             }
         }
+        #expect(authorizer.requestedPaths.isEmpty)
+    }
+
+    @Test func authorizeAsksForTheRawDeviceAndSpawnsNothing() async throws {
+        let marker = FileManager.default.temporaryDirectory.appendingPathComponent("reddelicious-marker-\(UUID().uuidString)")
+        let script = try StandIn("touch '\(marker.path)'; exit 1")
+        let authorizer = FakeDeviceAuthorizer()
+        let grant = try await AuthopenOpener(executable: script.path, authorizer: authorizer).authorize(bsdName: "disk4")
+        #expect(grant.bsdName == "disk4")
+        #expect(authorizer.requestedPaths == ["/dev/rdisk4"])
         #expect(!FileManager.default.fileExists(atPath: marker.path))
+        grant.release()
     }
 
     @Test func passesExactArguments() async throws {
         let script = try StandIn("echo \"$@\" >&2; exit 3")
         await #expect(throws: DeviceOpenError.authopenFailed(status: 3, message: "-stdoutpipe -extauth -o 2 /dev/rdisk42")) {
-            _ = try await opener(script.path).openForReadWrite(bsdName: "disk42")
+            _ = try await open(script.path, "disk42")
         }
     }
 
     @Test func cancelFromStandInMapsToUserCancelled() async throws {
         let script = try StandIn("echo 'AuthorizationCreate failed: The authorization was canceled by the user.' >&2; exit 1")
         await #expect(throws: DeviceOpenError.userCancelled) {
-            _ = try await opener(script.path).openForReadWrite(bsdName: "disk4")
+            _ = try await open(script.path, "disk4")
         }
     }
 
     @Test func cleanExitWithoutDescriptorFails() async throws {
         let script = try StandIn("echo not-a-descriptor; exit 0")
         await #expect(throws: DeviceOpenError.authopenFailed(status: 0, message: "")) {
-            _ = try await opener(script.path).openForReadWrite(bsdName: "disk4")
+            _ = try await open(script.path, "disk4")
         }
     }
 
     @Test func killedStandInIsTermination() async throws {
         let script = try StandIn("kill -9 $$")
         await #expect(throws: DeviceOpenError.authopenTerminated(signal: 9)) {
-            _ = try await opener(script.path).openForReadWrite(bsdName: "disk4")
+            _ = try await open(script.path, "disk4")
         }
     }
 
@@ -102,7 +112,7 @@ struct AuthopenOpenerTests {
         #expect(fstat(fd, &info) == 0)
         let script = try StandIn("stat -L -f %i /dev/fd/\(fd) 1>&2 2>/dev/null; exit 4")
         do {
-            _ = try await opener(script.path).openForReadWrite(bsdName: "disk4")
+            _ = try await open(script.path, "disk4")
             Issue.record("expected a failure")
         } catch DeviceOpenError.authopenFailed(let status, let message) {
             #expect(status == 4)
@@ -112,7 +122,7 @@ struct AuthopenOpenerTests {
 
     @Test func missingExecutableIsSpawnError() async {
         await #expect(throws: DeviceOpenError.posix(operation: "posix_spawn", code: ENOENT)) {
-            _ = try await opener("/nonexistent/reddelicious/authopen").openForReadWrite(bsdName: "disk4")
+            _ = try await open("/nonexistent/reddelicious/authopen", "disk4")
         }
     }
 
@@ -123,15 +133,13 @@ struct AuthopenOpenerTests {
         .permissionDenied,
         .authorizationFailed(status: errAuthorizationInternal),
     ])
-    func failedAuthorizationNeverSpawns(_ error: DeviceOpenError) async throws {
-        let marker = FileManager.default.temporaryDirectory.appendingPathComponent("reddelicious-marker-\(UUID().uuidString)")
-        let script = try StandIn("touch '\(marker.path)'; exit 1")
+    func failedAuthorizationIsThrownFromAuthorize(_ error: DeviceOpenError) async throws {
         let authorizer = FakeDeviceAuthorizer(error: error)
         await #expect(throws: error) {
-            _ = try await AuthopenOpener(executable: script.path, authorizer: authorizer).openForReadWrite(bsdName: "disk4")
+            _ = try await AuthopenOpener(executable: "/nonexistent/reddelicious/authopen", authorizer: authorizer)
+                .authorize(bsdName: "disk4")
         }
         #expect(authorizer.requestedPaths == ["/dev/rdisk4"])
-        #expect(!FileManager.default.fileExists(atPath: marker.path))
     }
 
     @Test func standInReceivesExtauthAndExactlyTheExternalForm() async throws {
@@ -141,7 +149,7 @@ struct AuthopenOpenerTests {
         let hex = FakeDeviceAuthorizer.sampleExternalForm.map { String(format: "%02x", $0) }.joined()
         #expect(hex.count == 64)
         await #expect(throws: DeviceOpenError.authopenFailed(status: 3, message: "-stdoutpipe -extauth -o 2 /dev/rdisk7|\(hex)")) {
-            _ = try await AuthopenOpener(executable: script.path, authorizer: authorizer).openForReadWrite(bsdName: "disk7")
+            _ = try await AuthopenOpener(executable: script.path, authorizer: authorizer).authorize(bsdName: "disk7").open()
         }
         #expect(authorizer.requestedPaths == ["/dev/rdisk7"])
     }
@@ -151,7 +159,7 @@ struct AuthopenOpenerTests {
         let script = try StandIn("exec 0<&-; exit 5")
         for _ in 0..<20 {
             await #expect(throws: DeviceOpenError.authopenFailed(status: 5, message: "")) {
-                _ = try await opener(script.path).openForReadWrite(bsdName: "disk4")
+                _ = try await open(script.path, "disk4")
             }
         }
     }
@@ -165,23 +173,22 @@ struct AuthopenOpenerTests {
         #expect(fcntl(pipe.write, F_GETFD) & FD_CLOEXEC != 0)
     }
 
-    @Test func authorizationIsReleasedOnceWhenTheOpenSucceeds() throws {
+    @Test func obtainingADescriptorLeavesTheAuthorizationToItsOwner() throws {
         let (url, fileFD) = try makeTempFile()
         defer {
             close(fileFD)
             unlink(url.path)
         }
         let authorizer = FakeDeviceAuthorizer()
-        let fd = try AuthopenOpener.obtainDescriptor(executable: "unused", authorizer: authorizer, devicePath: "/dev/rdisk4") { _, arguments, input in
-            // Still alive while authopen runs.
-            #expect(authorizer.authorizations.first?.releaseCount == 0)
+        let authorization = try authorizer.authorize(devicePath: "/dev/rdisk4")
+        let fd = try AuthopenOpener.obtainDescriptor(executable: "unused", authorization: authorization, devicePath: "/dev/rdisk4") { _, arguments, input in
             #expect(arguments.contains("-extauth"))
             #expect(input == FakeDeviceAuthorizer.sampleExternalForm)
             return AuthopenOpener.Outcome(descriptor: dup(fileFD), termination: .exited(0), stderr: "")
         }
         defer { close(fd) }
         #expect(fd >= 0)
-        #expect(authorizer.authorizations.map(\.releaseCount) == [1])
+        #expect(authorizer.authorizations.map(\.releaseCount) == [0])
     }
 
     @Test(arguments: [
@@ -189,37 +196,49 @@ struct AuthopenOpenerTests {
         "echo not-a-descriptor; exit 0", // exited without sending an fd
         "kill -9 $$",                   // killed
     ])
-    func authorizationIsReleasedOnceWhenNoDescriptorArrives(_ body: String) async throws {
+    func aFailedOpenKeepsTheAuthorizationUntilTheGrantIsReleased(_ body: String) async throws {
         let script = try StandIn(body)
         let authorizer = FakeDeviceAuthorizer()
-        await #expect(throws: DeviceOpenError.self) {
-            _ = try await AuthopenOpener(executable: script.path, authorizer: authorizer).openForReadWrite(bsdName: "disk4")
-        }
+        let grant = try await AuthopenOpener(executable: script.path, authorizer: authorizer).authorize(bsdName: "disk4")
+        await #expect(throws: DeviceOpenError.self) { _ = try await grant.open() }
+        #expect(authorizer.authorizations.map(\.releaseCount) == [0])
+        grant.release()
         #expect(authorizer.authorizations.map(\.releaseCount) == [1])
     }
 
-    @Test func authorizationIsReleasedOnceWhenTheSpawnFails() async throws {
+    @Test func releasingAGrantTwiceReleasesTheAuthorizationOnce() async throws {
         let authorizer = FakeDeviceAuthorizer()
-        await #expect(throws: DeviceOpenError.posix(operation: "posix_spawn", code: ENOENT)) {
-            _ = try await AuthopenOpener(executable: "/nonexistent/reddelicious/authopen", authorizer: authorizer)
-                .openForReadWrite(bsdName: "disk4")
-        }
+        let grant = try await AuthopenOpener(executable: "/nonexistent/reddelicious/authopen", authorizer: authorizer)
+            .authorize(bsdName: "disk4")
+        grant.release()
+        grant.release()
         #expect(authorizer.authorizations.map(\.releaseCount) == [1])
     }
 
-    @Test func eachOpenAuthorizesAfresh() async throws {
-        let script = try StandIn("exit 1")
+    @Test func aDroppedGrantReleasesTheAuthorization() async throws {
         let authorizer = FakeDeviceAuthorizer()
-        let standIn = AuthopenOpener(executable: script.path, authorizer: authorizer)
+        let standIn = AuthopenOpener(executable: "/nonexistent/reddelicious/authopen", authorizer: authorizer)
+        _ = try await standIn.authorize(bsdName: "disk4")
+        #expect(authorizer.authorizations.map(\.releaseCount) == [1])
+    }
+
+    @Test func eachAuthorizeAsksAfresh() async throws {
+        let authorizer = FakeDeviceAuthorizer()
+        let standIn = AuthopenOpener(executable: "/nonexistent/reddelicious/authopen", authorizer: authorizer)
         for _ in 0..<2 {
-            await #expect(throws: DeviceOpenError.self) { _ = try await standIn.openForReadWrite(bsdName: "disk4") }
+            let grant = try await standIn.authorize(bsdName: "disk4")
+            grant.release()
         }
+        #expect(authorizer.requestedPaths == ["/dev/rdisk4", "/dev/rdisk4"])
         #expect(authorizer.authorizations.map(\.releaseCount) == [1, 1])
     }
 }
 
-private func opener(_ executable: String) -> AuthopenOpener {
-    AuthopenOpener(executable: executable, authorizer: FakeDeviceAuthorizer())
+/// Authorizes with a fake, then opens through the stand-in at `executable`.
+private func open(_ executable: String, _ bsdName: String) async throws -> any OpenedDevice {
+    let grant = try await AuthopenOpener(executable: executable, authorizer: FakeDeviceAuthorizer()).authorize(bsdName: bsdName)
+    defer { grant.release() }
+    return try await grant.open()
 }
 
 /// An executable `/bin/sh` script in the temp directory, deleted on deinit.

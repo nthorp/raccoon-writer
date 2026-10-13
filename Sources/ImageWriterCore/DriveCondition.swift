@@ -16,7 +16,7 @@ public enum DriveCondition: Equatable, Sendable {
     /// is known. Conservative: a write stopped before its first chunk still counts.
     public init(stoppedIn stage: PipelineStage) {
         switch stage {
-        case .safetyCheck, .unmount, .open: self = .untouched
+        case .authorize, .safetyCheck, .unmount, .open: self = .untouched
         case .write: self = .partiallyWritten
         // The write and its flush finished before the verify started.
         case .verify: self = .unverified

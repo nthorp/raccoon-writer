@@ -1,7 +1,7 @@
 import Foundation
 
-/// Why `SafetyGuard` refused to let a write start. Nothing has been unmounted or
-/// opened when any of these is thrown.
+/// Why `SafetyGuard` refused to let a write start. Nothing has been written when any
+/// of these is thrown, and from `validate` nothing has been unmounted or opened either.
 public enum SafetyGuardError: Error, Equatable, Sendable {
     /// The confirmed disk is no longer listed, usually because it was removed.
     case diskMissing(bsdName: String)

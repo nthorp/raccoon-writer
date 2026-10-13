@@ -11,10 +11,12 @@ final class CoordinatorFaultTests {
     nonisolated static let blockSize = 512
     nonisolated static let chunkBlocks = 4
     nonisolated static let imageBytes = 3 * chunkBlocks * blockSize + 100
+    nonisolated static let deviceBlocks: UInt64 = 64
 
     let dir: URL
     let filter = DiskFilter(showAllExternal: false)
-    let disk = DiskInfo.usbStick()
+    /// The size of `device()`, which the opened device is checked against.
+    let disk = DiskInfo.usbStick(sizeBytes: deviceBlocks * UInt64(blockSize))
     let sleep = FakeSleepPreventer()
 
     init() throws {
@@ -38,7 +40,7 @@ final class CoordinatorFaultTests {
     }
 
     func device(faults: FileBackedDevice.Faults = .init()) throws -> FileBackedDevice {
-        try FileBackedDevice(blockSize: Self.blockSize, blockCount: 64, faults: faults, directory: dir)
+        try FileBackedDevice(blockSize: Self.blockSize, blockCount: Self.deviceBlocks, faults: faults, directory: dir)
     }
 
     func coordinator(diskManager: any DiskManager = FakeDiskManager(), opener: any DeviceOpener) -> WriteCoordinator {
@@ -157,31 +159,30 @@ final class CoordinatorFaultTests {
 
     // MARK: - Prompt cancelled
 
-    @Test func cancelledPromptReturnsToTheConfirmScreen() async throws {
+    @Test func cancelledPromptReturnsToTheConfirmScreenWithTheDriveUntouched() async throws {
         let diskManager = FakeDiskManager()
-        let opener = FakeDeviceOpener(error: .userCancelled)
+        let opener = FakeDeviceOpener(authorizeError: .userCancelled)
         let coordinator = coordinator(diskManager: diskManager, opener: opener)
         let image = try image()
 
         try await run(coordinator, image: image)
 
-        var unmounted = disk
-        unmounted.mountPoints = []
-        #expect(coordinator.state == .awaitingConfirmation(image, unmounted))
+        // The dialog comes before the unmount, so the volumes stay mounted.
+        #expect(coordinator.state == .awaitingConfirmation(image, disk))
         #expect(coordinator.notice == .passwordPromptCancelled)
-        #expect(coordinator.selectedDrive == unmounted)
+        #expect(coordinator.selectedDrive == disk)
         #expect(coordinator.isCancelling == false)
-        #expect(diskManager.calls == [.unmount("disk4")])
-        #expect(opener.openAttempts == ["disk4"])
+        #expect(diskManager.calls.isEmpty)
+        #expect(opener.authorizeAttempts == ["disk4"])
+        #expect(opener.openAttempts.isEmpty)
     }
 
     @Test func afterACancelledPromptTheUserCanConfirmAgain() async throws {
         let device = try device()
         let attempts = AttemptCounter()
-        let opener = FakeDeviceOpener { _ in
+        let opener = FakeDeviceOpener(authorize: { _ in
             if attempts.next() == 1 { throw DeviceOpenError.userCancelled }
-            return device
-        }
+        }) { _ in device }
         let coordinator = coordinator(opener: opener)
 
         try await run(coordinator, image: try image())
@@ -194,7 +195,7 @@ final class CoordinatorFaultTests {
     }
 
     @Test func afterACancelledPromptTheUserCanGoBack() async throws {
-        let coordinator = coordinator(opener: FakeDeviceOpener(error: .userCancelled))
+        let coordinator = coordinator(opener: FakeDeviceOpener(authorizeError: .userCancelled))
         let image = try image()
 
         try await run(coordinator, image: image)
@@ -205,11 +206,11 @@ final class CoordinatorFaultTests {
     }
 
     @Test func otherOpenFailuresStillFail() async throws {
-        let coordinator = coordinator(opener: FakeDeviceOpener(error: .permissionDenied))
+        let coordinator = coordinator(opener: FakeDeviceOpener(authorizeError: .permissionDenied))
 
         try await run(coordinator, image: try image())
 
-        #expect(coordinator.state == .failed(WriteFailure(stage: .open, error: DeviceOpenError.permissionDenied)))
+        #expect(coordinator.state == .failed(WriteFailure(stage: .authorize, error: DeviceOpenError.permissionDenied)))
         #expect(coordinator.notice == nil)
     }
 
@@ -230,7 +231,7 @@ final class CoordinatorFaultTests {
         #expect(coordinator.driveTooSmall == expected)
         #expect(throws: WriteCoordinatorError.driveTooSmall(expected)) { try coordinator.requestConfirmation() }
         #expect(coordinator.state == .driveSelected(image, small))
-        #expect(opener.openAttempts.isEmpty)
+        #expect(opener.authorizeAttempts.isEmpty)
     }
 
     @Test func choosingASmallerImageClearsTheProblem() throws {
@@ -285,7 +286,7 @@ final class CoordinatorFaultTests {
         try await run(failing, image: try image())
         #expect(failing.state.phase == .failed)
 
-        let prompt = coordinator(opener: FakeDeviceOpener(error: .userCancelled))
+        let prompt = coordinator(opener: FakeDeviceOpener(authorizeError: .userCancelled))
         try await run(prompt, image: try image())
         #expect(prompt.state.phase == .awaitingConfirmation)
 
@@ -361,6 +362,7 @@ final class CoordinatorFaultTests {
     @Test func cancellableStages() throws {
         let image = try image()
         let progress = TransferProgress(completedBytes: 0, totalBytes: 1, bytesPerSecond: nil)
+        #expect(WriteState.preparing(.authorize).cancellableStage == .authorize)
         #expect(WriteState.preparing(.open).cancellableStage == .open)
         #expect(WriteState.writing(progress).cancellableStage == .write)
         #expect(WriteState.verifying(progress).cancellableStage == .verify)

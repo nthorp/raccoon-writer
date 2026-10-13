@@ -4,7 +4,8 @@ import os
 /// Opens raw disks through `/usr/libexec/authopen`, which passes back an open
 /// descriptor, so the app never runs as root. The app shows the admin prompt itself
 /// (`DeviceAuthorizer`) and hands the authorization over with `-extauth`, so the
-/// dialog names Red Delicious. Each call authorizes afresh and prompts again.
+/// dialog names Red Delicious and authopen itself doesn't prompt. Each `authorize`
+/// prompts again.
 public struct AuthopenOpener: DeviceOpener {
     static let defaultExecutable = "/usr/libexec/authopen"
     private static let log = Logger(subsystem: AppInfo.bundleIdentifier, category: "authopen")
@@ -24,45 +25,42 @@ public struct AuthopenOpener: DeviceOpener {
         self.authorizer = authorizer
     }
 
-    /// Opens `/dev/r<bsdName>` with `O_RDWR`. Blocks a background thread, not the
-    /// caller, while the password prompt is up. Cancellation is honoured only before
-    /// the prompt appears; the prompt itself cannot be withdrawn.
-    public func openForReadWrite(bsdName: String) async throws -> any OpenedDevice {
+    /// Shows the dialog for `sys.openfile.readwrite./dev/r<bsdName>`. Blocks a background
+    /// thread, not the caller, while it is up. Cancellation is honoured only before the
+    /// dialog appears; the dialog itself cannot be withdrawn. Spawns nothing.
+    public func authorize(bsdName: String) async throws -> any DeviceGrant {
         guard BSDName.isWholeDisk(bsdName) else { throw DeviceOpenError.invalidDiskName(bsdName) }
         try Task.checkCancellation()
-        let executable = executable
         let authorizer = authorizer
         let devicePath = "/dev/r\(bsdName)"
-        let fd = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int32, Error>) in
-            // AuthorizationCreate blocks while the dialog is up, so it runs here too.
-            DispatchQueue.global(qos: .userInitiated).async {
-                continuation.resume(with: Result {
-                    try Self.obtainDescriptor(executable: executable, authorizer: authorizer, devicePath: devicePath)
-                })
-            }
+        let authorization = try await Self.offCooperativePool {
+            try authorizer.authorize(devicePath: devicePath)
         }
-        do {
-            return try RawDevice(fd: fd)
-        } catch {
-            Darwin.close(fd)
-            throw error
+        return AuthopenGrant(bsdName: bsdName, executable: executable, authorization: authorization)
+    }
+
+    /// Runs blocking work (the dialog, authopen) on a GCD thread, so it never ties up
+    /// the cooperative pool.
+    static func offCooperativePool<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(with: Result { try work() })
+            }
         }
     }
 
     typealias Runner = (_ executable: String, _ arguments: [String], _ input: [UInt8]) throws -> Outcome
 
+    /// Runs authopen with an authorization the caller already holds, and keeps. authopen
+    /// resolves the external form while it runs, so the caller frees it only afterwards.
     /// `runner` is a seam for tests that need a descriptor to arrive, which a shell
     /// stand-in can't send.
     static func obtainDescriptor(
         executable: String,
-        authorizer: any DeviceAuthorizer,
+        authorization: any DeviceAuthorization,
         devicePath: String,
         runner: Runner = run
     ) throws -> Int32 {
-        // A failed or cancelled authorization never spawns authopen.
-        let authorization = try authorizer.authorize(devicePath: devicePath)
-        // authopen resolves the external form while it runs, so free it only afterwards.
-        defer { authorization.release() }
         let outcome = try runner(
             executable,
             ["-stdoutpipe", "-extauth", "-o", String(O_RDWR), devicePath],

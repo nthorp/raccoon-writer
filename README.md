@@ -12,8 +12,9 @@ Several checks keep the wrong disk from being written:
 
 - **The drive list hides disks that are never safe targets.** The boot disk (including its APFS container and the physical disk behind it) and every internal disk never appear, under any setting. By default only external, removable USB drives are listed. "Show all external disks" adds other external disks, such as Thunderbolt SSDs. If the app can't work out which disk is the boot disk, the list stays empty.
 - **A confirm screen** shows the drive's name, size, `/dev/diskN` and mounted volumes, and requires a click on **Erase and Write**.
-- **A safety check right before writing** queries the disk again and stops if it has disappeared, changed (different size, name, block size or bus), or no longer passes the filter.
 - **macOS asks for an administrator password** before every write, in a dialog that names Red Delicious. The app hands the resulting authorization to `authopen`, the macOS tool that opens the disk and passes it back. The app itself never runs as root.
+- **A safety check right after the password dialog** queries the disk again and stops if it has disappeared, changed (different size, name, block size or bus), or no longer passes the filter. It runs after the dialog, not before, because the dialog can stay open indefinitely: if the drive is unplugged meanwhile, another disk can take over its `/dev/diskN` name.
+- **The opened disk is checked too.** Its size and block size must match the disk the safety check just approved, or nothing is written.
 
 After a cancelled or failed write, the drive's contents are undefined. The app says so and tells you what state the drive was left in.
 
@@ -56,13 +57,16 @@ log stream --predicate 'subsystem == "com.example.reddelicious"' --info
 ## How it works
 
 ```
-Select image → Select drive → Confirm → safety re-check → diskutil unmountDisk
+Select image → Select drive → Confirm
   → password prompt (Security.framework, names Red Delicious)
-  → authopen -extauth (opens the disk, returns an open file descriptor)
+  → safety re-check → diskutil unmountDisk
+  → authopen -extauth (no second prompt; opens the disk, returns an open file descriptor)
+  → size check of the opened disk
   → write to /dev/rdiskN → flush → read back and compare → diskutil eject → Done
 ```
 
 - One password prompt covers the write and the verify, because both use the same file descriptor. The app creates the authorization for `sys.openfile.readwrite./dev/rdiskN` itself and passes it to `authopen` on stdin (`-extauth`), so the dialog names Red Delicious.
+- The prompt comes first so that the safety check, unmount and open run back to back after it. The authorization is for a device path, and a path can change hands while the dialog is open. Cancelling the dialog leaves the drive as it was, still mounted.
 - Writes go to the raw device (`/dev/rdiskN`) in about 4 MiB chunks, with aligned buffers and the system cache bypassed. The final flush uses `F_FULLFSYNC`, or `fsync` on devices that don't support it.
 - Verification is always on. It compares every byte of the image with what the drive returns.
 - The Mac is kept from idle-sleeping during a write. The window can't be closed mid-write, and quitting asks first, then stops the write cleanly.
@@ -74,9 +78,9 @@ Select image → Select drive → Confirm → safety re-check → diskutil unmou
 - **No compressed images.** Decompress `.xz`, `.gz` or `.zip` images first (for example `xz -dk image.img.xz`).
 - **One drive at a time.** No persistence partitions.
 - **SD cards in a Mac's built-in slot are not listed.** macOS reports the built-in reader as an internal disk, and Red Delicious never shows internal disks. Use a USB card reader instead.
-- **A password prompt on every write.** The app discards the authorization after each write, so the next one asks again.
+- **A password prompt on every write.** The app discards the authorization as soon as the disk is open, so the next write asks again.
+- **Two identical drives look the same.** The checks compare size, name, block size and bus. If you swap in an identical drive while the password dialog is open, that drive is written. Don't swap drives during a write.
 - **The password dialog has no custom icon yet.** macOS also adds its own headline above the app's message, which can't be removed.
-- **After a cancelled password prompt the drive stays unmounted.** Unplug and reinsert it to get its volumes back.
 - **Not signed or notarized.** Build from source. A copy downloaded or AirDropped from elsewhere is blocked by Gatekeeper until you remove the quarantine flag (`xattr -dr com.apple.quarantine RedDelicious.app`).
 - English only. No drag-and-drop and no checksum display.
 

@@ -67,6 +67,8 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 
 **Wait for T13 before running H10, H11, H12 and H14.** T13 (in `PLAN.md`) changes the password dialog, so these run on the T13 build. Put the build's commit (`git log --oneline -1`) in each test's notes.
 
+**From T16 on, the password dialog comes first**, before the safety check and the unmount. A cancelled dialog leaves the drive mounted (H5), and the dialog appears even when the drive turns out to be in use (H12). H15 is new in T16.
+
 | ID | Test | Build | Result | Notes / issue |
 | --- | --- | --- | --- | --- |
 | H1 | Simulate mode: layout and dark mode | Debug | PASS | |
@@ -83,6 +85,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H12 | Drive in use (unmount refused) | Release | | |
 | H13 | Intel Mac run | Release | Not possible | Intel Mac runs macOS 13.7.8; app needs 14+ |
 | H14 | What real disks report (read-only) | none | | |
+| H15 | Drive swapped during the password dialog | Debug | | |
 
 **Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09)
 
@@ -178,10 +181,9 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 2. Choose any image and the stick, click Continue, then **Erase and Write**.
 3. In the password dialog, click **Cancel**. From T13 on the dialog names the app; earlier builds showed "authopen wants to make changes".
 
-**Expected**
-- The app returns to the confirm screen, not an error screen, with the notice: "The password dialog was cancelled, so nothing was written. The drive's volumes have been unmounted; reinsert the drive to get them back."
-- "Mounted volumes" now reads none, and the volume has left Finder.
-- After the stick is reinserted, its volume and files are intact.
+**Expected** (from T16 on; earlier builds unmounted the drive before the dialog, which is what the result below recorded)
+- The app returns to the confirm screen, not an error screen, with the notice: "The password dialog was cancelled, so nothing was written and the drive was left as it was."
+- "Mounted volumes" still lists the volume, and it is still in Finder with its files intact.
 
 **Result:** PASS
 **Notes:** 2026-10-09, Release build, stick formatted ExFAT/GPT as `TESTSTICK` with one test file. Clicking Cancel in the authopen dialog returned the app to the confirm screen with the notice, not an error screen. "Mounted volumes" read none and `TESTSTICK` left Finder. After a replug, `TESTSTICK` remounted. The agent checked read-only afterwards: `disk7` still had its GPT layout (EFI + `TESTSTICK`) and the test file was intact.
@@ -293,7 +295,7 @@ The main end-to-end test. Also records the flush method on a real stick.
 3. Stop the `tail` (or `cd` away) and try again.
 
 **Expected**
-- First attempt: "The drive is in use", naming the process that is holding it, with "Nothing was written to the drive." No password dialog appears.
+- First attempt: the password dialog appears (from T16 on it comes before the unmount). After you enter the password: "The drive is in use", naming the process that is holding it, with "Nothing was written to the drive."
 - Second attempt: works normally.
 
 **Result:**
@@ -328,3 +330,37 @@ Change `disk4` to the disk's number first. Paste each output below, and note whe
 **Notes:**
 - **USB stick 1, `disk7` on 2026-10-09** (read by the agent): MediaName `Cruzer Glide`, BusProtocol `USB`, Internal `false`, Removable `true`, RemovableMedia `true`, Ejectable `true`, VirtualOrPhysical `Physical`, DeviceBlockSize `512`, TotalSize `31406948352`. This matches the hand-written USB fixture's rules (T03): shown in the default list.
 - **SD card in the built-in SDXC slot, `disk4` on 2026-10-09** (read by the agent): MediaName `Built In SDXC Reader`, BusProtocol `Secure Digital`, Internal **`true`**, Removable `true`, RemovableMedia `true`, Ejectable `true`, VirtualOrPhysical `Physical`, DeviceBlockSize `512`, TotalSize `64021856256`. Hidden under both settings because it reports internal. The T03 fixture `info-disk7` guessed `Internal = false` for an SD card; a real built-in slot says `true`. Not seen in ISO Sword with the toggle off or on.
+
+### H15 — Drive swapped during the password dialog (RAM disks, debug flag)
+
+Checks that a disk which takes over the drive's `/dev/diskN` name while the password dialog is open is refused. RAM disks stand in for the stick and the other disk, so nothing real is at risk. Added in T16.
+
+**Steps**
+1. `scripts/build.sh` (Debug).
+2. Create RAM disk **A** (512 MiB) with root-owned nodes, as in H2 step 2:
+   ```sh
+   DISK=$(hdiutil attach -nomount ram://1048576 | awk '{print $1}')
+   RAW="/dev/r${DISK#/dev/}"
+   sudo chown root:operator "$DISK" "$RAW"
+   echo "$DISK"
+   ```
+3. `REDDELICIOUS_ALLOW_VIRTUAL_DISKS=1 build/RedDelicious.app/Contents/MacOS/RedDelicious`
+4. Choose `~/iso-sword-test/ram-test.img`, pick RAM disk A, click Continue, then **Erase and Write**. **Leave the password dialog open.**
+5. In Terminal, detach A and attach RAM disk **B**, which is half the size:
+   ```sh
+   hdiutil detach "$DISK" || sudo hdiutil detach "$DISK"
+   DISK2=$(hdiutil attach -nomount ram://524288 | awk '{print $1}')
+   RAW2="/dev/r${DISK2#/dev/}"
+   sudo chown root:operator "$DISK2" "$RAW2"
+   echo "$DISK $DISK2"
+   ```
+   The two names should be the same, because macOS reuses the lowest free number. If they differ, note it, detach B and start again from step 2.
+6. Enter your password in the dialog.
+7. Clean up: `hdiutil detach "$DISK2" || sudo hdiutil detach "$DISK2"`
+
+**Expected**
+- After the password, the app shows "A different drive is attached", saying the drive's size changed, with "Nothing was written to the drive."
+- The log shows `Refused diskN` from the `safety` category, and no unmount or authopen lines for that run.
+
+**Result:**
+**Notes:**

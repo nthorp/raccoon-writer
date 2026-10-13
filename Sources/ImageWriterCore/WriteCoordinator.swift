@@ -161,7 +161,7 @@ public final class WriteCoordinator {
         let id = runID
         isCancelling = false
         let startTime = clock.now()
-        transition(to: .preparing(.safetyCheck))
+        transition(to: .preparing(.authorize))
         let task = Task { await run(image: image, disk: disk, filter: filter, startTime: startTime, id: id) }
         runTask = task
         return task
@@ -184,8 +184,8 @@ public final class WriteCoordinator {
     /// For quitting: cancels a run if one can still be stopped, then returns once it has
     /// ended, so the device is closed and the state final. A run that is already
     /// finishing (verified, ejecting) is left to complete. Returns at once if idle.
-    /// While the admin prompt is up this waits for the user to answer it, since authopen
-    /// can't be interrupted.
+    /// While the admin prompt is up this waits for the user to answer it, since the
+    /// dialog can't be withdrawn.
     public func stopAndWait() async {
         if state.cancellableStage != nil {
             requestStop()
@@ -221,14 +221,29 @@ public final class WriteCoordinator {
     // MARK: - Pipeline
 
     private func run(image: ImageInfo, disk: DiskInfo, filter: DiskFilter, startTime: TimeInterval, id: UInt64) async {
-        var stage = PipelineStage.safetyCheck
+        var stage = PipelineStage.authorize
+        var grant: (any DeviceGrant)?
         var device: (any OpenedDevice)?
-        // Every exit path, cancel and error included, releases the descriptor.
-        defer { device?.close() }
+        // Every exit path, cancel and error included, releases the descriptor and the
+        // admin permission.
+        defer {
+            device?.close()
+            grant?.release()
+        }
         let activity = sleepPreventer.preventSleep(reason: "Writing \(image.fileName) to \(disk.bsdName)")
         defer { activity.end() }
 
         do {
+            // The password dialog comes first and can stay up indefinitely. If the drive
+            // is swapped meanwhile, another disk can take its name, and the permission
+            // covers the name. So the safety check, unmount and open follow it back to
+            // back. A cancel can't withdraw the dialog; the check below catches it.
+            let permission = try await opener.authorize(bsdName: disk.bsdName)
+            grant = permission
+            try Task.checkCancellation()
+
+            stage = .safetyCheck
+            transition(to: .preparing(.safetyCheck))
             // The fresh disk, not the confirmed snapshot, is what gets unmounted and opened.
             let target = try await safetyGuard.validate(confirmed: disk, filter: filter)
             try Task.checkCancellation()
@@ -240,10 +255,13 @@ public final class WriteCoordinator {
 
             stage = .open
             transition(to: .preparing(.open))
-            // authopen honours a cancel only before its prompt appears; one that lands
-            // while the prompt is up is caught by the check below, and the defer closes the fd.
-            let opened = try await opener.openForReadWrite(bsdName: target.bsdName)
+            let opened = try await permission.open()
             device = opened
+            // The descriptor is all the write needs; drop the admin rights now.
+            permission.release()
+            grant = nil
+            // Covers a disk that took the name in the moments between check and open.
+            try safetyGuard.checkOpened(opened, matches: target)
             try Task.checkCancellation()
 
             stage = .write
@@ -278,14 +296,11 @@ public final class WriteCoordinator {
                 syncMethod: written.syncMethod,
                 ejectWarning: warning
             )))
-        } catch DeviceOpenError.userCancelled where stage == .open && !isCancelling {
+        } catch DeviceOpenError.userCancelled where stage == .authorize && !isCancelling {
             // Dismissing the password dialog is a change of mind, not a failure: back to
-            // the confirm screen. The unmount before it succeeded, so no volumes are mounted.
+            // the confirm screen. Nothing has been unmounted yet.
             Self.log.notice("Admin prompt cancelled; back to the confirm screen")
-            var unmounted = disk
-            unmounted.mountPoints = []
-            selectedDrive = unmounted
-            transition(to: .awaitingConfirmation(image, unmounted))
+            transition(to: .awaitingConfirmation(image, disk))
             notice = .passwordPromptCancelled
         } catch {
             // Once the user has asked to stop, whatever unwinds the run (usually a

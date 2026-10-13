@@ -32,7 +32,9 @@ public enum SimulationMode {
         promptDelay: Duration = .seconds(2),
         directory: URL = FileManager.default.temporaryDirectory
     ) -> WriteCoordinator {
-        let opener = FakeDeviceOpener { bsdName in
+        let opener = FakeDeviceOpener(authorize: { bsdName in
+            if SimulatedDrive(bsdName: bsdName) == .promptCancelled { throw DeviceOpenError.userCancelled }
+        }) { bsdName in
             guard let drive = SimulatedDrive(bsdName: bsdName) else {
                 throw DeviceOpenError.authopenFailed(status: 1, message: "Simulate: no simulated drive \(bsdName)")
             }

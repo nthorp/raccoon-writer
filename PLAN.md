@@ -53,10 +53,13 @@ Windows ISOs or any file-extraction mode, compressed images (`.xz`, `.gz`, `.zip
 ### Runtime flow (target behavior)
 
 ```
-Select image → Select drive → Confirm → [SafetyGuard re-check] → unmount disk
-  → authopen (admin password prompt, returns fd) → write → fsync → verify (read back via same fd)
+Select image → Select drive → Confirm → admin password prompt
+  → [SafetyGuard re-check] → unmount disk → authopen -extauth (no prompt, returns fd)
+  → [size check of the opened fd] → write → fsync → verify (read back via same fd)
   → eject → Done
 ```
+
+The prompt comes first since T16: it can stay open indefinitely, and the authorization covers a device path that another disk can take over meanwhile.
 
 Error and cancel are possible from any step after Confirm. After a cancel or failure the drive contents are undefined; the UI must say so.
 
@@ -119,6 +122,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T13 | 🧑 Branded password prompt (`authopen -extauth`) | T11 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
 | T14 | Rename to Red Delicious Media Writer | T13 | DONE | 2026-10-12 | Claude |
 | T15 | App icon | T14 | DONE | 2026-10-12 | Claude |
+| T16 | 🧑 Password prompt before the safety check; size check after open | T15 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -829,6 +833,63 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 
 ---
 
+### T16 — 🧑 Password prompt before the safety check; size check after open
+
+**Goal:** close a review finding. The pipeline ran safety check → unmount → password dialog → authopen, and wrote whatever authopen opened. The dialog can stay open indefinitely. If the stick is unplugged meanwhile and another disk attached, macOS usually gives the new disk the same `diskN`, and the authorization (`sys.openfile.readwrite./dev/rdiskN`) covers the path, not the medium. A backup drive that would never pass the filter could be written. Fix it in two parts:
+1. Show the dialog first, then run the safety check, unmount and authopen back to back. authopen gets the authorization through `-extauth` (T13), so it doesn't prompt.
+2. After the open, require the opened device's block size and block count × block size to match the disk the safety check returned.
+
+This also removes the README limitation "after a cancelled password prompt the drive stays unmounted". Out of scope by Nick's decision: a stronger hardware identifier (such as the IOKit registry entry ID of the opened descriptor), so two identical sticks still look the same.
+
+**Order with T12:** T12's remaining tests (H10, H11, H12, H14) run on the T16 build. H12's expected result changes: the dialog now appears before the unmount fails.
+
+**Agent steps**
+1. Split `DeviceOpener` into `authorize(bsdName:) -> DeviceGrant` (shows the dialog, opens nothing) and `DeviceGrant.open()` (no prompt) plus `release()`. `AuthopenOpener.authorize` runs `DeviceAuthorizer` off the cooperative pool; the new `AuthopenGrant` owns the authorization and runs authopen with it. `obtainDescriptor` no longer authorizes or frees.
+2. Add `PipelineStage.authorize` before `.safetyCheck`. The coordinator authorizes first, then validates, unmounts, opens, releases the grant as soon as the descriptor arrives, then calls the new `SafetyGuard.checkOpened`. A `defer` releases the grant on every other path. Only a cancel of the app's own dialog (stage `.authorize`) returns to the confirm screen; the drive is untouched, so the `mountPoints = []` workaround goes.
+3. Update the fakes (`FakeDeviceOpener` with `authorizeError:`/`openError:`, `FakeDeviceGrant` counting releases), Simulate mode, `ProgressDisplay`, `AppDelegate`, `WriteNotice`, previews, README and `docs/HARDWARE_TESTS.md` (H5 and H12 expectations, new H15).
+4. Tests: a disk that takes the name during the dialog is refused before unmount and open; an opened device of another size or block size is never written; the grant is released exactly once on success, failure and cancel; a cancelled dialog unmounts nothing; a cancel reported by authopen itself fails plainly.
+5. `scripts/test.sh` and `scripts/build.sh --release` pass. Write instructions for Nick, set `NEEDS_HUMAN`, stop.
+
+**Human steps (Nick)**
+1. RAM disk, Debug build: one full write. Exactly one dialog appears, even though authopen now runs a moment after the dialog, once the unmount is done.
+2. H15: swap RAM disks while the dialog is open. The write is refused.
+3. Real USB stick, Release build: H5 (cancel the dialog). The volume stays mounted.
+4. Real USB stick, Release build: one full write and verify. It passes, which confirms the size check matches what real hardware reports.
+
+**Acceptance criteria**
+- The dialog comes before the safety check and the unmount, and a disk swapped in during the dialog is refused (unit test and H15).
+- An opened device whose size or block size differs from the checked disk is never written (unit tests).
+- One dialog per write; a full write and verify to a real stick passes.
+- A cancelled dialog leaves the drive mounted. The README no longer lists the unmounted-after-cancel limitation.
+- `scripts/test.sh` and `scripts/build.sh --release` pass.
+
+**Files:** `Sources/ImageWriterCore/` (`DeviceOpener`, new `DeviceGrant`, new `AuthopenGrant`, `AuthopenOpener`, `DeviceAuthorization`, `SecurityAuthorization`, `SafetyGuard`, `SafetyGuardError`, `PipelineStage`, `DriveCondition`, `ProgressDisplay`, `WriteCoordinator`, `WriteNotice`, `Fakes/FakeDeviceOpener`, `Simulation/`), `App/` (`AppDelegate`, `ConfirmView`, `PreviewSamples`, `ProgressStepView`), `Tests/`, `README.md`, `docs/HARDWARE_TESTS.md`
+
+**Handoff notes:**
+- **Agent prep done 2026-10-12, now `NEEDS_HUMAN`.** `scripts/test.sh` passes 371 tests (355 before). `scripts/build.sh` and `scripts/build.sh --release` succeed with no Swift warnings, and the release flag check passes. The agent wrote to no disk and never ran authopen or `AuthorizationCreate`.
+- **What was built:**
+  - `DeviceOpener.authorize(bsdName:)` returns a `DeviceGrant` (`bsdName`, `open()`, `release()`, idempotent). `AuthopenGrant` holds the `DeviceAuthorization` and releases it once, also from `deinit`. `DeviceAuthorization` is now `Sendable`, and `SecurityAuthorization` guards its reference with a lock because it's released on a different thread from the one that created it.
+  - `PipelineStage.authorize` ("Getting permission to write") is the first stage. `.open` is now "Opening the drive" with no dialog hint. `ProgressDisplay` and the quit alert key the dialog text off `.authorize`.
+  - `SafetyGuard.checkOpened(_:matches:)` compares block size (when diskutil reported one) and then bytes, and throws the existing `SafetyGuardError.diskChanged`, so the failure screen says "A different drive is attached". The failure is in stage `.open`, so the drive is reported untouched. A disk with unknown size (discovery falls back to 0) fails closed.
+  - `WriteNotice.passwordPromptCancelled` now says the drive was left as it was.
+- **Mutation-checked:** with the old order (validate before authorize), the swap-during-dialog test writes the backup drive and fails. Without `checkOpened`, both opened-device tests write the wrong device and fail.
+- **Deviations:**
+  1. `userCancelled` during `.open` (authopen showing its own dialog, which T13 showed doesn't happen) is now a plain failure, not a return to the confirm screen, because by then the drive is unmounted.
+  2. The coordinator test suites' disk fixture now has the size of their 32 KiB fake device (`DiskInfo.usbStick(sizeBytes:)`), since the open is checked against it.
+- **Nick: run these on the T16 commit**, with the log open in a second Terminal window:
+  ```sh
+  log stream --predicate 'subsystem == "com.example.reddelicious" OR process == "authopen"' --info
+  ```
+  1. **RAM disk, Debug build.** `scripts/build.sh`, create the RAM disk exactly as in H2 step 2 of `docs/HARDWARE_TESTS.md`, then run `REDDELICIOUS_ALLOW_VIRTUAL_DISKS=1 build/RedDelicious.app/Contents/MacOS/RedDelicious`. Write `~/iso-sword-test/ram-test.img` to the RAM disk. **Count the dialogs: exactly one.** The progress screen should show "Getting permission to write" with the dialog, then "Checking the drive", "Unmounting the drive" and "Opening the drive" quickly after you enter the password. Write and verify should pass. If a second dialog naming authopen appears, or the log shows `Refused … after opening`, copy the log lines.
+  2. **H15** in `docs/HARDWARE_TESTS.md`: swap RAM disks while the dialog is open. Record the result there.
+  3. **Real USB stick, Release build.** `scripts/build.sh --release`, then `open build/RedDelicious.app`. Run **H5** (cancel the dialog) with a mounted volume on the stick. Expect the confirm screen with "…the drive was left as it was", and the volume still in Finder.
+  4. **Same stick:** one full write and verify. Expect one dialog, then a pass. If it fails with "A different drive is attached", copy the `Refused` log line: it means the opened size differs from what diskutil reports on real hardware.
+  5. Clean up any RAM disk still attached: `hdiutil detach "$DISK" || sudo hdiutil detach "$DISK"`, and the same with `"$DISK2"` after H15.
+
+  Then tell the agent the results. If they meet the acceptance criteria, the agent records them here and marks T16 `DONE`.
+
+---
+
 ## 4. Future work (not in scope)
 
 - Rename the GitHub repo and local folder from `iso-sword` to match the app (T14 left them as they are).
@@ -842,7 +903,7 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | Risk | Mitigation |
 | --- | --- |
 | authopen behavior differs from assumptions (flags, read-back on same fd) | T01 spike first; T02, T05 and T06 are amended from its findings |
-| Wrong disk written | Layered defenses: filtered list, explicit confirm screen, `SafetyGuard` re-check, fail-closed discovery, tests for boot disk and internal exclusion |
+| Wrong disk written | Layered defenses: filtered list, explicit confirm screen, `SafetyGuard` re-check after the password dialog (T16), size check of the opened device (T16), fail-closed discovery, tests for boot disk and internal exclusion. Identical drives swapped during the dialog are not told apart |
 | Raw I/O alignment bugs | Aligned buffers, block-size-parametrized tests at 512 and 4096 |
 | TCC or privacy prompts on removable media | Observed in T01 and documented in README |
 | Agents touching real disks | Hard safety rule in sections 0 and `AGENTS.md`; real-device work only in human checkpoints |
@@ -875,3 +936,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-12 | T14 added: rename to Red Delicious Media Writer; T12's remaining tests run on the T14 build | Claude |
 | 2026-10-12 | T14 DONE: app renamed to Red Delicious Media Writer (`RedDelicious`, `com.example.reddelicious`, `REDDELICIOUS_*`) | Claude |
 | 2026-10-12 | T15 DONE: app icon from Nick's artwork in `App/Assets.xcassets` | Claude |
+| 2026-10-12 | T16 added from a review finding (disk swapped during the password dialog) and prepped: prompt before the safety check, size check after open; NEEDS_HUMAN. T12's remaining tests run on the T16 build | Claude |

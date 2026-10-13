@@ -1,10 +1,11 @@
 import Foundation
 import os
 
-/// The last check before the privileged open. Re-resolves the boot disks, re-lists the
-/// disks, and requires the confirmed disk to still be present, to still be the same
-/// medium, and to still pass the filter the user chose it under. Fails closed: any
-/// query error refuses the write.
+/// The last checks before writing. `validate` runs after the password dialog and before
+/// the unmount: it re-resolves the boot disks, re-lists the disks, and requires the
+/// confirmed disk to still be present, to still be the same medium, and to still pass
+/// the filter the user chose it under. Fails closed: any query error refuses the write.
+/// `checkOpened` then compares the opened device with what `validate` returned.
 public struct SafetyGuard: Sendable {
     private static let log = Logger(subsystem: AppInfo.bundleIdentifier, category: "safety")
 
@@ -31,6 +32,27 @@ public struct SafetyGuard: Sendable {
             Self.log.error("Refused \(confirmed.bsdName, privacy: .public): \(error.localizedDescription, privacy: .public)")
             throw error
         }
+    }
+
+    /// After the open, before the first write: the device authopen handed back must have
+    /// the size (and, when known, the block size) of the disk `validate` just returned.
+    /// A disk that took over the name between the check and the open almost always
+    /// differs in size. Throws `SafetyGuardError.diskChanged`.
+    public func checkOpened(_ device: any OpenedDevice, matches disk: DiskInfo) throws {
+        let field: DiskIdentityField?
+        if let blockSize = disk.blockSize, blockSize != device.blockSize {
+            field = .blockSize
+        } else if device.byteCount != disk.sizeBytes {
+            field = .size
+        } else {
+            field = nil
+        }
+        guard let field else { return }
+        Self.log.error("""
+            Refused \(disk.bsdName, privacy: .public) after opening: expected \(disk.sizeBytes) bytes \
+            in \(disk.blockSize ?? 0)-byte blocks, opened \(device.blockCount) × \(device.blockSize)
+            """)
+        throw SafetyGuardError.diskChanged(bsdName: disk.bsdName, field: field)
     }
 
     private func check(confirmed: DiskInfo, filter: DiskFilter) async throws -> DiskInfo {

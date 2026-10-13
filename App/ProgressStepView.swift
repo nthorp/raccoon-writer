@@ -90,7 +90,7 @@ private func progressPreview(_ state: WriteState, isCancelling: Bool = false) ->
 
 #Preview("Safety check") { progressPreview(.preparing(.safetyCheck)) }
 #Preview("Unmounting") { progressPreview(.preparing(.unmount)) }
-#Preview("Password prompt") { progressPreview(.preparing(.open)) }
+#Preview("Password prompt") { progressPreview(.preparing(.authorize)) }
 #Preview("Writing, speed unknown") { progressPreview(.writing(PreviewSamples.progress(0.01, speed: nil))) }
 #Preview("Writing") { progressPreview(.writing(PreviewSamples.progress(0.42))) }
 #Preview("Flushing") { progressPreview(.writing(PreviewSamples.progress(1))) }

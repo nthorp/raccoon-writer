@@ -27,9 +27,17 @@ struct ProgressDisplayTests {
     }
 
     @Test func thePromptStageNamesTheAppsOwnDialog() throws {
+        let prompt = try #require(ProgressDisplay(state: .preparing(.authorize), isCancelling: false))
+        #expect(prompt.title == "Getting permission to write")
+        #expect(prompt.detail?.contains("dialog from Red Delicious") == true)
+        #expect(prompt.detail?.contains("authopen") == false)
+    }
+
+    @Test func theOpenStageNoLongerMentionsADialog() throws {
+        // authopen gets the app's authorization and doesn't prompt.
         let open = try #require(ProgressDisplay(state: .preparing(.open), isCancelling: false))
-        #expect(open.detail?.contains("dialog from Red Delicious") == true)
-        #expect(open.detail?.contains("authopen") == false)
+        #expect(open.title == "Opening the drive")
+        #expect(open.detail == nil)
     }
 
     @Test func writingShowsPercentBytesSpeedAndTimeLeft() throws {

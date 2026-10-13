@@ -68,11 +68,12 @@ enum DiskutilFixtures {
 
 extension DiskInfo {
     /// A plain external USB stick that passes the default filter. Tests change one field.
-    static func usbStick(_ bsdName: String = "disk4") -> DiskInfo {
+    /// Coordinator tests pass the size of their fake device, which the open is checked against.
+    static func usbStick(_ bsdName: String = "disk4", sizeBytes: UInt64 = 30_752_636_928) -> DiskInfo {
         DiskInfo(
             bsdName: bsdName,
             mediaName: "SanDisk Ultra",
-            sizeBytes: 30_752_636_928,
+            sizeBytes: sizeBytes,
             blockSize: 512,
             busProtocol: "USB",
             isInternal: false,

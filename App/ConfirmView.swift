@@ -70,7 +70,7 @@ struct ConfirmView: View {
 }
 
 #Preview("Back after the password dialog was cancelled") {
-    ConfirmView(image: PreviewSamples.image, disk: PreviewSamples.unmountedStick, notice: .passwordPromptCancelled, onCancel: {}, onConfirm: {})
+    ConfirmView(image: PreviewSamples.image, disk: PreviewSamples.stick, notice: .passwordPromptCancelled, onCancel: {}, onConfirm: {})
         .padding(24)
         .frame(width: 580, height: 500)
 }
