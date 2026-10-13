@@ -116,6 +116,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T10 | SwiftUI shell and screens | T09 | DONE | 2026-10-09 | Claude |
 | T11 | Error states, cancel, disconnect handling, polish | T10 | DONE | 2026-10-09 | Claude |
 | T12 | 🧑 Hardware test checklist and README | T11 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T13 | 🧑 Branded password prompt (`authopen -extauth`) | T12 | TODO | | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -671,9 +672,59 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 
 ---
 
+### T13 — 🧑 Branded password prompt (`authopen -extauth`)
+
+**Goal:** the admin dialog names ISO Sword instead of authopen. The app creates the authorization itself and hands it to authopen with `-extauth` (see `man authopen`). The fd passing, single open and the rest of the pipeline stay as they are. The app still never runs as root.
+
+**Why it depends on T12:** this changes the opener that T12's remaining hardware tests run against. Finish T12 on the validated build first, so its results describe one build.
+
+**Agent steps**
+1. Add a `DeviceAuthorizer` protocol to `ImageWriterCore`, with a production `SecurityAuthorizer` (Security.framework is a system framework, so there is still no dependency) and a `Fakes/FakeDeviceAuthorizer`. It takes a device path and returns a value that owns the `AuthorizationRef` and exposes its external form (`AuthorizationMakeExternalForm`, `kAuthorizationExternalFormLength` = 32 bytes).
+   - Right: `sys.openfile.readwrite./dev/rdiskN`. It must match the path passed to authopen exactly. authopen asks for `readwrite` because of `-o 2`.
+   - Flags: `kAuthorizationFlagInteractionAllowed | kAuthorizationFlagExtendRights | kAuthorizationFlagPreAuthorize`.
+   - Environment: `kAuthorizationEnvironmentPrompt` with one plain sentence, for example "ISO Sword needs your password to erase and write the selected drive." The system's own "wants to make changes" line can't be removed.
+   - Keep the `AuthorizationRef` alive until authopen has exited, because authopen resolves the external form while it runs. Free it on every path afterwards.
+   - **Keep one prompt per write.** An in-process authorization may be reused within the right's `timeout` (300 s), unlike separate authopen runs (T01). Free with `kAuthorizationFlagDestroyRights` so the next write prompts again. Nick confirms this in human step 3.
+   - Map `OSStatus`: `errAuthorizationCanceled` → `userCancelled`, `errAuthorizationDenied` → `permissionDenied`, anything else → a new `DeviceOpenError.authorizationFailed(status:)` whose description uses `SecCopyErrorMessageString`. Give the new case wording in `FailureExplanation`. The jargon test must still pass.
+2. `AuthopenOpener` takes a `DeviceAuthorizer`. `init()` uses `SecurityAuthorizer`, and the internal `init(executable:authorizer:)` serves tests. In `obtainDescriptor`:
+   - Authorize first, on the same GCD thread as now, because `AuthorizationCreate` blocks while the dialog is up. If it fails, authopen is never spawned.
+   - Run `authopen -stdoutpipe -extauth -o 2 /dev/rdiskN` with stdin on a pipe instead of `/dev/null`. Write the 32 bytes, then close the write end, before `recvmsg`. 32 bytes is under `PIPE_BUF`, so the write can't block.
+   - **Set `F_SETNOSIGPIPE` on the write end.** If authopen exits before reading stdin, a plain write raises `SIGPIPE` and kills the app. Treat `EPIPE` as "authopen exited early" and map the error from its exit status and stderr as usual.
+   - Make the stdin pipe `FD_CLOEXEC`, like the other parent ends, and keep `POSIX_SPAWN_CLOEXEC_DEFAULT`.
+   - Keep the stderr cancel mapping as a fallback: it covers a dialog from authopen itself (see human step 2).
+3. Tests (none may call `AuthorizationCreate` or authopen):
+   - The `OSStatus` mapping.
+   - A failed or cancelled authorization never spawns the stand-in script.
+   - The stand-in script receives `-extauth` in argv and exactly the fake's 32 bytes on stdin.
+   - A stand-in that exits without reading stdin doesn't crash the test process and maps to an error.
+   - The authorization value is freed on success, on failure and when no fd arrives.
+4. Update user-facing text that quotes the old dialog: `ProgressDisplay.swift` (the "authopen wants to make changes" detail), `ConfirmView.swift`, `README.md` (the safety note, the limitation "The dialog names `authopen`", the roadmap item, how-it-works), and the `-extauth` bullet in section 4. Leave T01 and T12's recorded results as they are; they describe the old build.
+5. `scripts/test.sh` and `scripts/build.sh --release` pass. Write exact instructions for Nick under Handoff notes, set `NEEDS_HUMAN`, and stop.
+
+**Human steps (Nick)**
+1. **RAM disk, Debug build**, with nodes chowned `root:operator` as in H2 (`docs/HARDWARE_TESTS.md`), so the real prompt appears. Write and verify `ram-test.img`. Record the exact dialog text and which icon it shows (the app has no icon yet, T11 step 7).
+2. Confirm **exactly one** dialog appears. A second dialog naming authopen means the external authorization didn't satisfy authopen. If that happens, copy the log window's `authopen` lines.
+3. Run a second write within 5 minutes. Record whether it prompts again. It should.
+4. Cancel the dialog. The app returns to the confirm screen with the notice, as in H5.
+5. Enter a wrong password until macOS gives up. Record the screen the app shows.
+6. **Real USB stick, Release build:** one full write and verify, to confirm the dialog and the write on real hardware.
+
+**Acceptance criteria**
+- The dialog names ISO Sword, and only one dialog appears per write.
+- Each write prompts once, including a second write within 5 minutes.
+- A cancel returns to the confirm screen, as before. A wrong password gives a clear failure screen with no jargon.
+- No test calls `AuthorizationCreate` or authopen. `scripts/test.sh` and `scripts/build.sh --release` pass.
+- No user-facing text still quotes "authopen wants to make changes".
+
+**Files:** `Sources/ImageWriterCore/` (`DeviceAuthorizer`, `SecurityAuthorizer`, `Fakes/FakeDeviceAuthorizer`, `AuthopenOpener`, `DeviceOpenError`, `FailureExplanation`, `ProgressDisplay`), `App/ConfirmView.swift`, `Tests/`, `README.md`
+
+**Handoff notes:**
+
+---
+
 ## 4. Future work (not in scope)
 
-- `authopen -extauth`: create the `AuthorizationRef` in-app (`AuthorizationCopyRights` for `sys.openfile.readwrite./dev/rdiskN`) and pass its external form on stdin. That shows a dialog naming ISO Sword instead of "authopen", and reports a cancel as a typed `errAuthorizationCanceled` instead of stderr text. Untested in T01.
+- ~~`authopen -extauth` for a dialog naming ISO Sword~~: now T13.
 - `HelperOpener` using an SMAppService-registered privileged XPC helper (removes per-write password prompt). Requires Developer ID signing; design must re-validate targets inside the helper.
 - Developer ID signing, notarization, DMG packaging.
 - Compressed image support, SHA-256 display, drag-and-drop, localization.
@@ -709,3 +760,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-09 | T10 DONE: SwiftUI screens, DriveListModel, ProgressDisplay, DisplayFormat, debug Simulate mode | Claude |
 | 2026-10-09 | T11 DONE: FailureExplanation, DriveCondition, DriveTooSmall, prompt cancel to confirm, sleep prevention, quit and close guards | Claude |
 | 2026-10-09 | T12 prep: docs/HARDWARE_TESTS.md checklist (H1–H14) and README; NEEDS_HUMAN for the hardware run | Claude |
+| 2026-10-12 | T13 added: branded password prompt via `authopen -extauth`, after T12 | Claude |
