@@ -116,7 +116,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T10 | SwiftUI shell and screens | T09 | DONE | 2026-10-09 | Claude |
 | T11 | Error states, cancel, disconnect handling, polish | T10 | DONE | 2026-10-09 | Claude |
 | T12 | 🧑 Hardware test checklist and README | T11 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
-| T13 | 🧑 Branded password prompt (`authopen -extauth`) | T12 | TODO | | Claude (prep) / Nick (run) |
+| T13 | 🧑 Branded password prompt (`authopen -extauth`) | T11 | TODO | | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -669,6 +669,7 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
   - The RAM-disk run (H2) `chown`s the nodes to `root:operator`, as in T01 run 2, so the real password prompt appears.
 - **README** rewritten: what it is, status, safety (what is erased and which checks prevent a wrong-disk write), requirements, build and run, the two debug-only modes, logs, how it works, known limitations, roadmap, layout. Limitations include the authopen-named dialog, one prompt per write, volumes left unmounted after a cancelled prompt (T11 deviation 3), and the quarantine workaround for the ad-hoc-signed app.
 - **Deviations:** added H1 (Simulate look-through), H12 (drive in use) and H14 (disk reports) beyond the plan's list, so the requests from T03, T07, T10 and T11 have a place to be recorded.
+- **2026-10-12: T13 runs before the remaining tests.** H1–H9 ran on the authopen-named-dialog build. Run H10, H11, H12 and H14 only after T13 is `DONE`, on the T13 build, and put the build's commit in each test's notes. See T13 "Order with T12".
 
 ---
 
@@ -676,7 +677,7 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 
 **Goal:** the admin dialog names ISO Sword instead of authopen. The app creates the authorization itself and hands it to authopen with `-extauth` (see `man authopen`). The fd passing, single open and the rest of the pipeline stay as they are. The app still never runs as root.
 
-**Why it depends on T12:** this changes the opener that T12's remaining hardware tests run against. Finish T12 on the validated build first, so its results describe one build.
+**Order with T12:** T13 runs before T12's remaining tests (H10, H11, H12, H14). H10 step 4 quits while the password dialog is up, which T13 changes, so H10 would need re-running after T13 anyway. H11 also exercises the new dialog on a real write. H12 stops before the prompt, and H14 only reads `diskutil`. The finished T12 results (H1–H9) stay valid; T13's human steps re-check the dialog text and cancel parts of H2, H5 and H6 on the new build.
 
 **Agent steps**
 1. Add a `DeviceAuthorizer` protocol to `ImageWriterCore`, with a production `SecurityAuthorizer` (Security.framework is a system framework, so there is still no dependency) and a `Fakes/FakeDeviceAuthorizer`. It takes a device path and returns a value that owns the `AuthorizationRef` and exposes its external form (`AuthorizationMakeExternalForm`, `kAuthorizationExternalFormLength` = 32 bytes).
@@ -698,7 +699,7 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
    - The stand-in script receives `-extauth` in argv and exactly the fake's 32 bytes on stdin.
    - A stand-in that exits without reading stdin doesn't crash the test process and maps to an error.
    - The authorization value is freed on success, on failure and when no fd arrives.
-4. Update user-facing text that quotes the old dialog: `ProgressDisplay.swift` (the "authopen wants to make changes" detail), `ConfirmView.swift`, `README.md` (the safety note, the limitation "The dialog names `authopen`", the roadmap item, how-it-works), and the `-extauth` bullet in section 4. Leave T01 and T12's recorded results as they are; they describe the old build.
+4. Update user-facing text that quotes the old dialog: `ProgressDisplay.swift` (the "authopen wants to make changes" detail), `ConfirmView.swift`, `README.md` (the safety note, the limitation "The dialog names `authopen`", the roadmap item, how-it-works), and the `-extauth` bullet in section 4. In `docs/HARDWARE_TESTS.md`, update the steps and expected results of the tests not yet run (H10 step 4) and of H5 step 3, which quote the dialog. Leave T01's and T12's recorded results and notes as they are; they describe the old build.
 5. `scripts/test.sh` and `scripts/build.sh --release` pass. Write exact instructions for Nick under Handoff notes, set `NEEDS_HUMAN`, and stop.
 
 **Human steps (Nick)**
@@ -716,7 +717,7 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - No test calls `AuthorizationCreate` or authopen. `scripts/test.sh` and `scripts/build.sh --release` pass.
 - No user-facing text still quotes "authopen wants to make changes".
 
-**Files:** `Sources/ImageWriterCore/` (`DeviceAuthorizer`, `SecurityAuthorizer`, `Fakes/FakeDeviceAuthorizer`, `AuthopenOpener`, `DeviceOpenError`, `FailureExplanation`, `ProgressDisplay`), `App/ConfirmView.swift`, `Tests/`, `README.md`
+**Files:** `Sources/ImageWriterCore/` (`DeviceAuthorizer`, `SecurityAuthorizer`, `Fakes/FakeDeviceAuthorizer`, `AuthopenOpener`, `DeviceOpenError`, `FailureExplanation`, `ProgressDisplay`), `App/ConfirmView.swift`, `Tests/`, `README.md`, `docs/HARDWARE_TESTS.md`
 
 **Handoff notes:**
 
@@ -761,3 +762,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-09 | T11 DONE: FailureExplanation, DriveCondition, DriveTooSmall, prompt cancel to confirm, sleep prevention, quit and close guards | Claude |
 | 2026-10-09 | T12 prep: docs/HARDWARE_TESTS.md checklist (H1–H14) and README; NEEDS_HUMAN for the hardware run | Claude |
 | 2026-10-12 | T13 added: branded password prompt via `authopen -extauth`, after T12 | Claude |
+| 2026-10-12 | T13 moved ahead of T12's remaining tests (H10, H11, H12, H14): now depends on T11 | Claude |

@@ -65,6 +65,8 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 
 ## Summary
 
+**Wait for T13 before running H10, H11, H12 and H14.** T13 (in `PLAN.md`) changes the password dialog, so these run on the T13 build. Put the build's commit (`git log --oneline -1`) in each test's notes.
+
 | ID | Test | Build | Result | Notes / issue |
 | --- | --- | --- | --- | --- |
 | H1 | Simulate mode: layout and dark mode | Debug | PASS | |
