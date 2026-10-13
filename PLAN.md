@@ -116,7 +116,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T10 | SwiftUI shell and screens | T09 | DONE | 2026-10-09 | Claude |
 | T11 | Error states, cancel, disconnect handling, polish | T10 | DONE | 2026-10-09 | Claude |
 | T12 | 🧑 Hardware test checklist and README | T11 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
-| T13 | 🧑 Branded password prompt (`authopen -extauth`) | T11 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T13 | 🧑 Branded password prompt (`authopen -extauth`) | T11 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -747,6 +747,14 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
   7. Clean up any RAM disk still attached: `hdiutil detach "$DISK" || sudo hdiutil detach "$DISK"`.
   
   Then tell the agent the results. If they meet the acceptance criteria, the agent records them here and marks T13 `DONE`. After that, run T12's H10, H11, H12 and H14 on the T13 build.
+- **Human results, 2026-10-12, commit `0639200`** (Nick ran the steps in the order cancel, wrong password, write, second write, USB, so one pair of RAM disks covered steps 1–5):
+  - **Step 1, dialog (Debug, RAM disk with `root:operator` nodes):** named ISO Sword, as expected. Nick didn't record the exact headline or the icon.
+  - **Step 2:** exactly one dialog per write. No second authopen dialog. The log was as expected (`fullSync used fsync fallback`). So the external authorization satisfies authopen.
+  - **Step 3:** a second write within 5 minutes prompted again. `destroyRights` works.
+  - **Step 4:** Cancel returned to the confirm screen with the notice, as in H5.
+  - **Step 5:** after 5 wrong passwords macOS was still asking. It never gives up: the agent read the rule (read-only `security authorizationdb read sys.openfile.`): `authenticate-user`, group `admin`, `timeout` 300, **`tries` 10000**. Only Cancel ends the dialog, and that is step 4's path.
+  - **Step 6 (Release, real USB stick):** one dialog, then write and verify passed.
+- **Acceptance:** every criterion is met except "a wrong password gives a clear failure screen", which can't be reached on a real Mac because of `tries` 10000. The code path is still covered: `errAuthorizationDenied` → `permissionDenied` → "Permission was refused" is unit-tested (`SecurityAuthorizerTests`, `FailureExplanationTests`). Marked `DONE` with this as a recorded deviation.
 
 ---
 
@@ -791,3 +799,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-12 | T13 added: branded password prompt via `authopen -extauth`, after T12 | Claude |
 | 2026-10-12 | T13 moved ahead of T12's remaining tests (H10, H11, H12, H14): now depends on T11 | Claude |
 | 2026-10-12 | T13 prep: DeviceAuthorizer, SecurityAuthorizer, FakeDeviceAuthorizer, `authopen -extauth` in AuthopenOpener; NEEDS_HUMAN for the dialog checks | Claude |
+| 2026-10-12 | T13 DONE after Nick's dialog checks; macOS retries wrong passwords indefinitely (`tries` 10000) | Claude |
