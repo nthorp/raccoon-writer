@@ -118,6 +118,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T12 | 🧑 Hardware test checklist and README | T11 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 | T13 | 🧑 Branded password prompt (`authopen -extauth`) | T11 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
 | T14 | Rename to Red Delicious Media Writer | T13 | DONE | 2026-10-12 | Claude |
+| T15 | App icon | T14 | DONE | 2026-10-12 | Claude |
 
 Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -806,6 +807,28 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 
 ---
 
+### T15 — App icon
+
+**Goal:** the app has its red apple icon in Finder, the Dock and the app switcher. Nick supplied the artwork in `icons/`: a complete `AppIcon.appiconset`, loose PNGs (16–1024) and an `AppIcon.icns`.
+
+**Agent steps**
+1. Move `icons/AppIcon.appiconset` to `App/Assets.xcassets/` and add the catalog's `Contents.json`.
+2. Set `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` in `project.yml`.
+3. Delete `icons/`: the loose PNGs and the `.icns` duplicate the set.
+4. `scripts/test.sh` and `scripts/build.sh --release` pass.
+
+**Acceptance criteria**
+- `build/RedDelicious.app/Contents/Resources/` contains `AppIcon.icns` and `Assets.car`, and `Info.plist` has `CFBundleIconName` = `AppIcon`.
+
+**Files:** `App/Assets.xcassets/`, `project.yml`, `PLAN.md`
+
+**Handoff notes:**
+- **Done 2026-10-12.** `scripts/test.sh` passes 355 tests. `scripts/build.sh --release` succeeds for `x86_64 arm64` and the release flag check passes. The bundle has `CFBundleIconFile` and `CFBundleIconName` = `AppIcon`. `assetutil` shows all 10 renditions (16–1024 px) in `Assets.car`. actool puts only 16–256 px into the `.icns`, as a fallback.
+- **Supplied files:** the set's `Contents.json` was already valid and every slot had the right pixel size, so it was used unchanged. The loose PNGs, the `.icns` and the `icons/` folder were deleted. They were never committed.
+- **For Nick:** check whether the password dialog now shows the apple. If it does, remove "The password dialog has no custom icon yet" from the README's known limitations. Finder and the Dock may keep showing the old icon until the icon cache refreshes, for example after moving the app or logging out.
+
+---
+
 ## 4. Future work (not in scope)
 
 - Rename the GitHub repo and local folder from `iso-sword` to match the app (T14 left them as they are).
@@ -851,3 +874,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-12 | T13 DONE after Nick's dialog checks; macOS retries wrong passwords indefinitely (`tries` 10000) | Claude |
 | 2026-10-12 | T14 added: rename to Red Delicious Media Writer; T12's remaining tests run on the T14 build | Claude |
 | 2026-10-12 | T14 DONE: app renamed to Red Delicious Media Writer (`RedDelicious`, `com.example.reddelicious`, `REDDELICIOUS_*`) | Claude |
+| 2026-10-12 | T15 DONE: app icon from Nick's artwork in `App/Assets.xcassets` | Claude |

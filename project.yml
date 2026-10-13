@@ -29,6 +29,7 @@ targets:
         PRODUCT_NAME: RedDelicious
         PRODUCT_BUNDLE_IDENTIFIER: com.example.reddelicious
         INFOPLIST_FILE: App/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: App/RedDelicious.entitlements
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Manual
