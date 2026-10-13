@@ -122,7 +122,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T13 | 🧑 Branded password prompt (`authopen -extauth`) | T11 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
 | T14 | Rename to Red Delicious Media Writer | T13 | DONE | 2026-10-12 | Claude |
 | T15 | App icon | T14 | DONE | 2026-10-12 | Claude |
-| T16 | 🧑 Password prompt before the safety check; size check after open | T15 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T16 | 🧑 Password prompt before the safety check; size check after open | T15 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -887,6 +887,13 @@ This also removes the README limitation "after a cancelled password prompt the d
   5. Clean up any RAM disk still attached: `hdiutil detach "$DISK" || sudo hdiutil detach "$DISK"`, and the same with `"$DISK2"` after H15.
 
   Then tell the agent the results. If they meet the acceptance criteria, the agent records them here and marks T16 `DONE`.
+- **Human results, 2026-10-12, commit `e55abea`:**
+  - **Step 1 (Debug, RAM disk):** exactly one dialog, then write and verify passed. So authopen accepts the external authorization when it runs after the unmount rather than straight after the dialog, and the size check matches on a RAM disk.
+  - **Step 2 (H15):** the first attempt didn't test the takeover: leftover RAM disks (`disk10`, `disk11`) were attached, so A became `disk12` and B took the lowest free number, `disk8`. After detaching the leftovers, A and B were both `disk8`, and the app showed "A different drive is attached" (size changed) after the password. H15 step 2 now says to detach other RAM disks first.
+  - **Step 3 (Release, real stick, H5):** the stick still held the FreeBSD image from H7, which macOS can't mount, so Nick erased it to ExFAT `TESTSTICK` with a test file first. Cancelling the dialog returned to the confirm screen with the new notice, and the volume stayed mounted.
+  - **Step 4 (Release, real stick):** one dialog, then write and verify passed. The opened device's size and block size match what diskutil reports for the Cruzer Glide.
+  - Side note: the first Debug launch didn't list the RAM disk because `build/` still held the agent's Release build; `scripts/build.sh` fixed it.
+- **Acceptance:** every criterion is met. Marked `DONE`.
 
 ---
 
@@ -937,3 +944,4 @@ This also removes the README limitation "after a cancelled password prompt the d
 | 2026-10-12 | T14 DONE: app renamed to Red Delicious Media Writer (`RedDelicious`, `com.example.reddelicious`, `REDDELICIOUS_*`) | Claude |
 | 2026-10-12 | T15 DONE: app icon from Nick's artwork in `App/Assets.xcassets` | Claude |
 | 2026-10-12 | T16 added from a review finding (disk swapped during the password dialog) and prepped: prompt before the safety check, size check after open; NEEDS_HUMAN. T12's remaining tests run on the T16 build | Claude |
+| 2026-10-12 | T16 DONE after Nick's runs: one dialog per write, H15 swap refused, H5 leaves the drive mounted, real-stick write and verify pass | Claude |

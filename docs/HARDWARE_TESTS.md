@@ -75,7 +75,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H2 | RAM-disk dry run with password prompt | Debug | PASS | Prompt shown; `fsync fallback` as expected for a RAM disk |
 | H3 | Boot and internal disks never listed | Debug + Release | PASS | Debug: only `disk7` and `disk9`; Release: only `disk7`; hot-plug and deselect work; built-in SD slot reports internal, so hidden |
 | H4 | Image bigger than the stick | Release | PASS | 40 GB image vs 31.4 GB stick |
-| H5 | Cancel the password prompt | Release | PASS | Back to confirm screen; volume and file intact after replug |
+| H5 | Cancel the password prompt | Release | PASS | Back to confirm screen; volume and file intact after replug. Re-run on T16: volume stays mounted |
 | H6 | Hybrid Linux ISO, boots on test machine; flush method | Release | PASS | Fedora 44 Live booted on a 2017 Intel Mac; `fsync fallback`; 4.7 MB/s, 11 min 30 s |
 | H7 | `.img` write | Release | PASS | FreeBSD `.img` booted on a 2017 Intel Mac |
 | H8 | Cancel during write | Release | PASS | |
@@ -85,7 +85,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H12 | Drive in use (unmount refused) | Release | | |
 | H13 | Intel Mac run | Release | Not possible | Intel Mac runs macOS 13.7.8; app needs 14+ |
 | H14 | What real disks report (read-only) | none | | |
-| H15 | Drive swapped during the password dialog | Debug | | |
+| H15 | Drive swapped during the password dialog | Debug | PASS | Both RAM disks were `disk8`; refused with "A different drive is attached" |
 
 **Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09)
 
@@ -187,6 +187,7 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 
 **Result:** PASS
 **Notes:** 2026-10-09, Release build, stick formatted ExFAT/GPT as `TESTSTICK` with one test file. Clicking Cancel in the authopen dialog returned the app to the confirm screen with the notice, not an error screen. "Mounted volumes" read none and `TESTSTICK` left Finder. After a replug, `TESTSTICK` remounted. The agent checked read-only afterwards: `disk7` still had its GPT layout (EFI + `TESTSTICK`) and the test file was intact.
+**Re-run on T16, 2026-10-12, Release build, commit `e55abea`:** stick erased to ExFAT `TESTSTICK` with a test file. Cancel returned to the confirm screen with "…nothing was written and the drive was left as it was", and the volume stayed mounted. A full write and verify on the same stick then passed.
 
 ### H6 — Hybrid Linux ISO, boots on a test machine
 
@@ -337,7 +338,7 @@ Checks that a disk which takes over the drive's `/dev/diskN` name while the pass
 
 **Steps**
 1. `scripts/build.sh` (Debug).
-2. Create RAM disk **A** (512 MiB) with root-owned nodes, as in H2 step 2:
+2. Detach any RAM disks left from earlier tests (`hdiutil info` lists them with image path `ram://…`). Otherwise A may not get the lowest free number, and B won't reuse A's name. Then create RAM disk **A** (512 MiB) with root-owned nodes, as in H2 step 2:
    ```sh
    DISK=$(hdiutil attach -nomount ram://1048576 | awk '{print $1}')
    RAW="/dev/r${DISK#/dev/}"
@@ -362,5 +363,5 @@ Checks that a disk which takes over the drive's `/dev/diskN` name while the pass
 - After the password, the app shows "A different drive is attached", saying the drive's size changed, with "Nothing was written to the drive."
 - The log shows `Refused diskN` from the `safety` category, and no unmount or authopen lines for that run.
 
-**Result:**
-**Notes:**
+**Result:** PASS
+**Notes:** 2026-10-12, Debug build, commit `e55abea`. First attempt: leftover RAM disks `disk10` and `disk11` were attached, so A became `disk12` and B took `disk8`; the names differed, so it was redone. After detaching the leftovers, A and B were both `disk8`, and after the password the app showed "A different drive is attached" (size changed).
