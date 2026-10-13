@@ -26,9 +26,10 @@ struct ProgressDisplayTests {
         #expect(check.canCancel)
     }
 
-    @Test func thePromptStageExplainsTheAuthopenDialog() throws {
+    @Test func thePromptStageNamesTheAppsOwnDialog() throws {
         let open = try #require(ProgressDisplay(state: .preparing(.open), isCancelling: false))
-        #expect(open.detail?.contains("authopen wants to make changes") == true)
+        #expect(open.detail?.contains("dialog from ISO Sword") == true)
+        #expect(open.detail?.contains("authopen") == false)
     }
 
     @Test func writingShowsPercentBytesSpeedAndTimeLeft() throws {

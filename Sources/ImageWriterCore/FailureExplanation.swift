@@ -127,6 +127,13 @@ public struct FailureExplanation: Equatable, Sendable {
                 message: "Another app is still using the drive. Quit any app that may be using it, then try again.",
                 drive: .untouched
             )
+        case .authorizationFailed:
+            return FailureExplanation(
+                title: "The password couldn’t be checked",
+                message: "macOS could not check the administrator password, so the drive was not opened. Try again, and restart the Mac if it keeps happening.",
+                drive: .untouched,
+                details: error.localizedDescription
+            )
         case .invalidDiskName, .authopenFailed, .authopenTerminated, .posix:
             return FailureExplanation(
                 title: "The drive couldn’t be opened",

@@ -13,7 +13,7 @@ Several checks keep the wrong disk from being written:
 - **The drive list hides disks that are never safe targets.** The boot disk (including its APFS container and the physical disk behind it) and every internal disk never appear, under any setting. By default only external, removable USB drives are listed. "Show all external disks" adds other external disks, such as Thunderbolt SSDs. If the app can't work out which disk is the boot disk, the list stays empty.
 - **A confirm screen** shows the drive's name, size, `/dev/diskN` and mounted volumes, and requires a click on **Erase and Write**.
 - **A safety check right before writing** queries the disk again and stops if it has disappeared, changed (different size, name, block size or bus), or no longer passes the filter.
-- **macOS asks for an administrator password** before every write. The dialog says *"authopen wants to make changes"*: `authopen` is the macOS tool that opens the disk for the app. The app itself never runs as root.
+- **macOS asks for an administrator password** before every write, in a dialog that names ISO Sword. The app hands the resulting authorization to `authopen`, the macOS tool that opens the disk and passes it back. The app itself never runs as root.
 
 After a cancelled or failed write, the drive's contents are undefined. The app says so and tells you what state the drive was left in.
 
@@ -57,11 +57,12 @@ log stream --predicate 'subsystem == "com.example.isosword"' --info
 
 ```
 Select image → Select drive → Confirm → safety re-check → diskutil unmountDisk
-  → authopen (password prompt, returns an open file descriptor)
+  → password prompt (Security.framework, names ISO Sword)
+  → authopen -extauth (opens the disk, returns an open file descriptor)
   → write to /dev/rdiskN → flush → read back and compare → diskutil eject → Done
 ```
 
-- One password prompt covers the write and the verify, because both use the same file descriptor.
+- One password prompt covers the write and the verify, because both use the same file descriptor. The app creates the authorization for `sys.openfile.readwrite./dev/rdiskN` itself and passes it to `authopen` on stdin (`-extauth`), so the dialog names ISO Sword.
 - Writes go to the raw device (`/dev/rdiskN`) in about 4 MiB chunks, with aligned buffers and the system cache bypassed. The final flush uses `F_FULLFSYNC`, or `fsync` on devices that don't support it.
 - Verification is always on. It compares every byte of the image with what the drive returns.
 - The Mac is kept from idle-sleeping during a write. The window can't be closed mid-write, and quitting asks first, then stops the write cleanly.
@@ -73,8 +74,8 @@ Select image → Select drive → Confirm → safety re-check → diskutil unmou
 - **No compressed images.** Decompress `.xz`, `.gz` or `.zip` images first (for example `xz -dk image.img.xz`).
 - **One drive at a time.** No persistence partitions.
 - **SD cards in a Mac's built-in slot are not listed.** macOS reports the built-in reader as an internal disk, and ISO Sword never shows internal disks. Use a USB card reader instead.
-- **A password prompt on every write.** macOS doesn't cache the authorization across `authopen` runs.
-- **The dialog names `authopen`, not ISO Sword.**
+- **A password prompt on every write.** The app discards the authorization after each write, so the next one asks again.
+- **The password dialog has no custom icon yet.** macOS also adds its own headline above the app's message, which can't be removed.
 - **After a cancelled password prompt the drive stays unmounted.** Unplug and reinsert it to get its volumes back.
 - **Not signed or notarized.** Build from source. A copy downloaded or AirDropped from elsewhere is blocked by Gatekeeper until you remove the quarantine flag (`xattr -dr com.apple.quarantine IsoSword.app`).
 - English only. No drag-and-drop and no checksum display.
@@ -82,7 +83,6 @@ Select image → Select drive → Confirm → safety re-check → diskutil unmou
 ## Roadmap
 
 - **A privileged helper** registered with `SMAppService`, so writes no longer need a password every time. Needs Developer ID signing, and the helper must re-check the target disk itself.
-- **A branded password prompt**, by creating the authorization in-app (`authopen -extauth`), so the dialog names ISO Sword instead of authopen.
 - **Developer ID signing, notarization** and a DMG download.
 - Later: compressed images, SHA-256 display, drag-and-drop, localization.
 

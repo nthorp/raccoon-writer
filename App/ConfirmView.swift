@@ -45,9 +45,7 @@ struct ConfirmView: View {
             Text("All data on this drive will be permanently lost.")
                 .bold()
 
-            Text("macOS will ask for an administrator password (the dialog says ")
-                + Text("authopen wants to make changes").italic()
-                + Text(").")
+            Text("ISO Sword will ask for an administrator password.")
 
             Spacer()
 

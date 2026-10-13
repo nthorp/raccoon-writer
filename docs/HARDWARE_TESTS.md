@@ -128,7 +128,7 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 
 **Expected**
 - The confirm screen shows the RAM disk's name, 537 MB and `/dev/diskN`.
-- The dialog says "authopen wants to make changes".
+- The dialog says "authopen wants to make changes" (builds before T13; from T13 on it names ISO Sword, see T13).
 - The progress screen goes through writing, "Finishing the write" and verifying, then shows "Finished. You can remove the drive." with the size, total time and average write speed.
 - The log shows `fullSync used fsync fallback` (RAM disks don't support `F_FULLFSYNC`, see T01).
 - Either the RAM disk was ejected, or the done screen says "Finished, but the drive is still attached". Note which one.
@@ -176,7 +176,7 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 **Steps**
 1. Make sure the stick has a mounted volume (format it in Disk Utility first if needed).
 2. Choose any image and the stick, click Continue, then **Erase and Write**.
-3. In the "authopen wants to make changes" dialog, click **Cancel**.
+3. In the password dialog, click **Cancel**. From T13 on the dialog names ISO Sword; earlier builds showed "authopen wants to make changes".
 
 **Expected**
 - The app returns to the confirm screen, not an error screen, with the notice: "The password dialog was cancelled, so nothing was written. The drive's volumes have been unmounted; reinsert the drive to get them back."
@@ -260,7 +260,7 @@ The main end-to-end test. Also records the flush method on a real stick.
 1. Start a write. While it is writing, press ⌘Q.
 2. Click **Keep Writing**. Check that the write continues.
 3. Press ⌘Q again and click **Stop and Quit**.
-4. Start another write, and during the password dialog press ⌘Q, then **Stop and Quit**, then answer the dialog (either button).
+4. Start another write, and while the ISO Sword password dialog is up press ⌘Q, then **Stop and Quit**, then answer the dialog (either button). Note which button you used.
 
 **Expected**
 - The alert says "Stop writing and quit?" with the drive note. "Keep Writing" is the default button.

@@ -116,7 +116,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T10 | SwiftUI shell and screens | T09 | DONE | 2026-10-09 | Claude |
 | T11 | Error states, cancel, disconnect handling, polish | T10 | DONE | 2026-10-09 | Claude |
 | T12 | 🧑 Hardware test checklist and README | T11 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
-| T13 | 🧑 Branded password prompt (`authopen -extauth`) | T11 | TODO | | Claude (prep) / Nick (run) |
+| T13 | 🧑 Branded password prompt (`authopen -extauth`) | T11 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -720,12 +720,39 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 **Files:** `Sources/ImageWriterCore/` (`DeviceAuthorizer`, `SecurityAuthorizer`, `Fakes/FakeDeviceAuthorizer`, `AuthopenOpener`, `DeviceOpenError`, `FailureExplanation`, `ProgressDisplay`), `App/ConfirmView.swift`, `Tests/`, `README.md`, `docs/HARDWARE_TESTS.md`
 
 **Handoff notes:**
+- **Agent prep done 2026-10-12, now `NEEDS_HUMAN`.** `scripts/test.sh` passes 353 tests (338 before). `scripts/build.sh` (Debug) and `scripts/build.sh --release` succeed for `x86_64 arm64` with no Swift warnings, and the release flag check passes. The agent wrote to no disk and never ran authopen or `AuthorizationCreate`.
+- **What was built:**
+  - `DeviceAuthorizer` (protocol), `DeviceAuthorization` (protocol: `externalForm` of 32 bytes and `release()`), production `SecurityAuthorizer` + `SecurityAuthorization`, and `Fakes/FakeDeviceAuthorizer` (+ `FakeDeviceAuthorization`, which counts releases).
+  - `SecurityAuthorizer` requests `sys.openfile.readwrite./dev/rdiskN` with `interactionAllowed | extendRights | preAuthorize` and the prompt "ISO Sword needs your password to erase and write the selected drive." `SecurityAuthorization.release()` calls `AuthorizationFree(…, destroyRights)`, is idempotent, and also runs from `deinit` as a safety net.
+  - `OSStatus` mapping: `errAuthorizationCanceled` → `userCancelled`, `errAuthorizationDenied` → `permissionDenied`, anything else → new `DeviceOpenError.authorizationFailed(status:)`, described with `SecCopyErrorMessageString`. `FailureExplanation` gives it "The password couldn’t be checked" with the system text in the details line.
+  - `AuthopenOpener.obtainDescriptor` authorizes first (on the same GCD thread), then runs `authopen -stdoutpipe -extauth -o 2 /dev/rdiskN` with stdin on a pipe. The 32 bytes are written and the write end closed before `recvmsg`. The authorization is released by `defer` after authopen has exited, on every path. Authopen's stderr cancel mapping is kept as a fallback.
+  - The stdin pipe is made by `makeInputPipe()`: both ends `FD_CLOEXEC`, write end `F_SETNOSIGPIPE`. A failed write (EPIPE) is logged and the error is then mapped from authopen's exit status and stderr as before. `POSIX_SPAWN_CLOEXEC_DEFAULT` is unchanged.
+  - User-facing text: `ProgressDisplay` now says "Enter an administrator password in the dialog from ISO Sword." `ConfirmView` says "ISO Sword will ask for an administrator password." README safety note, how-it-works, limitations and roadmap updated. Section 4's `-extauth` bullet marked implemented. In `docs/HARDWARE_TESTS.md`, H5 step 3 and H10 step 4 no longer quote the authopen dialog.
+- **Tests:** `OSStatus` mapping, right name, prompt text, error description, external form length (`SecurityAuthorizerTests`). In `AuthopenOpenerTests`: failed/cancelled/denied authorization never spawns the stand-in; the stand-in gets `-extauth` and exactly the fake's 32 bytes on stdin (read to EOF, so it also proves the write end is closed); a stand-in that closes stdin and exits is an error, not a crash (20 runs); a deterministic test writes to a pipe with no reader and gets `EPIPE`; the authorization is released exactly once on success, on authopen failure, on exit without an fd, on a signal and on a spawn failure, and is still alive while authopen runs; two opens authorize twice. "OSStatus" added to the jargon list in `FailureExplanationTests`. **Mutation-checked:** removing `F_SETNOSIGPIPE` kills the test process.
+- **Deviations:**
+  1. Release is an explicit `release()` on a `DeviceAuthorization` protocol, not only `deinit`, so tests can check it is freed on every path.
+  2. `obtainDescriptor` has an internal `runner` parameter (default `run`). A shell stand-in can't send an fd over `SCM_RIGHTS`, so the success-path release test uses it.
+  3. The app's text no longer quotes the dialog's headline; it says "the dialog from ISO Sword". The exact macOS headline is unknown until human step 1. If it's worth quoting, update `ProgressDisplay` and `ConfirmView` then.
+  4. H2's expected line got a note that builds from T13 on name ISO Sword. H2's recorded result and notes are unchanged.
+- **Nick: run these on the current commit**, with the log open in a second Terminal window:
+  ```sh
+  log stream --predicate 'subsystem == "com.example.isosword" OR process == "authopen"' --info
+  ```
+  1. **RAM disk, Debug build.** `scripts/build.sh`. Create the RAM disk and `chown` its nodes exactly as in H2 step 2 of `docs/HARDWARE_TESTS.md`. Then run `ISOSWORD_ALLOW_VIRTUAL_DISKS=1 build/IsoSword.app/Contents/MacOS/IsoSword`, write `~/iso-sword-test/ram-test.img` to the RAM disk and enter your password. **Record the exact dialog text** (headline and message) and **which icon it shows**. Expect the message "ISO Sword needs your password to erase and write the selected drive."
+  2. **Count the dialogs.** Exactly one should appear. If a second one naming authopen appears, copy the log's `authopen` lines and tell the agent.
+  3. **Second write within 5 minutes** of entering the password in step 1. The RAM disk is ejected after a successful write, so create a new one with the H2 step 2 snippet first. Record whether it prompts again. It should.
+  4. **Cancel.** Start another write and click Cancel in the dialog. Expect the confirm screen with the notice, as in H5.
+  5. **Wrong password.** Start another write and enter a wrong password until macOS stops asking. Record the screen the app shows. Expect "Permission was refused".
+  6. **Real USB stick, Release build.** `scripts/build.sh --release`, then `open build/IsoSword.app`. One full write and verify to the test stick. Record the dialog text and icon, and whether the write and verify passed.
+  7. Clean up any RAM disk still attached: `hdiutil detach "$DISK" || sudo hdiutil detach "$DISK"`.
+  
+  Then tell the agent the results. If they meet the acceptance criteria, the agent records them here and marks T13 `DONE`. After that, run T12's H10, H11, H12 and H14 on the T13 build.
 
 ---
 
 ## 4. Future work (not in scope)
 
-- ~~`authopen -extauth` for a dialog naming ISO Sword~~: now T13.
+- ~~`authopen -extauth` for a dialog naming ISO Sword~~: implemented in T13.
 - `HelperOpener` using an SMAppService-registered privileged XPC helper (removes per-write password prompt). Requires Developer ID signing; design must re-validate targets inside the helper.
 - Developer ID signing, notarization, DMG packaging.
 - Compressed image support, SHA-256 display, drag-and-drop, localization.
@@ -763,3 +790,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-09 | T12 prep: docs/HARDWARE_TESTS.md checklist (H1–H14) and README; NEEDS_HUMAN for the hardware run | Claude |
 | 2026-10-12 | T13 added: branded password prompt via `authopen -extauth`, after T12 | Claude |
 | 2026-10-12 | T13 moved ahead of T12's remaining tests (H10, H11, H12, H14): now depends on T11 | Claude |
+| 2026-10-12 | T13 prep: DeviceAuthorizer, SecurityAuthorizer, FakeDeviceAuthorizer, `authopen -extauth` in AuthopenOpener; NEEDS_HUMAN for the dialog checks | Claude |

@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// Failures while obtaining a privileged handle to a disk.
 public enum DeviceOpenError: Error, Equatable, Sendable {
@@ -10,6 +11,9 @@ public enum DeviceOpenError: Error, Equatable, Sendable {
     case permissionDenied
     /// The disk is in use (usually still mounted).
     case deviceBusy
+    /// Security.framework refused to create the authorization, for a reason other than
+    /// cancel or denial. `status` is the `OSStatus`.
+    case authorizationFailed(status: OSStatus)
     /// authopen failed for a reason we do not recognize. `status` is its exit code.
     case authopenFailed(status: Int32, message: String)
     /// authopen was killed by a signal before handing over a descriptor.
@@ -29,6 +33,9 @@ extension DeviceOpenError: LocalizedError {
             return "macOS did not allow the drive to be opened for writing."
         case .deviceBusy:
             return "The drive is in use. Close any files on it and try again."
+        case .authorizationFailed(let status):
+            let message = SecCopyErrorMessageString(status, nil).map { String($0) } ?? "unknown error"
+            return "Authorization failed: \(message) (OSStatus \(status))."
         case .authopenFailed(let status, let message):
             let detail = message.isEmpty ? "" : ": \(message)"
             return "Opening the drive failed (authopen exit status \(status))\(detail)."

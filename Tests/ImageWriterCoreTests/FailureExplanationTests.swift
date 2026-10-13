@@ -25,6 +25,7 @@ struct FailureExplanationTests {
         WriteFailure(stage: .open, error: DeviceOpenError.userCancelled),
         WriteFailure(stage: .open, error: DeviceOpenError.permissionDenied),
         WriteFailure(stage: .open, error: DeviceOpenError.deviceBusy),
+        WriteFailure(stage: .open, error: DeviceOpenError.authorizationFailed(status: -60008)),
         WriteFailure(stage: .open, error: DeviceOpenError.authopenFailed(status: 1, message: "boom")),
         WriteFailure(stage: .open, error: DeviceOpenError.authopenTerminated(signal: 9)),
         WriteFailure(stage: .open, error: DeviceOpenError.posix(operation: "recvmsg", code: EBADF)),
@@ -54,7 +55,7 @@ struct FailureExplanationTests {
         #expect(!explanation.title.isEmpty)
         #expect(!explanation.message.isEmpty)
         // Technical text belongs in the details line, never the main message.
-        for jargon in ["errno", "exit status", "authopen", "posix", "recvmsg", "Optional("] {
+        for jargon in ["errno", "exit status", "authopen", "OSStatus", "posix", "recvmsg", "Optional("] {
             #expect(!explanation.message.contains(jargon), "\(failure.error) message: \(explanation.message)")
             #expect(!explanation.title.contains(jargon))
         }
@@ -163,6 +164,13 @@ struct FailureExplanationTests {
         let explanation = explain(.open, DeviceOpenError.authopenFailed(status: 3, message: "no such device"))
         #expect(explanation.title == "The drive couldn’t be opened")
         #expect(explanation.details?.contains("exit status 3") == true)
+        #expect(explanation.drive == .untouched)
+    }
+
+    @Test func authorizationFailureKeepsTheSystemMessageInTheDetails() {
+        let explanation = explain(.open, DeviceOpenError.authorizationFailed(status: -60008))
+        #expect(explanation.title == "The password couldn’t be checked")
+        #expect(explanation.details?.contains("OSStatus -60008") == true)
         #expect(explanation.drive == .untouched)
     }
 
