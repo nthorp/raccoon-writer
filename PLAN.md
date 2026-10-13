@@ -117,6 +117,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T11 | Error states, cancel, disconnect handling, polish | T10 | DONE | 2026-10-09 | Claude |
 | T12 | 🧑 Hardware test checklist and README | T11 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 | T13 | 🧑 Branded password prompt (`authopen -extauth`) | T11 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
+| T14 | Rename to Red Delicious Media Writer | T13 | TODO | | Claude |
 
 Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -670,6 +671,7 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - **README** rewritten: what it is, status, safety (what is erased and which checks prevent a wrong-disk write), requirements, build and run, the two debug-only modes, logs, how it works, known limitations, roadmap, layout. Limitations include the authopen-named dialog, one prompt per write, volumes left unmounted after a cancelled prompt (T11 deviation 3), and the quarantine workaround for the ad-hoc-signed app.
 - **Deviations:** added H1 (Simulate look-through), H12 (drive in use) and H14 (disk reports) beyond the plan's list, so the requests from T03, T07, T10 and T11 have a place to be recorded.
 - **2026-10-12: T13 runs before the remaining tests.** H1–H9 ran on the authopen-named-dialog build. Run H10, H11, H12 and H14 only after T13 is `DONE`, on the T13 build, and put the build's commit in each test's notes. See T13 "Order with T12".
+- **2026-10-12: run them on the T14 build instead.** T14 renames the app to Red Delicious (`build/RedDelicious.app`, `REDDELICIOUS_*` env vars, subsystem `com.example.reddelicious`), and the checklist's unrun steps use the new names.
 
 ---
 
@@ -758,8 +760,46 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 
 ---
 
+### T14 — Rename to Red Delicious Media Writer
+
+**Goal:** the app is called **Red Delicious Media Writer**, or **Red Delicious** for short. Rename the display name and every internal identifier. `ImageWriterCore` keeps its name because it's generic. The GitHub repo and local folder stay `iso-sword` (see section 4).
+
+**Name mapping**
+
+| Old | New |
+| --- | --- |
+| "ISO Sword" | `AppInfo.displayName` = "Red Delicious Media Writer"; new `AppInfo.shortName` = "Red Delicious" |
+| `IsoSword` (XcodeGen project, target, scheme, `PRODUCT_NAME`, `.app`, executable) | `RedDelicious` |
+| `IsoSwordApp` / `App/IsoSwordApp.swift`, `App/IsoSword.entitlements` | `RedDeliciousApp` / `App/RedDeliciousApp.swift`, `App/RedDelicious.entitlements` |
+| `com.example.isosword` (bundle ID and log subsystem) | `com.example.reddelicious` |
+| `ISOSWORD_ALLOW_VIRTUAL_DISKS`, `ISOSWORD_SIMULATE` | `REDDELICIOUS_ALLOW_VIRTUAL_DISKS`, `REDDELICIOUS_SIMULATE` |
+| `isosword-*` temp prefixes, `/nonexistent/isosword/…` test paths | `reddelicious-*`, `/nonexistent/reddelicious/…` |
+
+**Where each name goes:** the full name in `CFBundleDisplayName` (Finder, Dock), the window title and the README heading. The short name in `CFBundleName` (menu bar, at most 15 characters) and in sentences, e.g. "Red Delicious needs your password…".
+
+**Order with T12:** T12's remaining tests (H10, H11, H12, H14) run on the T14 build, so the checklist's `.app` path, env vars and log predicate match what Nick launches.
+
+**Agent steps**
+1. Core: `AppInfo` (`displayName`, new `shortName`, `bundleIdentifier`). `SecurityAuthorizer.prompt` and `ProgressDisplay` use `shortName`. New env keys in `DebugTestMode` and `SimulationMode`. Change the `FileBackedDevice` temp prefix. Update comments that name the app.
+2. App and project: `git mv` the app struct file and entitlements, then rename the struct. `Info.plist` names. `ConfirmView` and `AppDelegate` interpolate `AppInfo.shortName`. Update `project.yml` (name, target, scheme, `PRODUCT_NAME`, bundle ID, entitlements and excludes), `scripts/build.sh` and `scripts/check-release-flags.sh`. Delete the stale generated `IsoSword.xcodeproj` and `build/IsoSword.app`.
+3. Tests: `AppInfoTests` checks both names and that `shortName` fits `CFBundleName`'s 15 characters. Update the strings in `SecurityAuthorizerTests`, `ProgressDisplayTests`, `CoordinatorFaultTests`, `DebugTestModeTests`, `SimulationModeTests`, `ReleaseFlagCheckTests`, and every `isosword-` prefix and `/nonexistent/isosword/` path.
+4. Docs: README (heading, prose, commands, log subsystem, quarantine command, a "formerly ISO Sword" line). In `docs/HARDWARE_TESTS.md`, update the intro, setup and steps of tests not yet run (H10, H11, H12, H14). Leave recorded results as they are, and add a line on pre-T14 names. Keep `~/iso-sword-test/`. Update the `AGENTS.md` title and this file's title, intro and section 1 rows. Leave earlier handoff notes and the change log as history.
+5. `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass. Fill in Handoff notes, mark `DONE` and commit.
+
+**Acceptance criteria**
+- `plutil -p build/RedDelicious.app/Contents/Info.plist` shows `CFBundleDisplayName` "Red Delicious Media Writer", `CFBundleName` "Red Delicious", `CFBundleIdentifier` `com.example.reddelicious` and `CFBundleExecutable` `RedDelicious`.
+- `git grep -i -E "iso ?sword|isosword"` matches only history (this file's earlier tasks and change log, HARDWARE_TESTS recorded results and the pre-T14 note), the README "formerly" line and clone URL, and the repo mention in `AGENTS.md`.
+- `scripts/test.sh` and `scripts/build.sh --release` pass, including the release flag check with the new markers.
+
+**Files:** `Sources/ImageWriterCore/` (`AppInfo`, `SecurityAuthorizer`, `ProgressDisplay`, `DebugTestMode`, `Simulation/SimulationMode`, `Fakes/FileBackedDevice`, comments), `App/`, `project.yml`, `scripts/`, `Tests/`, `README.md`, `docs/HARDWARE_TESTS.md`, `AGENTS.md`, `PLAN.md`
+
+**Handoff notes:**
+
+---
+
 ## 4. Future work (not in scope)
 
+- Rename the GitHub repo and local folder from `iso-sword` to match the app (T14 left them as they are).
 - ~~`authopen -extauth` for a dialog naming ISO Sword~~: implemented in T13.
 - `HelperOpener` using an SMAppService-registered privileged XPC helper (removes per-write password prompt). Requires Developer ID signing; design must re-validate targets inside the helper.
 - Developer ID signing, notarization, DMG packaging.
@@ -800,3 +840,4 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 | 2026-10-12 | T13 moved ahead of T12's remaining tests (H10, H11, H12, H14): now depends on T11 | Claude |
 | 2026-10-12 | T13 prep: DeviceAuthorizer, SecurityAuthorizer, FakeDeviceAuthorizer, `authopen -extauth` in AuthopenOpener; NEEDS_HUMAN for the dialog checks | Claude |
 | 2026-10-12 | T13 DONE after Nick's dialog checks; macOS retries wrong passwords indefinitely (`tries` 10000) | Claude |
+| 2026-10-12 | T14 added: rename to Red Delicious Media Writer; T12's remaining tests run on the T14 build | Claude |
