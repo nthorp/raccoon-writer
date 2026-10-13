@@ -124,6 +124,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T15 | App icon | T14 | DONE | 2026-10-12 | Claude |
 | T16 | 🧑 Password prompt before the safety check; size check after open | T15 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
 | T17 | 🧑 Layered app icon (Icon Composer) with dark variant | T15 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
+| T18 | 🧑 Make the password-cancelled notice stand out | T16 | TODO | | Claude (prep) / Nick (check) |
 
 Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -932,6 +933,41 @@ This also removes the README limitation "after a cancelled password prompt the d
 - **Project:** XcodeGen 2.46 adds `AppIcon.icon` as a single `wrapper.icon` file reference in Resources, so `project.yml` is unchanged. `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` now resolves to it.
 - **Pre-26 fallback (step 4):** `actool` renders the legacy icons from the `.icon` file. With both sources present, the `.icns` (16–256 px) and the 7 flat `Assets.car` images (32–1024 px) were renders of the new icon, not the T15 PNGs. Removing the set left the `.icns` byte-identical and the same 7 images. Their digests changed, but they also change between two compiles of the same input, so the renders aren't byte-stable. The `.car` also has layered stacks for Aqua, DarkAqua and Tintable. So `App/Assets.xcassets` (it held only the icon) was deleted.
 - **Deviation:** none from the steps. Step 3's `project.yml` edit turned out not to be needed.
+
+---
+
+### T18 — 🧑 Make the password-cancelled notice stand out
+
+**Goal:** after the password dialog is cancelled, the app goes back to the confirm screen, which looks almost exactly as it did before. The only difference is the `WriteNotice` line ("The password dialog was cancelled, so nothing was written…"). It is easy to miss because `ConfirmView` shows it in `.secondary` grey (the icon too), with no background, under the much louder red "Erase this drive?" title. Make it a tinted callout box and move it to the top of the screen.
+
+Out of scope (Nick chose only these two changes): new wording or a separate title for `WriteNotice`, animation, VoiceOver announcements, the grey dialog hint on the progress screen, and a shared message view for the other inline warnings and errors.
+
+**Agent steps**
+1. In `App/ConfirmView.swift`, show the notice as a callout:
+   - The text uses the primary colour and `.font(.callout)`. Only the icon (`info.circle.fill`) is tinted blue.
+   - The box has padding of about 10, full width with leading alignment, a `.blue.opacity(0.12)` fill and a `.blue.opacity(0.3)` border, both with corner radius 8.
+   - `.fixedSize(horizontal: false, vertical: true)` stays, so long text wraps instead of truncating.
+   - Put it in a small private view in the same file, like `StepHeader` in `SetupView.swift`.
+2. Move the callout to the top of the `VStack`, above the "Erase this drive?" title. When there is no notice, the screen must look exactly as it does now.
+3. `WriteNotice` and the coordinator don't change. The existing preview "Back after the password dialog was cancelled" shows the new layout.
+4. `scripts/test.sh` and `scripts/build.sh --release` pass. Write instructions for Nick, set `NEEDS_HUMAN`, stop.
+
+**Human steps (Nick)**
+1. Run `scripts/build.sh` (Debug), then `REDDELICIOUS_SIMULATE=1 build/RedDelicious.app/Contents/MacOS/RedDelicious`.
+2. Choose any `.iso` or `.img` image, select "Simulated USB Stick (password dialog cancelled)", then Continue… and Erase and Write. After the simulated dialog delay, the confirm screen comes back.
+3. Check the callout catches your eye before the red title, and that it reads well in both Light and Dark appearance (System Settings › Appearance). Also check it at the narrowest window width.
+4. Press Cancel, choose the same drive again and continue. The confirm screen should show no callout and look as it did before T18.
+
+**Acceptance criteria**
+- The notice is the first thing on the confirm screen. It shows in a tinted box with primary-colour text and a blue icon.
+- It reads well in Light and Dark, and wraps rather than truncates at the minimum window width.
+- Without a notice, the confirm screen is unchanged.
+- `scripts/test.sh` and `scripts/build.sh --release` pass.
+
+**Files:** `App/ConfirmView.swift`, `PLAN.md`
+
+**Handoff notes:**
+- _(none yet)_
 
 ---
 
