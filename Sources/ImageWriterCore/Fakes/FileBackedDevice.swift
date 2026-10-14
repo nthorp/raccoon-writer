@@ -22,8 +22,11 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
         public var shortWriteOnCall: Int?
         /// The same as `shortWriteOnCall`, for read calls.
         public var shortReadOnCall: Int?
-        /// errno returned by every sync attempt.
+        /// errno returned by every sync attempt the device supports.
         public var syncError: Int32?
+        /// Make `DKIOCSYNCHRONIZE` succeed, like a real USB stick. By default it fails with
+        /// `ENOTTY`, as it does on a regular file, so the sync lands on `F_FULLFSYNC`.
+        public var synchronizeSupported: Bool
         /// Make `F_FULLFSYNC` fail with `ENOTTY`, like the T01 RAM disk, to exercise the fallback.
         public var fullFsyncUnsupported: Bool
 
@@ -33,6 +36,7 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
             shortWriteOnCall: Int? = nil,
             shortReadOnCall: Int? = nil,
             syncError: Int32? = nil,
+            synchronizeSupported: Bool = false,
             fullFsyncUnsupported: Bool = false
         ) {
             self.failWrite = failWrite
@@ -40,6 +44,7 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
             self.shortWriteOnCall = shortWriteOnCall
             self.shortReadOnCall = shortReadOnCall
             self.syncError = syncError
+            self.synchronizeSupported = synchronizeSupported
             self.fullFsyncUnsupported = fullFsyncUnsupported
         }
     }
@@ -157,6 +162,7 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
             syncs += 1
             let faults = currentFaults
             let method = try SyncMethod.perform(
+                synchronize: { faults.synchronizeSupported ? faults.syncError ?? 0 : ENOTTY },
                 fullFsync: {
                     if faults.fullFsyncUnsupported { return ENOTTY }
                     return faults.syncError ?? PosixIO.fcntlStatus(fd, F_FULLFSYNC)

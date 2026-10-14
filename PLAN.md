@@ -70,7 +70,7 @@ Error and cancel are possible from any step after Confirm. After a cancel or fai
 - **authopen:** `/usr/libexec/authopen -stdoutpipe -o <open-flags> /dev/rdiskN` shows the system admin prompt and passes an open file descriptor back over its stdout socket using `SCM_RIGHTS` (`recvmsg`). The app itself never runs as root. Confirm exact flags with `man authopen` in the T01 spike.
 - **One privileged open.** Each authopen call prompts for a password, so open `O_RDWR` once and reuse that fd for both the write and the verify read-back.
 - **Raw device I/O must be block-aligned.** Use `posix_memalign`-ed buffers, I/O sizes that are multiples of the device block size (query with `DKIOCGETBLOCKSIZE` / `DKIOCGETBLOCKCOUNT` from `<sys/disk.h>`), chunk size around 4 MiB. Zero-pad the final partial block when writing; compare only the true image length when verifying.
-- **Cache and sync:** set `F_NOCACHE` on the fd; call `fcntl(fd, F_FULLFSYNC)` after the last write, falling back to `fsync()` if it fails with `ENOTTY`/`ENOTSUP` (T01: RAM disks return `ENOTTY`).
+- **Cache and sync:** set `F_NOCACHE` on the fd. After the last write, flush with `ioctl(fd, DKIOCSYNCHRONIZE)` (a zeroed `dk_synchronize_t`; the disk driver sends the drive a SYNCHRONIZE CACHE), falling back to `fcntl(fd, F_FULLFSYNC)` and then `fsync()`, each only when the previous call fails with `ENOTTY`/`ENOTSUP` (T19). On a raw node `F_FULLFSYNC` returns `ENOTTY` (T01, T12) and `fsync` does nothing, so before T19 the drive's cache was never flushed by the app.
 - **Hybrid detection:** read the first 64 KiB of the image. MBR signature `0x55 0xAA` at offset 510. GPT header `"EFI PART"` at offset 512. ISO 9660 `"CD001"` at offset `0x8001`. An ISO with `CD001` but no MBR or GPT gets a non-blocking "may not boot from USB" warning.
 - **Disk discovery** uses `diskutil list -plist` and `diskutil info -plist` (parsed with `PropertyListDecoder`). DiskArbitration is optional, for live add/remove notifications only.
 - **Boot disk exclusion:** resolve the disk backing `/` via `diskutil info -plist /`. On APFS this is a synthesized container, so also resolve its physical store(s) (`APFSPhysicalStores`). Exclude any disk that matches, plus anything with `Internal == true`.
@@ -126,7 +126,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T17 | 🧑 Layered app icon (Icon Composer) with dark variant | T15 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
 | T18 | 🧑 Make the password-cancelled notice stand out | T16 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
 | T23 | Rename to Raccoon Writer, with the raccoon icon | T16 | DONE | 2026-10-13 | Claude |
-| T19 | 🧑 Flush the drive cache with `DKIOCSYNCHRONIZE` | T16 | TODO | | Claude (prep) / Nick (run) |
+| T19 | 🧑 Flush the drive cache with `DKIOCSYNCHRONIZE` | T16 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 | T20 | 🧑 Warn for drives over 500 GB; README says USB hard drives are listed | T18 | TODO | | Claude (prep) / Nick (check) |
 | T21 | Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill | T16 | TODO | | Claude |
 | T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | TODO | | Claude (prep) / Nick (run) |
@@ -1020,6 +1020,22 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
 **Files:** `Sources/ImageWriterCore/` (`RawDevice`, `SyncMethod`, `PosixIO`, `Fakes/FileBackedDevice`, `Simulation/SimulatedDevice`), `App/PreviewSamples.swift`, `Tests/` (`SyncMethodTests`, `RawDeviceTests`, `FileBackedDeviceTests`, coordinator and engine tests as needed), `README.md`, `docs/HARDWARE_TESTS.md`, `PLAN.md`
 
 **Handoff notes:**
+- **Agent prep done 2026-10-13, now `NEEDS_HUMAN`.** `scripts/test.sh` passes 374 tests. `scripts/build.sh --release` succeeds with no Swift warnings, and the release flag check passes. The agent wrote to no disk and never ran authopen.
+- **Step 1 (constant):** a C file compiled for arm64 and x86_64 printed `DKIOCSYNCHRONIZE=0x80186416` and `sizeof(dk_synchronize_t)=24` on both (and the T01 values for the geometry ioctls). Darwin imports `dk_synchronize_t` into Swift, so there is no mirror struct. `RawDeviceTests.synchronizeIoctlMatchesTheHeader` checks the size is 24 and rebuilds `_IOW('d', 22, …)` from the `<sys/ioccom.h>` formula.
+- **What was built:**
+  - `SyncMethod.synchronize` is the new first case. `SyncMethod.perform(synchronize:fullFsync:fsync:onSkip:)` runs the three in order, moves on only on `ENOTTY`/`ENOTSUP`, retries `EINTR` at every step, and throws `DeviceIOError.posix` with the call's name (`ioctl(DKIOCSYNCHRONIZE)`, `F_FULLFSYNC`, `fsync`) for any other errno. Any error from `fsync`, `ENOTTY` included, is still fatal, as before.
+  - `RawDevice.fullSync()` sends a zeroed `dk_synchronize_t` through the new `PosixIO.ioctlStatus`. It logs `fullSync skipped <call>: errno N (<text>)` at info level for each skipped call, then `fullSync used DKIOCSYNCHRONIZE` / `F_FULLFSYNC` / `fsync fallback`.
+  - `FileBackedDevice.Faults.synchronizeSupported` (default false) makes the synchronize step succeed. When it's off the step returns `ENOTTY` without calling the ioctl, so the fake stays deterministic. `syncError` now applies to every step the device supports, so existing tests keep their `F_FULLFSYNC` error. `SimulatedDevice` names no method and is unchanged; `PreviewSamples` now shows `.synchronize`.
+  - Tests: every fallback step with `ENOTTY` and `ENOTSUP`, other errnos fatal at each step with later steps not called, `EINTR` at each step, `RawDevice` on a temp file landing on `.fullFsync`, and the engine and coordinator reporting all three methods.
+- **Deviations:** none. The sync method still isn't shown in the UI, only in the log and `WriteSummary`.
+- **Nick: run these on the T19 commit**, with this log open in a second Terminal window:
+  ```sh
+  log stream --predicate 'subsystem == "com.example.raccoonwriter"' --info
+  ```
+  1. **RAM disk, Debug build.** Run `scripts/build.sh`, create the RAM disk exactly as in H2 step 2 of `docs/HARDWARE_TESTS.md`, then run `RACCOONWRITER_ALLOW_VIRTUAL_DISKS=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`. Write `~/iso-sword-test/ram-test.img` to the RAM disk. Write and verify should pass. **Copy the `fullSync used …` line and any `fullSync skipped …` lines.** Either `DKIOCSYNCHRONIZE` or `fsync fallback` is acceptable on a RAM disk. Then clean up: `hdiutil detach "$DISK" || sudo hdiutil detach "$DISK"`
+  2. **Real USB stick (the Cruzer Glide), Release build.** Run `scripts/build.sh --release`, then `open build/RaccoonWriter.app`. Write any image to the stick, for example the Fedora ISO from H6, and let it verify. It should pass. **Copy the `fullSync used …` line.** The expected result is `DKIOCSYNCHRONIZE`. If it says `F_FULLFSYNC` or `fsync fallback`, also copy the `fullSync skipped …` lines, because they give the errno.
+
+  Then tell the agent the results. If the stick used `DKIOCSYNCHRONIZE`, the agent records the results here and in `docs/HARDWARE_TESTS.md` and marks T19 `DONE`. If not, the agent updates the README to say what the app actually does and decides with Nick whether the older `DKIOCSYNCHRONIZECACHE` is worth trying.
 
 ---
 
@@ -1299,3 +1315,4 @@ Keep `AppInfo.shortName` even though it now equals `displayName`, so code that u
 | 2026-10-12 | T22 added from four review findings: volume names aren't shown, test fakes ship in Release, Info.plist lacks copyright, category and removable-volume usage text, and the Hardened Runtime is off. DiskArbitration (the fifth) left out | Claude |
 | 2026-10-13 | T23 added: rename to Raccoon Writer (`RaccoonWriter`, `com.example.raccoonwriter`, `RACCOONWRITER_*`) and the raccoon icon from Nick's `raccoon-writer-branding/` pack, deleted afterwards; listed above T19 so it is done before T19–T22 | Claude |
 | 2026-10-13 | T23 DONE: app renamed to Raccoon Writer (`RaccoonWriter`, `com.example.raccoonwriter`, `RACCOONWRITER_*`); raccoon layer in `App/AppIcon.icon`; branding folder deleted | Claude |
+| 2026-10-13 | T19 prep: `DKIOCSYNCHRONIZE` is the first flush method, then `F_FULLFSYNC`, then `fsync`; skipped methods logged with their errno; NEEDS_HUMAN for the RAM-disk and Cruzer Glide runs | Claude |

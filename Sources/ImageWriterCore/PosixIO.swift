@@ -32,6 +32,10 @@ enum PosixIO {
         fcntl(fd, command) == -1 ? errno : 0
     }
 
+    static func ioctlStatus<Argument>(_ fd: Int32, _ request: UInt, _ argument: inout Argument) -> Int32 {
+        ioctl(fd, request, &argument) == -1 ? errno : 0
+    }
+
     static func fsyncStatus(_ fd: Int32) -> Int32 {
         Darwin.fsync(fd) == -1 ? errno : 0
     }

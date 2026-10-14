@@ -50,7 +50,7 @@ enum PreviewSamples {
         WriteSummary(
             imageName: image.fileName, driveName: stick.mediaName, bsdName: stick.bsdName,
             bytes: image.sizeBytes, writeSeconds: 74, verifySeconds: 31, totalSeconds: 112,
-            syncMethod: .fullFsync, ejectWarning: ejectWarning
+            syncMethod: .synchronize, ejectWarning: ejectWarning
         )
     }
 

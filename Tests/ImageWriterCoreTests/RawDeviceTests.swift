@@ -13,7 +13,7 @@ struct RawDeviceTests {
         let bytes = pattern(count: 1024)
         #expect(try device.write(bytes, at: 512) == 1024)
         #expect(try device.read(count: 1024, at: 512) == bytes)
-        // A regular APFS file supports F_FULLFSYNC.
+        // A regular file returns ENOTTY for DKIOCSYNCHRONIZE, and APFS supports F_FULLFSYNC.
         #expect(try device.fullSync() == .fullFsync)
 
         device.close()
@@ -21,6 +21,15 @@ struct RawDeviceTests {
         #expect(throws: DeviceIOError.closed) { _ = try device.read(count: 512, at: 0) }
         #expect(throws: DeviceIOError.closed) { _ = try device.write([UInt8](repeating: 0, count: 512), at: 0) }
         #expect(throws: DeviceIOError.closed) { try device.fullSync() }
+    }
+
+    @Test func synchronizeIoctlMatchesTheHeader() {
+        // _IOW(g, n, t) = IOC_IN | (sizeof(t) & IOCPARM_MASK) << 16 | g << 8 | n, from <sys/ioccom.h>.
+        let size = UInt(MemoryLayout<dk_synchronize_t>.size)
+        #expect(size == 24)
+        let expected = UInt(0x8000_0000) | (size & 0x1FFF) << 16 | UInt(UInt8(ascii: "d")) << 8 | 22
+        #expect(RawDevice.ioctlSynchronize == expected)
+        #expect(RawDevice.ioctlSynchronize == 0x8018_6416)
     }
 
     @Test func rejectsInvalidGeometry() throws {

@@ -140,10 +140,16 @@ final class WriteEngineTests {
         }
     }
 
-    @Test func syncFallbackIsReported() throws {
-        let device = try FileBackedDevice(blockSize: 512, blockCount: 16, faults: .init(fullFsyncUnsupported: true))
+    @Test(arguments: [
+        (FileBackedDevice.Faults(synchronizeSupported: true), SyncMethod.synchronize),
+        (FileBackedDevice.Faults(), SyncMethod.fullFsync),
+        (FileBackedDevice.Faults(fullFsyncUnsupported: true), SyncMethod.fsyncFallback),
+    ])
+    func reportsTheSyncMethodTheDeviceUsed(faults: FileBackedDevice.Faults, method: SyncMethod) throws {
+        let device = try FileBackedDevice(blockSize: 512, blockCount: 16, faults: faults)
         let (result, _) = try run(engine(blockSize: 512), image(pattern(count: 4096)), device)
-        #expect(result.syncMethod == .fsyncFallback)
+        #expect(result.syncMethod == method)
+        #expect(device.lastSyncMethod == method)
     }
 
     @Test func imageChangedSinceSelectionWritesNothing() throws {

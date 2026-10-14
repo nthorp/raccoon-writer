@@ -87,7 +87,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H14 | What real disks report (read-only) | none | | |
 | H15 | Drive swapped during the password dialog | Debug | PASS | Both RAM disks were `disk8`; refused with "A different drive is attached" |
 
-**Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09)
+**Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09). That build never tried `DKIOCSYNCHRONIZE`. From T19 on the expected method is `DKIOCSYNCHRONIZE`; the T19 result is recorded in `PLAN.md` under T19.
 
 ---
 
@@ -133,11 +133,12 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 - The confirm screen shows the RAM disk's name, 537 MB and `/dev/diskN`.
 - The dialog says "authopen wants to make changes" (builds before T13; from T13 on it names the app, see T13).
 - The progress screen goes through writing, "Finishing the write" and verifying, then shows "Finished. You can remove the drive." with the size, total time and average write speed.
-- The log shows `fullSync used fsync fallback` (RAM disks don't support `F_FULLFSYNC`, see T01).
+- The log shows `fullSync used …`. From T19 on this is `DKIOCSYNCHRONIZE` if the RAM disk supports it; otherwise `fsync fallback`, with a `fullSync skipped …` line and its errno for each method that was skipped. Before T19 it was always `fsync fallback` (RAM disks don't support `F_FULLFSYNC`, see T01).
 - Either the RAM disk was ejected, or the done screen says "Finished, but the drive is still attached". Note which one.
 
 **Result:** PASS
 **Notes:** 2026-10-09, Debug build, 512 MiB RAM disk with `root:operator` nodes. Nick reports every expected result, including the authopen password dialog and the `fullSync used fsync fallback` log line. Afterwards the agent checked `hdiutil info`: the 512 MiB RAM disk was no longer attached. The agent also found that `log show` afterwards returned no lines from the app, because info-level lines aren't stored, so the flush method can only be seen live with `log stream`.
+- T19 adds `DKIOCSYNCHRONIZE` as the first flush method and re-runs this test; see T19 in `PLAN.md`.
 
 ### H3 — Boot and internal disks never listed
 
@@ -208,7 +209,7 @@ The main end-to-end test. Also records the flush method on a real stick.
 - "Finished. You can remove the drive." The stick has disappeared from `diskutil list` (ejected).
 - The sleep assertion is present during the run and gone afterwards. The close button works again.
 - The test machine boots to the distro's boot menu or live desktop.
-- **Record** the flush method (`F_FULLFSYNC` or `fsync fallback`), the average write speed and the total time.
+- **Record** the flush method (`DKIOCSYNCHRONIZE` is expected from T19 on; otherwise `F_FULLFSYNC` or `fsync fallback`, plus the `fullSync skipped …` lines with their errno), the average write speed and the total time.
 
 **Result:** PASS
 **Notes:**
@@ -216,6 +217,7 @@ The main end-to-end test. Also records the flush method on a real stick.
 - **Flush method: `fsync fallback`.** Log: `2026-10-09 22:04:46.084688-0500 … IsoSword: [com.example.isosword:device] fullSync used fsync fallback`. This stick does not support `F_FULLFSYNC` (open question from T01). The write still verified. The cache is bypassed (`F_NOCACHE`), and the eject that follows has macOS flush the drive.
 - **Average write speed 4.7 MB/s, total time 11 min 30 s** (write, flush, verify and eject). This is slow but in line with this stick, a USB 2.0 Cruzer Glide on a 480 Mb/s link through a hub. Writing is the stick's bottleneck.
 - **Boot test PASS:** the stick booted Fedora 44 Live on a 2017 Intel Mac.
+- T19: `F_FULLFSYNC` returns `ENOTTY` on any raw disk node, not only this stick, and `fsync` there doesn't reach the drive, so this build never flushed the stick's cache; the eject did. T19 flushes with `DKIOCSYNCHRONIZE` and re-runs the write on this stick; see T19 in `PLAN.md`.
 
 ### H7 — `.img` write
 

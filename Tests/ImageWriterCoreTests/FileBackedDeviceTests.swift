@@ -105,12 +105,18 @@ struct FileBackedDeviceTests {
         #expect(try device.fullSync() == .fsyncFallback)
         #expect(device.lastSyncMethod == .fsyncFallback)
 
+        device.faults = .init(synchronizeSupported: true)
+        #expect(try device.fullSync() == .synchronize)
+        #expect(device.lastSyncMethod == .synchronize)
+
+        device.faults = .init(syncError: EIO, synchronizeSupported: true)
+        #expect(throws: DeviceIOError.posix(operation: "ioctl(DKIOCSYNCHRONIZE)", code: EIO)) { try device.fullSync() }
         device.faults = .init(syncError: EIO)
         #expect(throws: DeviceIOError.posix(operation: "F_FULLFSYNC", code: EIO)) { try device.fullSync() }
         device.faults = .init(syncError: EIO, fullFsyncUnsupported: true)
         #expect(throws: DeviceIOError.posix(operation: "fsync", code: EIO)) { try device.fullSync() }
-        #expect(device.lastSyncMethod == .fsyncFallback)
-        #expect(device.syncCallCount == 4)
+        #expect(device.lastSyncMethod == .synchronize)
+        #expect(device.syncCallCount == 6)
     }
 
     @Test func closeIsIdempotentAndBlocksFurtherIO() throws {

@@ -122,8 +122,12 @@ final class WriteCoordinatorTests {
         #expect(probe.deviceWasClosedAtEject == true)
     }
 
-    @Test func summaryDescribesTheRun() async throws {
-        let device = try device(faults: .init(fullFsyncUnsupported: true))
+    @Test(arguments: [
+        (FileBackedDevice.Faults(synchronizeSupported: true), SyncMethod.synchronize),
+        (FileBackedDevice.Faults(fullFsyncUnsupported: true), SyncMethod.fsyncFallback),
+    ])
+    func summaryDescribesTheRun(faults: FileBackedDevice.Faults, method: SyncMethod) async throws {
+        let device = try device(faults: faults)
         let image = try image()
         // Two coordinator clock reads, start and end, one second apart.
         let (coordinator, _) = coordinator(opener: FakeDeviceOpener(device: device), clock: steppingClock(step: 1))
@@ -138,7 +142,7 @@ final class WriteCoordinatorTests {
             writeSeconds: 0,
             verifySeconds: 0,
             totalSeconds: 1,
-            syncMethod: .fsyncFallback,
+            syncMethod: method,
             ejectWarning: nil
         )))
         #expect(coordinator.selectedImage == image)

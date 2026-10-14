@@ -67,7 +67,7 @@ Select image → Select drive → Confirm
 
 - One password prompt covers the write and the verify, because both use the same file descriptor. The app creates the authorization for `sys.openfile.readwrite./dev/rdiskN` itself and passes it to `authopen` on stdin (`-extauth`), so the dialog names Raccoon Writer.
 - The prompt comes first so that the safety check, unmount and open run back to back after it. The authorization is for a device path, and a path can change hands while the dialog is open. Cancelling the dialog leaves the drive as it was, still mounted.
-- Writes go to the raw device (`/dev/rdiskN`) in about 4 MiB chunks, with aligned buffers and the system cache bypassed. The final flush uses `F_FULLFSYNC`, or `fsync` on devices that don't support it.
+- Writes go to the raw device (`/dev/rdiskN`) in about 4 MiB chunks, with aligned buffers and the system cache bypassed. The final flush asks the drive to empty its write cache with `DKIOCSYNCHRONIZE`, falling back to `F_FULLFSYNC` and then `fsync` where it isn't supported. On a raw device `fsync` doesn't reach the drive; the eject that follows flushes it.
 - Verification is always on. It compares every byte of the image with what the drive returns.
 - The Mac is kept from idle-sleeping during a write. The window can't be closed mid-write, and quitting asks first, then stops the write cleanly.
 

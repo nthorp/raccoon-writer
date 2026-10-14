@@ -8,6 +8,8 @@ public final class RawDevice: OpenedDevice, @unchecked Sendable {
     // C headers in T01: _IOR('d', 24, uint32_t) and _IOR('d', 25, uint64_t).
     static let ioctlGetBlockSize: UInt = 0x4004_6418
     static let ioctlGetBlockCount: UInt = 0x4008_6419
+    // Checked in T19 (arm64 and x86_64): _IOW('d', 22, dk_synchronize_t), a 24-byte struct.
+    static let ioctlSynchronize: UInt = 0x8018_6416
 
     private static let log = Logger(subsystem: AppInfo.bundleIdentifier, category: "device")
 
@@ -61,13 +63,29 @@ public final class RawDevice: OpenedDevice, @unchecked Sendable {
     public func fullSync() throws -> SyncMethod {
         let method = try withDescriptor { fd in
             try SyncMethod.perform(
+                synchronize: {
+                    // Zero offset and length with no options flushes the whole device.
+                    var request = dk_synchronize_t()
+                    return PosixIO.ioctlStatus(fd, Self.ioctlSynchronize, &request)
+                },
                 fullFsync: { PosixIO.fcntlStatus(fd, F_FULLFSYNC) },
-                fsync: { PosixIO.fsyncStatus(fd) }
+                fsync: { PosixIO.fsyncStatus(fd) },
+                onSkip: { skipped, code in
+                    Self.log.info("fullSync skipped \(skipped.callName, privacy: .public): errno \(code) (\(String(cString: strerror(code)), privacy: .public))")
+                }
             )
         }
-        // T12 records which path a real USB stick takes.
-        Self.log.info("fullSync used \(method == .fullFsync ? "F_FULLFSYNC" : "fsync fallback", privacy: .public)")
+        // The hardware runs (T12, T19) record which path a real USB stick takes.
+        Self.log.info("fullSync used \(Self.logName(method), privacy: .public)")
         return method
+    }
+
+    private static func logName(_ method: SyncMethod) -> String {
+        switch method {
+        case .synchronize: "DKIOCSYNCHRONIZE"
+        case .fullFsync: "F_FULLFSYNC"
+        case .fsyncFallback: "fsync fallback"
+        }
     }
 
     public func close() {
