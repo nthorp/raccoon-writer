@@ -131,7 +131,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T21 | Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill | T16 | DONE | 2026-10-13 | Claude |
 | T24 | Smaller app: optimized raccoon layer, stripped Release binary | T23 | DONE | 2026-10-13 | Claude |
 | T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
-| T25 | 🧑 Tell a Removable Volumes privacy denial apart from a refused password | T21 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T25 | 🧑 Tell a Removable Volumes privacy denial apart from a refused password | T21 | BLOCKED | | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T25 builds on T22's committed prep but not on Nick's T22 runs, so it may start while T22 is `NEEDS_HUMAN`. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -1461,6 +1461,8 @@ Also, `NSRemovableVolumesUsageDescription` (T22) says the access is for reading 
 
 **Instructions for Nick:** run H16 in `docs/HARDWARE_TESTS.md` (steps 1–3, step 4 optional) and report back: what the failed screen showed in Simulate and in Release, which pane the button opened, the two log lines from step 2, whether the stick's volume stayed mounted, and whether the write after turning on Removable Volumes passed with or without a relaunch.
 
+**BLOCKED, 2026-10-13: the Removable Volumes switch isn't shown.** During H16 step 2 (Release, after `tccutil reset SystemPolicyRemovableVolumes` and Don't Allow), Nick's Files & Folders pane listed RaccoonWriter with a single "Full Disk Access" row and no Removable Volumes switch. IsoSword, Terminal and Visual Studio Code look the same. The system TCC database (read-only `sqlite3`) has `kTCCServiceSystemPolicyAllFiles` with `auth_value 0`, `auth_reason 5` (denied by service policy, never prompted) for all four. So none of them has Full Disk Access, but the pane shows that label for any app with a Full Disk Access row and hides the per-location switches. tccd creates that row silently at launch: at 22:26:05 it logged "Failed to match existing code requirement … kTCCServiceSystemPolicyAllFiles" and created a new row, then showed the Removable Volumes prompt. So the failed screen's instruction ("turn on Removable Volumes under Raccoon Writer") can't be followed on this Mac. Needs Nick's decision on what the screen and button should point to (Full Disk Access, the `tccutil` reset and relaunch, or both) before H16 continues.
+
 ---
 
 ## 4. Future work (not in scope)
@@ -1532,3 +1534,4 @@ Also, `NSRemovableVolumesUsageDescription` (T22) says the access is for reading 
 | 2026-10-13 | T22 DONE after Nick's runs: volume names, copyright, Release write on the Cruzer Glide and Debug RAM-disk write pass with the Hardened Runtime; privacy-prompt findings moved to T25 | Claude |
 | 2026-10-13 | T25 added from Nick's test: denying the Removable Volumes prompt (shown at launch by `diskutil` discovery) makes authopen fail with "Operation not permitted", which was reported as a refused password. New `blockedByPrivacySettings` case, failed screen with a Privacy Settings button, corrected usage text. T22's optional privacy-prompt step is superseded | Claude |
 | 2026-10-13 | T25 prep: `blockedByPrivacySettings` for authopen's "Operation not permitted", failed screen with an "Open Privacy Settings…" button (`FailureAction`), password-only `.permissionDenied` wording, `SimulatedDrive.privacyBlocked` (disk97), new usage text, README troubleshooting, H16; NEEDS_HUMAN for Nick's runs | Claude |
+| 2026-10-13 | T25 BLOCKED: Files & Folders shows only "Full Disk Access" (a silent denied row) for Raccoon Writer and hides the Removable Volumes switch the failed screen points to; needs a decision on the fix to offer | Claude |
