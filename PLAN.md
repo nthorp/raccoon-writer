@@ -131,8 +131,9 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T21 | Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill | T16 | DONE | 2026-10-13 | Claude |
 | T24 | Smaller app: optimized raccoon layer, stripped Release binary | T23 | DONE | 2026-10-13 | Claude |
 | T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T25 | 🧑 Tell a Removable Volumes privacy denial apart from a refused password | T21 | TODO | | Claude (prep) / Nick (run) |
 
-Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
+Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T25 builds on T22's committed prep but not on Nick's T22 runs, so it may start while T22 is `NEEDS_HUMAN`. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
 ---
 
@@ -1216,7 +1217,7 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
 2. **Volume names, Release build, real stick:** plug in the Cruzer Glide with a named volume. The drive list shows the volume name on its row. Press Continue…: the confirm screen shows "Volume names:" and "Mounted volumes:". Cancel the password dialog: both rows still appear above the T18 notice callout. Then eject the volume in Finder (not the drive), press Refresh, and record whether the name is still listed while unmounted.
 3. **Hardened Runtime, Release build, real stick:** one full write and verify. The password dialog appears with the app's name (T13 `-extauth`), the write and verify pass, and the drive ejects. Record anything unusual in the log.
 4. **Hardened Runtime, Debug build, RAM disk:** with `RACCOONWRITER_ALLOW_VIRTUAL_DISKS=1` and a RAM disk from `hdiutil attach -nomount ram://65536`, one full write and verify passes.
-5. **Optional, privacy prompt:** with the image stored on a second USB volume (not the target), choose it in the app. Record whether the removable-volume prompt appears, and if it does, that it shows the new text. If no prompt appears, try `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter` and run the step again.
+5. ~~**Optional, privacy prompt.**~~ Superseded by T25; see the instructions below.
 
 **Acceptance criteria**
 - Drive rows and the confirm screen show volume names when a drive has any. Nothing changes for a drive without them (unit tests and Nick's check).
@@ -1249,7 +1250,7 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
 2. **Volume names, Release, Cruzer Glide.** With the stick's volume mounted, its row shows the volume name first. Continue…: the confirm screen shows "Volume names:" and "Mounted volumes:". Cancel the password dialog: both rows are still there below the callout. Then Cancel, eject the **volume** in Finder (not the drive), press Refresh, and record whether the name is still on the row. Also say whether "EFI" appears and whether it should be hidden.
 3. **Hardened Runtime, Release, Cruzer Glide.** One full write and verify. The dialog names the app, the write and verify pass, and the drive ejects. Note anything unusual in the log.
 4. **Hardened Runtime, Debug, RAM disk.** `scripts/build.sh`, make a RAM disk as in H2 step 2 (`hdiutil attach -nomount ram://65536` is enough for a 32 MiB image), then `RACCOONWRITER_ALLOW_VIRTUAL_DISKS=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`. One full write and verify passes.
-5. **Optional, privacy prompt.** With the image on a second USB volume (not the target), choose it. Record whether the removable-volume prompt appears and, if so, that it shows the new text. If none appears, run `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter` and try again.
+5. ~~**Optional, privacy prompt.**~~ Superseded by T25 (2026-10-13): the prompt comes from drive discovery at launch, not from choosing an image, and T25 rewrites its text. Skip this step.
 
 ---
 
@@ -1380,6 +1381,62 @@ Expected result: about 4.2 MB.
 - **Unrelated:** the Release log has one Swift warning, `PosixIO.swift:36` ("forming 'UnsafeMutableRawPointer' to a variable of type 'Argument'"). It comes from T19's code, not this task.
 - **`raccoon-optimized.png`** was deleted from the repo root after the builds passed. It was never committed. Its pixels are in `App/AppIcon.icon/Assets/raccoon.png`, with only the `tRNS` chunk changed.
 
+### T25 — 🧑 Tell a Removable Volumes privacy denial apart from a refused password
+
+**Goal:** a user who denies the Removable Volumes privacy prompt is told what to change, not told to use an administrator password. Nick found this on 2026-10-13 with the T22 build:
+1. At launch, drive discovery runs `diskutil info`, which reads the raw `/dev/rdiskN` devices. TCC treats the app as responsible, so macOS shows the `kTCCServiceSystemPolicyRemovableVolumes` prompt (tccd log: `AUTHREQ_PROMPTING ... service=kTCCServiceSystemPolicyRemovableVolumes`, next to kernel `System Policy: diskutil(…) deny(1) file-read-data /dev/rdiskN`). Nick denied it. Discovery still worked.
+2. When writing, the app's password dialog (`SecurityAuthorizer`) succeeded. authopen then failed with `authopen: couldn't open /dev/rdisk8: Operation not permitted` (exit 1), twice.
+3. `AuthopenOpener.failure(for:stderr:)` maps any "not permitted" or "denied" text to `.permissionDenied`, the same case `SecurityAuthorizer` uses for `errAuthorizationDenied`. `FailureExplanation` shows "Permission was refused … Use the name and password of an administrator account." That advice is wrong here.
+
+The password check happens in the app before authopen runs (T13 `-extauth`, `.preAuthorize`), so an `EPERM` from authopen's `open` means the system policy refused the open, not the password. On a removable drive that is the Removable Volumes setting.
+
+Also, `NSRemovableVolumesUsageDescription` (T22) says the access is for reading an image stored on a USB drive. The prompt actually comes from drive discovery, and writing needs the access.
+
+**Out of scope:** checking the TCC state before a write (there's no public API, and probing a raw device ourselves could show the prompt or touch a real disk); Full Disk Access; changing how discovery runs `diskutil` to avoid the prompt; MDM-managed policies.
+
+**Agent steps**
+1. **New error case.** Add `DeviceOpenError.blockedByPrivacySettings`, documented as "macOS's privacy settings (Removable Volumes) refused the open after authorization succeeded". Description: "macOS privacy settings did not allow Raccoon Writer to open the drive." (use `AppInfo.shortName`, not a literal name).
+2. **Mapping in `AuthopenOpener.failure(for:stderr:)`:**
+   - Keep cancel and signal handling first, then `busy`, as now.
+   - stderr containing "operation not permitted" (case-insensitive; that's `strerror(EPERM)`, and authopen's open-failure line is `authopen: couldn't open <path>: <strerror>`) → `.blockedByPrivacySettings`.
+   - Other "not permitted" or "denied" text (for example `Permission denied` = `EACCES`, `AuthorizationCopyRights denied`) → `.permissionDenied`, as now.
+   - Log the mapped case next to the existing stderr log line, so a hardware run shows which branch was taken.
+   - `SecurityAuthorizer.error(for:)` is unchanged: `errAuthorizationDenied` stays `.permissionDenied`.
+3. **`FailureExplanation`** for the new case, with the drive `.untouched`:
+   - Title: "macOS blocked access to removable drives"
+   - Message: "Raccoon Writer isn’t allowed to use removable drives. In System Settings, open Privacy & Security › Files & Folders, turn on Removable Volumes under Raccoon Writer, then try again." (use `AppInfo.shortName`.)
+   - No details line; the message says everything.
+   - Reword `.permissionDenied` so it is about the password only, for example "The administrator name and password weren’t accepted, so the drive wasn’t opened. Use the name and password of an administrator account." The jargon test must still pass (no "TCC", "EPERM", "authopen").
+4. **Settings button.** Add `FailureExplanation.action: FailureAction?` (a small enum in its own file, `FailureAction`, with one case `openPrivacySettings`) so `ImageWriterCore` stays UI-free. It is `.openPrivacySettings` for the new case and nil for every other case. `FailedView` shows an "Open Privacy Settings…" button next to "Try Again" when it is set. The button opens `x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders` with `NSWorkspace.shared.open` (define the URL in `App/`, as a `static let` built without force unwraps; if the `URL` init fails, the button is not shown). "Try Again" keeps working as now. If `OutcomeView` only takes one button, give it an optional secondary button rather than building a second layout.
+5. **Usage text.** `NSRemovableVolumesUsageDescription`: "Raccoon Writer needs access to removable drives to list them and write disk images to them." Update `InfoPlistTests` if it checks the wording.
+6. **Simulate mode.** Add `SimulatedDrive.privacyBlocked`, "Simulated USB Stick (privacy settings blocked)", bsdName `disk97`, mounted at `/Volumes/SIM97`, whose simulated open throws `.blockedByPrivacySettings` after the simulated password dialog succeeds. Update any simulation test that counts or lists the cases.
+7. **README.** Add a short troubleshooting entry: what the Removable Volumes prompt is, that denying it makes every write fail after the password, and both fixes (the Files & Folders toggle, or `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter` and relaunch). Note that each ad-hoc-signed rebuild counts as new code to TCC, so developers see the prompt again after rebuilding (tccd: "Failed to match existing code requirement"). Update the section 5 risk row to point at T25.
+8. **Tests:**
+   - `AuthopenOpenerTests`: split the current `["open: Operation not permitted", "open: Permission denied", "AuthorizationCopyRights denied"]` case. `authopen: couldn't open /dev/rdisk8: Operation not permitted` (Nick's exact line) and an upper-case variant → `.blockedByPrivacySettings`; the other two → `.permissionDenied`. "busy" and cancel texts are unchanged. Exit status 1 and another non-zero status both map the same way.
+   - `FailureExplanationTests`: the new case's title, message, `.untouched` and `action == .openPrivacySettings`; every other case has `action == nil`; the new case is included in the jargon test.
+   - `SimulationModeTests`: disk97 ends `.failed` at stage `.open` with `.blockedByPrivacySettings`, and nothing was written.
+   - `CoordinatorFaultTests` or `WriteCoordinatorTests`: an open failing with `.blockedByPrivacySettings` leaves the drive untouched and mounted, like `.permissionDenied` (`WriteCoordinatorTests.swift:250`).
+9. Build Debug and run disk97 in Simulate mode. The failed screen shows the new wording and both buttons. `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass. Write instructions for Nick, set `NEEDS_HUMAN`, stop.
+
+**Human steps (Nick)**, with `log stream --predicate 'subsystem == "com.example.raccoonwriter" OR (subsystem == "com.apple.TCC" AND eventMessage CONTAINS[c] "raccoonwriter")' --info` open in a second Terminal window:
+1. **Simulate, Debug.** `RACCOONWRITER_SIMULATE=1`: run disk97. The failed screen says macOS blocked access to removable drives, with "Open Privacy Settings…" and "Try Again". Check Light and Dark, and the minimum window width. Press "Open Privacy Settings…" and record which pane opens.
+2. **Deny, Release, Cruzer Glide.** `scripts/build.sh --release`, then `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter`. Launch the app with the stick plugged in. The prompt appears with the new usage text; press Don't Allow. Choose an image and the stick, then Erase and Write, and enter the password. The failed screen shows the new wording, and the log shows the authopen line mapped to `blockedByPrivacySettings`. The stick is untouched and still mounted.
+3. **Fix without relaunching.** From that screen, press "Open Privacy Settings…", turn on Removable Volumes for Raccoon Writer, go back, press Try Again and write again. Record whether the write and verify pass without relaunching. If they don't, quit, relaunch and try again, and record that a relaunch was needed.
+4. **Cancelled dialog unchanged.** Optional: cancel the password dialog once and check that the T18 cancelled notice still appears, not the new screen.
+
+**Acceptance criteria**
+- authopen's "Operation not permitted" maps to `.blockedByPrivacySettings`; refused authorization and `Permission denied` still map to `.permissionDenied` (unit tests).
+- The failed screen for a privacy denial names the Files & Folders setting and offers a button that opens Privacy & Security; no other failure shows the button (unit tests, Nick's step 1).
+- `.permissionDenied` wording is about the password only, and the jargon test passes.
+- `NSRemovableVolumesUsageDescription` says the access is for listing and writing drives (unit test or `plutil`, and Nick's step 2).
+- On real hardware, denying the prompt gives the new failed screen, and turning the setting on lets a write and verify pass (Nick's steps 2 and 3, whether or not a relaunch was needed).
+- README has the troubleshooting entry.
+- `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass.
+
+**Files:** `Sources/ImageWriterCore/` (`DeviceOpenError`, `AuthopenOpener`, `FailureExplanation`, new `FailureAction`, `Simulation/SimulatedDrive` and its scripted opener), `App/` (`FailedView.swift`, maybe `OutcomeView.swift`, `Info.plist`), `Tests/ImageWriterCoreTests/` (`AuthopenOpenerTests`, `FailureExplanationTests`, `SimulationModeTests`, `InfoPlistTests`, a coordinator test), `README.md`, `docs/HARDWARE_TESTS.md` (record the results), `PLAN.md`
+
+**Handoff notes:**
+
 ---
 
 ## 4. Future work (not in scope)
@@ -1397,7 +1454,7 @@ Expected result: about 4.2 MB.
 | authopen behavior differs from assumptions (flags, read-back on same fd) | T01 spike first; T02, T05 and T06 are amended from its findings |
 | Wrong disk written | Layered defenses: filtered list, explicit confirm screen, `SafetyGuard` re-check after the password dialog (T16), size check of the opened device (T16), fail-closed discovery, tests for boot disk and internal exclusion. Identical drives swapped during the dialog are not told apart |
 | Raw I/O alignment bugs | Aligned buffers, block-size-parametrized tests at 512 and 4096 |
-| TCC or privacy prompts on removable media | Observed in T01 and documented in README |
+| TCC or privacy prompts on removable media | Observed in T01. A denied Removable Volumes prompt makes every write fail after the password; T25 explains it on the failed screen and in the README |
 | Agents touching real disks | Hard safety rule in sections 0 and `AGENTS.md`; real-device work only in human checkpoints |
 
 ## 6. Change log
@@ -1448,3 +1505,4 @@ Expected result: about 4.2 MB.
 | 2026-10-13 | T24 added: the Release app grew from 2.9 MB to 7.0 MB (icon layer and unstripped binary); swap in Nick's optimized 1024 px raccoon layer and strip Release builds; listed above T22 so it is done next | Claude |
 | 2026-10-13 | T24 DONE: optimized layer at scale 0.918 (T23 framing), Release binary stripped with its dSYM kept in `build/`, sizes printed by `build.sh`; app 7.0 → 4.67 MB. Size limit raised from 4.5 to 4.8 MB with Nick's approval, since the 4.2 MB estimate assumed a smaller raccoon | Claude |
 | 2026-10-13 | T22 prep: volume names in the drive list and on the confirm screen; `Fakes/` debug-only with three new release markers; copyright, category and removable-volume keys in Info.plist; Hardened Runtime on (needs `--options=runtime` for ad-hoc signing, and `ENABLE_DEBUG_DYLIB: NO` in Debug), checked by `build.sh`; NEEDS_HUMAN for Nick's runs | Claude |
+| 2026-10-13 | T25 added from Nick's test: denying the Removable Volumes prompt (shown at launch by `diskutil` discovery) makes authopen fail with "Operation not permitted", which was reported as a refused password. New `blockedByPrivacySettings` case, failed screen with a Privacy Settings button, corrected usage text. T22's optional privacy-prompt step is superseded | Claude |
