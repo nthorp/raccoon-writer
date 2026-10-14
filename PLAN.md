@@ -124,7 +124,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T15 | App icon | T14 | DONE | 2026-10-12 | Claude |
 | T16 | 🧑 Password prompt before the safety check; size check after open | T15 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
 | T17 | 🧑 Layered app icon (Icon Composer) with dark variant | T15 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
-| T18 | 🧑 Make the password-cancelled notice stand out | T16 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
+| T18 | 🧑 Make the password-cancelled notice stand out | T16 | DONE | 2026-10-13 | Claude (prep) / Nick (check) |
 | T23 | Rename to Raccoon Writer, with the raccoon icon | T16 | DONE | 2026-10-13 | Claude |
 | T19 | 🧑 Flush the drive cache with `DKIOCSYNCHRONIZE` | T16 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
 | T20 | 🧑 Warn for drives over 500 GB; README says USB hard drives are listed | T18 | TODO | | Claude (prep) / Nick (check) |
@@ -984,6 +984,8 @@ Out of scope (Nick chose only these two changes): new wording or a separate titl
   4. Press Cancel, choose the same drive again and Continue…. The confirm screen should have no box and look as it did before T18.
 
   Then tell the agent the results. If they meet the acceptance criteria, the agent records them here and marks T18 `DONE`.
+- **Human results, 2026-10-13, on the T23 build or later (commit `162d647`):** Nick ran steps 1–4 and all passed. The callout catches the eye before the red title, reads well in Light and Dark, and wraps at the narrowest window width. After Cancel and choosing the drive again, the confirm screen has no callout.
+- **Acceptance:** every criterion is met. `scripts/test.sh` passes 374 tests and `scripts/build.sh --release` succeeds for `x86_64 arm64` with the release flag check passing, re-run on `162d647`. Marked `DONE`.
 
 ---
 
@@ -1322,3 +1324,4 @@ Keep `AppInfo.shortName` even though it now equals `displayName`, so code that u
 | 2026-10-13 | T23 DONE: app renamed to Raccoon Writer (`RaccoonWriter`, `com.example.raccoonwriter`, `RACCOONWRITER_*`); raccoon layer in `App/AppIcon.icon`; branding folder deleted | Claude |
 | 2026-10-13 | T19 prep: `DKIOCSYNCHRONIZE` is the first flush method, then `F_FULLFSYNC`, then `fsync`; skipped methods logged with their errno; NEEDS_HUMAN for the RAM-disk and Cruzer Glide runs | Claude |
 | 2026-10-13 | T19 DONE after Nick's runs: both the RAM disk and the Cruzer Glide flush with `DKIOCSYNCHRONIZE` | Claude |
+| 2026-10-13 | T18 DONE after Nick's check: the callout stands out in Light and Dark, wraps at minimum width, and is absent without a notice | Claude |
