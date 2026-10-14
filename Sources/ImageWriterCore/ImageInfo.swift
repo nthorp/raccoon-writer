@@ -5,6 +5,9 @@ public struct ImageInfo: Equatable, Sendable {
     public var url: URL
     public var fileName: String
     public var sizeBytes: UInt64
+    /// The file as it was inspected. Writing and verifying fail if the file at `url`
+    /// is no longer this one. Not optional, so the check can't be skipped.
+    public var identity: FileIdentity
     public var kind: ImageKind
     public var hasMBR: Bool
     public var hasGPT: Bool
@@ -15,6 +18,7 @@ public struct ImageInfo: Equatable, Sendable {
         url: URL,
         fileName: String,
         sizeBytes: UInt64,
+        identity: FileIdentity,
         kind: ImageKind,
         hasMBR: Bool,
         hasGPT: Bool,
@@ -24,6 +28,7 @@ public struct ImageInfo: Equatable, Sendable {
         self.url = url
         self.fileName = fileName
         self.sizeBytes = sizeBytes
+        self.identity = identity
         self.kind = kind
         self.hasMBR = hasMBR
         self.hasGPT = hasGPT

@@ -34,6 +34,33 @@ struct ProcessCommandRunnerTests {
         #expect(Date().timeIntervalSince(start) < 10)
     }
 
+    @Test func commandIgnoringTerminateIsKilled() async {
+        let start = Date()
+        // sleep inherits the ignored SIGTERM, so only SIGKILL ends it.
+        await #expect(throws: CommandRunnerError.timedOut(executable: "/bin/sh", seconds: 0.3)) {
+            _ = try await ProcessCommandRunner(timeout: 0.3, killGrace: 0.3)
+                .run("/bin/sh", arguments: ["-c", "trap '' TERM; exec /bin/sleep 5"])
+        }
+        // timeout + 2 × killGrace, with room for a slow machine.
+        #expect(Date().timeIntervalSince(start) < 3)
+    }
+
+    @Test func outputHeldOpenAfterExitIsUnreadable() async {
+        let start = Date()
+        // The shell exits at once, but the background sleep keeps stdout and stderr open.
+        do {
+            _ = try await ProcessCommandRunner(timeout: 10, killGrace: 0.3)
+                .run("/bin/sh", arguments: ["-c", "/bin/sleep 5 & echo done"])
+            Issue.record("expected outputUnreadable")
+        } catch CommandRunnerError.outputUnreadable(let executable, let message) {
+            #expect(executable == "/bin/sh")
+            #expect(message.contains("stayed open after the command exited"))
+        } catch {
+            Issue.record("unexpected error \(error)")
+        }
+        #expect(Date().timeIntervalSince(start) < 3)
+    }
+
     @Test func missingExecutableIsLaunchFailure() async {
         do {
             _ = try await runner.run("/nonexistent/raccoonwriter/diskutil", arguments: [])

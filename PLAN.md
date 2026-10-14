@@ -128,7 +128,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T23 | Rename to Raccoon Writer, with the raccoon icon | T16 | DONE | 2026-10-13 | Claude |
 | T19 | 🧑 Flush the drive cache with `DKIOCSYNCHRONIZE` | T16 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
 | T20 | 🧑 Warn for drives over 500 GB; README says USB hard drives are listed | T18 | DONE | 2026-10-13 | Claude (prep) / Nick (check) |
-| T21 | Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill | T16 | TODO | | Claude |
+| T21 | Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill | T16 | DONE | 2026-10-13 | Claude |
 | T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | TODO | | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
@@ -1153,7 +1153,20 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
 **Files:** `Sources/ImageWriterCore/` (`DescriptorReceiver`, `WriteEngine`, `WriteEngineError`, `Verifier`, `VerifierError`, `FailureExplanation`, `FileIdentity` (new), `ImageInfo`, `ImageInspector`, `ImageSource`, `ProcessCommandRunner`, `Fakes/FileBackedDevice`), `App/PreviewSamples.swift`, `Tests/ImageWriterCoreTests/` (`DescriptorReceiverTests`, `WriteEngineTests`, `VerifierTests`, `FailureExplanationTests`, `ImageSourceTests`, `ImageInspectorTests`, `ProcessCommandRunnerTests`, `TestSupport`, and the tests that construct `ImageInfo`), `PLAN.md`
 
 **Handoff notes:**
-- _(none yet)_
+- **Done 2026-10-13.** `scripts/test.sh` passes 391 tests. `scripts/build.sh --release` succeeds with no Swift warnings, and the release flag check passes. `scripts/build.sh` (Debug, which compiles `PreviewSamples`) also succeeds. Nothing touched a disk.
+- **A.** `DescriptorReceiver.receive` sets `FD_CLOEXEC` on the received descriptor (`closeOnExec`). If `fcntl` fails it closes the descriptor and throws `DeviceOpenError.posix(operation: "fcntl(FD_CLOEXEC)", …)`, which the existing "couldn’t be opened" explanation covers.
+- **B.** `WriteEngine.writeFully` and `Verifier.readFully` throw `WriteEngineError.partialBlock(atOffset:byteCount:)` / `VerifierError.partialBlock(atOffset:byteCount:)` when a transfer isn't a block multiple; whole-block short transfers are still retried. Explanations: "The drive wrote only part of a block" (`.partiallyWritten`) and "The drive returned only part of a block" (`.unverified`, like the verify stage's `.read` errors). The byte count is in the details line. `FileBackedDevice.Faults` has `partialBlockWriteOnCall` / `partialBlockReadOnCall`, which transfer `length - blockSize / 2` for a request longer than one block.
+- **C.** New `FileIdentity` (device, inode, size, `st_mtimespec` seconds and nanoseconds), recorded by `ImageInspector` from its `fstat`. `ImageInfo.identity` is non-optional and its init takes `identity:` right after `sizeBytes:`. `ImageSource.init` compares the open descriptor's identity; `ImageSource.checkUnchanged()` compares again and `Verifier` calls it after the last chunk matched, before returning. Test helpers in `TestSupport`: `fileIdentity(at:)`, `imageInfo(at:)` (real temp file) and `FileIdentity.madeUp` (for an `ImageInfo` never opened). `PreviewSamples` uses a made-up identity.
+- **D.** `ProcessCommandRunner.runBlocking`: after the timeout, SIGTERM, wait `killGrace`, SIGKILL if still running, wait `killGrace`, then throw `timedOut` (logged under category `commands` if it still hasn't exited). After a normal exit the readers get `killGrace`; if a grandchild holds a pipe, it throws `outputUnreadable` ("it stayed open after the command exited, …") and leaves the readers to finish on their own. `killGrace` is an internal init parameter, default 2 s.
+- **Tests that failed without their fix** (all of them):
+  - A: `DescriptorReceiverTests.receivedDescriptorIsCloseOnExec` (flag was 0).
+  - B: `WriteEngineTests.partialBlockWriteStopsWithoutRetry` and `VerifierTests.partialBlockReadStopsWithoutRetry` (both block sizes) threw the old `EINVAL` "at offset 3840" error after an extra call. `FailureExplanationTests` gained `partialBlockWriteSaysWritingStopped`, `partialBlockReadSaysVerificationStopped` and both cases in `everyFailure`; these were written alongside the new cases, so they have no before state.
+  - C: `ImageSourceTests.sameSizeFileRenamedOverThePathIsAChange`, `fileRewrittenInPlaceBeforeOpeningIsAChange`, `fileRewrittenInPlaceWhileOpenFailsTheCheck` and `VerifierTests.imageChangedDuringVerifyFails` all passed with no error when the two identity comparisons were disabled (checked by mutation, then restored). `untouchedFilePassesBothChecks` passes either way, as intended.
+  - D: `ProcessCommandRunnerTests.commandIgnoringTerminateIsKilled` and `outputHeldOpenAfterExitIsUnreadable` each took the stand-in's full 5 s (it would be forever for a real hang); the second also returned success instead of `outputUnreadable`. Now 0.6 s and 0.3 s.
+- **Deviations:**
+  - `ImageSource.init` keeps the size comparison next to the identity comparison rather than replacing it. `ImageInfo.sizeBytes` is what gets copied, so it must agree with the file even if a caller builds the two fields separately. The existing `imageChangedSinceSelection…` tests rely on it.
+  - After a timeout the runner throws `timedOut` without waiting for the output readers, since that output isn't used. So the worst case is `timeout` + 2 × `killGrace`, not 3 ×; the doc comment says so.
+  - Added `VerifierTests.imageChangedDuringVerifyFails`, not in the steps, for the "change during the run" acceptance criterion at the `Verifier` level.
 
 ---
 
@@ -1350,3 +1363,4 @@ Keep `AppInfo.shortName` even though it now equals `displayName`, so code that u
 | 2026-10-13 | T17 DONE after Nick's check: the raccoon icon follows the Default, Dark, Clear and Tinted icon styles | Claude |
 | 2026-10-13 | T20 prep: `LargeDriveWarning` over 500 GB in the drive list and on the confirm screen, `SimulatedDrive.usbHardDrive`, README says USB hard drives are listed; NEEDS_HUMAN for the Simulate mode check | Claude |
 | 2026-10-13 | T20 DONE after Nick's check: "Large drive" in the list and the confirm screen warning pass in Simulate mode, Light and Dark, at minimum width | Claude |
+| 2026-10-13 | T21 DONE: received device descriptor is close-on-exec; partial-block transfers stop with `partialBlock` errors; `FileIdentity` (inode, size, mtime) checked when the image is opened and after verify; `ProcessCommandRunner` escalates to SIGKILL and bounds every wait | Claude |

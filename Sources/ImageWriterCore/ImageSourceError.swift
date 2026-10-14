@@ -2,7 +2,8 @@ import Foundation
 
 /// Failures reading the image file during a write or verify.
 public enum ImageSourceError: Error, Equatable, Sendable {
-    /// The file's size or type differs from when it was selected.
+    /// The file is not the one selected, or it was modified since: its type, size,
+    /// inode or modification time differs.
     case changed(fileName: String)
     /// The file ended before its selected size, so it was truncated while in use.
     case truncated(fileName: String, atOffset: UInt64)

@@ -32,10 +32,7 @@ final class WriteCoordinatorTests {
     func image(_ bytes: [UInt8] = pattern(count: imageBytes)) throws -> ImageInfo {
         let url = dir.appendingPathComponent("image-\(UUID().uuidString).img")
         try Data(bytes).write(to: url)
-        return ImageInfo(
-            url: url, fileName: url.lastPathComponent, sizeBytes: UInt64(bytes.count), kind: .img,
-            hasMBR: false, hasGPT: false, isISO9660: false, bootWarning: nil
-        )
+        return try imageInfo(at: url)
     }
 
     func device(faults: FileBackedDevice.Faults = .init()) throws -> FileBackedDevice {

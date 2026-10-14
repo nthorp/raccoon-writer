@@ -7,16 +7,21 @@ enum PreviewSamples {
     static let image = ImageInfo(
         url: URL(fileURLWithPath: "/Users/me/Downloads/Fedora-Workstation-Live-x86_64-40-1.14.iso"),
         fileName: "Fedora-Workstation-Live-x86_64-40-1.14.iso",
-        sizeBytes: 2_295_853_056, kind: .iso,
+        sizeBytes: 2_295_853_056, identity: madeUpIdentity(sizeBytes: 2_295_853_056), kind: .iso,
         hasMBR: true, hasGPT: true, isISO9660: true, bootWarning: nil
     )
 
     static let isoOnlyImage = ImageInfo(
         url: URL(fileURLWithPath: "/Users/me/Downloads/old-installer.iso"),
         fileName: "old-installer.iso",
-        sizeBytes: 700_000_000, kind: .iso,
+        sizeBytes: 700_000_000, identity: madeUpIdentity(sizeBytes: 700_000_000), kind: .iso,
         hasMBR: false, hasGPT: false, isISO9660: true, bootWarning: .mayNotBootFromUSB
     )
+
+    /// Previews never open the image, so its identity is never checked.
+    private static func madeUpIdentity(sizeBytes: Int64) -> FileIdentity {
+        FileIdentity(device: 1, inode: 1, sizeBytes: sizeBytes, modifiedSeconds: 0, modifiedNanoseconds: 0)
+    }
 
     static let stick = DiskInfo(
         bsdName: "disk4", mediaName: "SanDisk Ultra", sizeBytes: 30_752_636_928, blockSize: 512,

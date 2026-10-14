@@ -33,10 +33,7 @@ final class CoordinatorFaultTests {
     func image(bytes: Int = imageBytes) throws -> ImageInfo {
         let url = dir.appendingPathComponent("image-\(UUID().uuidString).img")
         try Data(pattern(count: bytes)).write(to: url)
-        return ImageInfo(
-            url: url, fileName: url.lastPathComponent, sizeBytes: UInt64(bytes), kind: .img,
-            hasMBR: false, hasGPT: false, isISO9660: false, bootWarning: nil
-        )
+        return try imageInfo(at: url)
     }
 
     func device(faults: FileBackedDevice.Faults = .init()) throws -> FileBackedDevice {

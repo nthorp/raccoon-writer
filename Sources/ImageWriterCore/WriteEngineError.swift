@@ -9,6 +9,9 @@ public enum WriteEngineError: Error, Equatable, Sendable {
     case write(DeviceIOError)
     /// The drive accepted no bytes at `atOffset`; retrying would never finish.
     case stalled(atOffset: UInt64)
+    /// The drive wrote `byteCount` bytes at `atOffset`, which isn't a whole number of
+    /// blocks. The rest can't be retried, because a raw device only takes whole blocks.
+    case partialBlock(atOffset: UInt64, byteCount: Int)
     /// Flushing the drive after the last write failed.
     case sync(DeviceIOError)
 }
@@ -24,6 +27,8 @@ extension WriteEngineError: LocalizedError {
             return "Writing to the drive failed. \(error.localizedDescription)"
         case .stalled(let offset):
             return "The drive stopped accepting data at byte \(offset)."
+        case .partialBlock(let offset, let count):
+            return "The drive wrote \(count) bytes at byte \(offset), which is not a whole number of blocks."
         case .sync(let error):
             return "Flushing data to the drive failed. \(error.localizedDescription)"
         }

@@ -40,7 +40,7 @@ final class ImageInspectorTests {
         let url = try file("distro.iso", image(size: 1 << 20, mbr: true, gpt: true, iso: true))
         let info = try inspector.inspect(url: url)
         #expect(info == ImageInfo(
-            url: url, fileName: "distro.iso", sizeBytes: 1 << 20, kind: .iso,
+            url: url, fileName: "distro.iso", sizeBytes: 1 << 20, identity: try fileIdentity(at: url), kind: .iso,
             hasMBR: true, hasGPT: true, isISO9660: true, bootWarning: nil
         ))
     }

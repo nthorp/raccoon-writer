@@ -19,10 +19,7 @@ final class WriteEngineTests {
     func image(_ bytes: [UInt8]) throws -> ImageInfo {
         let url = dir.appendingPathComponent("image-\(UUID().uuidString).img")
         try Data(bytes).write(to: url)
-        return ImageInfo(
-            url: url, fileName: url.lastPathComponent, sizeBytes: UInt64(bytes.count), kind: .img,
-            hasMBR: false, hasGPT: false, isISO9660: false, bootWarning: nil
-        )
+        return try imageInfo(at: url)
     }
 
     func engine(blockSize: Int, clock: MonotonicClock = steppingClock(step: 0)) -> WriteEngine {
@@ -113,6 +110,19 @@ final class WriteEngineTests {
         #expect(Array(try device.contents()[..<bytes.count]) == bytes)
         // Prefill, then three chunks, one of which needed a second call.
         #expect(device.writeCallCount == 1 + 3 + 1)
+    }
+
+    @Test(arguments: [512, 4096])
+    func partialBlockWriteStopsWithoutRetry(_ blockSize: Int) throws {
+        let chunk = Self.chunkBlocks * blockSize
+        let bytes = pattern(count: 3 * chunk)
+        // Call 1 is the prefill, so call 3 is the second chunk.
+        let device = try dirtyDevice(blockSize: blockSize, blockCount: 16, faults: .init(partialBlockWriteOnCall: 3))
+        #expect(throws: WriteEngineError.partialBlock(atOffset: UInt64(chunk), byteCount: chunk - blockSize / 2)) {
+            _ = try self.run(self.engine(blockSize: blockSize), self.image(bytes), device)
+        }
+        #expect(device.writeCallCount == 3)
+        #expect(device.syncCallCount == 0)
     }
 
     @Test func writeFailureStopsWithoutSync() throws {

@@ -9,6 +9,9 @@ public enum VerifierError: Error, Equatable, Sendable {
     case read(DeviceIOError)
     /// The drive returned no data at `atOffset`, inside its reported size.
     case deviceEnded(atOffset: UInt64)
+    /// The drive returned `byteCount` bytes at `atOffset`, which isn't a whole number of
+    /// blocks. The rest can't be retried, because a raw device only reads whole blocks.
+    case partialBlock(atOffset: UInt64, byteCount: Int)
     /// The drive differs from the image, first at image byte `atOffset`.
     case verificationFailed(atOffset: UInt64)
 }
@@ -24,6 +27,8 @@ extension VerifierError: LocalizedError {
             return "Reading back from the drive failed. \(error.localizedDescription)"
         case .deviceEnded(let offset):
             return "The drive stopped returning data at byte \(offset)."
+        case .partialBlock(let offset, let count):
+            return "The drive returned \(count) bytes at byte \(offset), which is not a whole number of blocks."
         case .verificationFailed(let offset):
             return "The data on the drive does not match the image, starting at byte \(offset)."
         }

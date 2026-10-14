@@ -102,7 +102,9 @@ public struct WriteEngine: Sendable {
         return WriteResult(bytesWritten: total, syncMethod: method, elapsedSeconds: clock.now() - start)
     }
 
-    /// `OpenedDevice.write` may write less than asked, so retry the remainder.
+    /// `OpenedDevice.write` may write less than asked, so retry the remainder. Only a
+    /// whole number of blocks can be retried: the remainder of a partial block has an
+    /// unaligned offset and buffer, which a raw device rejects with `EINVAL`.
     private static func writeFully(_ data: UnsafeRawBufferPointer, to device: any OpenedDevice, at offset: UInt64) throws {
         var done = 0
         while done < data.count {
@@ -114,6 +116,9 @@ public struct WriteEngine: Sendable {
                 throw WriteEngineError.write(error)
             }
             guard count > 0 else { throw WriteEngineError.stalled(atOffset: position) }
+            guard BlockMath.isAligned(count, to: device.blockSize) else {
+                throw WriteEngineError.partialBlock(atOffset: position, byteCount: count)
+            }
             done += count
         }
     }

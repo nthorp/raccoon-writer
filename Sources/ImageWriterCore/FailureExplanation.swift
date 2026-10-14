@@ -163,6 +163,13 @@ public struct FailureExplanation: Equatable, Sendable {
                 message: "The drive stopped accepting data \(position(offset)). It may be faulty.",
                 drive: .partiallyWritten
             )
+        case .partialBlock(let offset, _):
+            return FailureExplanation(
+                title: "The drive wrote only part of a block",
+                message: "The drive accepted only part of a block \(position(offset)), so writing was stopped. It may be faulty.",
+                drive: .partiallyWritten,
+                details: error.localizedDescription
+            )
         case .sync(let ioError):
             return deviceError(
                 ioError,
@@ -191,6 +198,13 @@ public struct FailureExplanation: Equatable, Sendable {
             )
         case .read(let ioError):
             return deviceError(ioError, during: "verification", otherwise: "Reading the drive back failed.", drive: .unverified)
+        case .partialBlock(let offset, _):
+            return FailureExplanation(
+                title: "The drive returned only part of a block",
+                message: "The drive returned only part of a block \(position(offset)) while it was being checked, so verification was stopped. It may be faulty.",
+                drive: .unverified,
+                details: error.localizedDescription
+            )
         case .imageTooLarge:
             return FailureExplanation(
                 title: "The drive couldn’t be verified",

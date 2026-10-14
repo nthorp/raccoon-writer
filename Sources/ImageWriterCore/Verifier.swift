@@ -98,10 +98,15 @@ public struct Verifier: Sendable {
                 if let progress = meter.update(completedBytes: offset, at: clock.now()) { onProgress(progress) }
             }
         }
+        // Bytes read early in the run may predate an in-place change; matching them
+        // proves nothing about the file now on disk.
+        try source.checkUnchanged()
         return VerifyResult(bytesVerified: total, elapsedSeconds: clock.now() - start)
     }
 
-    /// `OpenedDevice.read` may return less than asked, so retry the remainder.
+    /// `OpenedDevice.read` may return less than asked, so retry the remainder. Only a
+    /// whole number of blocks can be retried: the remainder of a partial block has an
+    /// unaligned offset and buffer, which a raw device rejects with `EINVAL`.
     private static func readFully(into buffer: UnsafeMutableRawBufferPointer, from device: any OpenedDevice, at offset: UInt64) throws {
         var filled = 0
         while filled < buffer.count {
@@ -113,6 +118,9 @@ public struct Verifier: Sendable {
                 throw VerifierError.read(error)
             }
             guard count > 0 else { throw VerifierError.deviceEnded(atOffset: position) }
+            guard BlockMath.isAligned(count, to: device.blockSize) else {
+                throw VerifierError.partialBlock(atOffset: position, byteCount: count)
+            }
             filled += count
         }
     }

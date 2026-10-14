@@ -1,12 +1,28 @@
 import Foundation
+import os
 
 /// Production `CommandRunner` built on `Process`, with a timeout so a hung diskutil
-/// can't stall disk discovery forever.
+/// can't stall disk discovery, the safety check, unmount or eject forever.
+///
+/// Every wait is bounded, so a call returns or throws within `timeout` + 2 × `killGrace`.
+/// After the timeout the command gets SIGTERM, then SIGKILL after `killGrace`, then
+/// another `killGrace` to exit before it is abandoned. A command that exits in time
+/// gives its output readers `killGrace` to finish, in case a grandchild inherited
+/// stdout or stderr and keeps the pipe open.
 public struct ProcessCommandRunner: CommandRunner {
+    private static let log = Logger(subsystem: AppInfo.bundleIdentifier, category: "commands")
+
     public var timeout: TimeInterval
+    /// How long each escalation step waits. Internal so tests can shorten it.
+    let killGrace: TimeInterval
 
     public init(timeout: TimeInterval = 30) {
+        self.init(timeout: timeout, killGrace: 2)
+    }
+
+    init(timeout: TimeInterval, killGrace: TimeInterval) {
         self.timeout = timeout
+        self.killGrace = killGrace
     }
 
     public func run(_ executable: String, arguments: [String]) async throws -> CommandResult {
@@ -41,15 +57,26 @@ public struct ProcessCommandRunner: CommandRunner {
         let stdout = OutputCollector(stdoutPipe.fileHandleForReading, group: readers)
         let stderr = OutputCollector(stderrPipe.fileHandleForReading, group: readers)
 
-        let timedOut = exited.wait(timeout: .now() + timeout) == .timedOut
-        if timedOut {
+        if exited.wait(timeout: .now() + timeout) == .timedOut {
             process.terminate()
-            exited.wait()
-        }
-        readers.wait()
-
-        if timedOut {
+            if exited.wait(timeout: .now() + killGrace) == .timedOut {
+                if process.isRunning {
+                    kill(process.processIdentifier, SIGKILL)
+                }
+                if exited.wait(timeout: .now() + killGrace) == .timedOut {
+                    Self.log.error("\(executable, privacy: .public) did not exit after SIGKILL; giving up on it")
+                }
+            }
+            // The output of a command that didn't finish isn't needed.
             throw CommandRunnerError.timedOut(executable: executable, seconds: timeout)
+        }
+        // If the readers don't finish, they are left to finish on their own: closing their
+        // handles under a blocked read could close a descriptor number reused elsewhere.
+        guard readers.wait(timeout: .now() + killGrace) == .success else {
+            throw CommandRunnerError.outputUnreadable(
+                executable: executable,
+                message: "it stayed open after the command exited, probably held by a process the command started."
+            )
         }
         if process.terminationReason == .uncaughtSignal {
             throw CommandRunnerError.terminated(executable: executable, signal: process.terminationStatus)

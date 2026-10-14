@@ -36,6 +36,7 @@ public struct ImageInspector: Sendable {
             url: url,
             fileName: fileName,
             sizeBytes: UInt64(info.st_size),
+            identity: FileIdentity(info),
             kind: kind,
             hasMBR: signatures.hasMBR,
             hasGPT: signatures.hasGPT,

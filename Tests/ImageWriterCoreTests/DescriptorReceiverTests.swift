@@ -30,6 +30,29 @@ struct DescriptorReceiverTests {
         #expect(original.st_dev == copy.st_dev)
     }
 
+    @Test func receivedDescriptorIsCloseOnExec() throws {
+        let (sender, receiver) = try makeSocketPair()
+        defer {
+            close(sender)
+            close(receiver)
+        }
+        let (url, fileFD) = try makeTempFile()
+        defer {
+            close(fileFD)
+            unlink(url.path)
+        }
+
+        try send(descriptor: fileFD, payload: [0, 0], on: sender)
+        let received = try #require(try DescriptorReceiver.receive(on: receiver))
+        defer { close(received) }
+
+        // Descriptor flags don't travel with SCM_RIGHTS, so a child process spawned
+        // while the device is open would otherwise inherit write access to it.
+        let flags = fcntl(received, F_GETFD)
+        #expect(flags >= 0)
+        #expect(flags & FD_CLOEXEC != 0)
+    }
+
     @Test func returnsNilWhenPeerClosesWithoutDescriptor() throws {
         let (sender, receiver) = try makeSocketPair()
         defer { close(receiver) }

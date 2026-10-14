@@ -27,6 +27,28 @@ func makeTempFile() throws -> (url: URL, fd: Int32) {
     return (url, fd)
 }
 
+/// The identity `ImageInspector` would record for the file at `url`.
+func fileIdentity(at url: URL) throws -> FileIdentity {
+    var info = stat()
+    guard stat(url.path, &info) == 0 else { throw DeviceIOError.posix(operation: "stat", code: errno) }
+    return FileIdentity(info)
+}
+
+/// An `ImageInfo` for a raw image already written at `url`, with the file's real size
+/// and identity, as `ImageInspector` would record them. Boot signatures are left off.
+func imageInfo(at url: URL) throws -> ImageInfo {
+    let identity = try fileIdentity(at: url)
+    return ImageInfo(
+        url: url, fileName: url.lastPathComponent, sizeBytes: UInt64(identity.sizeBytes), identity: identity,
+        kind: .img, hasMBR: false, hasGPT: false, isISO9660: false, bootWarning: nil
+    )
+}
+
+extension FileIdentity {
+    /// For an `ImageInfo` that is never opened, such as one only shown on screen.
+    static let madeUp = FileIdentity(device: 1, inode: 2, sizeBytes: 3, modifiedSeconds: 4, modifiedNanoseconds: 5)
+}
+
 extension OpenedDevice {
     func write(_ bytes: [UInt8], at offset: UInt64) throws -> Int {
         try bytes.withUnsafeBytes { try write(from: $0, at: offset) }

@@ -37,6 +37,7 @@ struct FailureExplanationTests {
         WriteFailure(stage: .write, error: WriteEngineError.write(.posix(operation: "write at offset 0", code: ENOSPC))),
         WriteFailure(stage: .write, error: WriteEngineError.write(.closed)),
         WriteFailure(stage: .write, error: WriteEngineError.stalled(atOffset: 4096)),
+        WriteFailure(stage: .write, error: WriteEngineError.partialBlock(atOffset: 4096, byteCount: 1792)),
         WriteFailure(stage: .write, error: WriteEngineError.sync(.posix(operation: "fsync", code: EIO))),
         WriteFailure(stage: .write, error: ImageSourceError.changed(fileName: "a.iso")),
         WriteFailure(stage: .write, error: ImageSourceError.truncated(fileName: "a.iso", atOffset: 10)),
@@ -45,6 +46,7 @@ struct FailureExplanationTests {
         WriteFailure(stage: .verify, error: VerifierError.read(.posix(operation: "read at offset 0", code: ENXIO))),
         WriteFailure(stage: .verify, error: VerifierError.read(.posix(operation: "read at offset 0", code: EIO))),
         WriteFailure(stage: .verify, error: VerifierError.deviceEnded(atOffset: 1_000_000)),
+        WriteFailure(stage: .verify, error: VerifierError.partialBlock(atOffset: 4096, byteCount: 1792)),
         WriteFailure(stage: .verify, error: VerifierError.verificationFailed(atOffset: 8_388_608)),
         WriteFailure(stage: .verify, error: ImageSourceError.changed(fileName: "a.iso")),
     ]
@@ -129,6 +131,23 @@ struct FailureExplanationTests {
         #expect(explanation.message.contains("at byte 8388608 (8.4 MB in)"))
         #expect(explanation.drive == .doesNotMatch)
         #expect(explanation.details == nil)
+    }
+
+    @Test func partialBlockWriteSaysWritingStopped() {
+        let explanation = explain(.write, WriteEngineError.partialBlock(atOffset: 8_388_608, byteCount: 1792))
+        #expect(explanation.title == "The drive wrote only part of a block")
+        #expect(explanation.message.contains("only part of a block at byte 8388608 (8.4 MB in)"))
+        #expect(explanation.message.contains("writing was stopped"))
+        #expect(explanation.drive == .partiallyWritten)
+        #expect(explanation.details?.contains("1792 bytes") == true)
+    }
+
+    @Test func partialBlockReadSaysVerificationStopped() {
+        let explanation = explain(.verify, VerifierError.partialBlock(atOffset: 8_388_608, byteCount: 1792))
+        #expect(explanation.title == "The drive returned only part of a block")
+        #expect(explanation.message.contains("verification was stopped"))
+        #expect(explanation.drive == .unverified)
+        #expect(explanation.details?.contains("1792 bytes") == true)
     }
 
     @Test func smallOffsetsAreNotGivenASize() {

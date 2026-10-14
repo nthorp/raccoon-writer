@@ -22,6 +22,12 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
         public var shortWriteOnCall: Int?
         /// The same as `shortWriteOnCall`, for read calls.
         public var shortReadOnCall: Int?
+        /// On this write call (1-based), write half a block less than asked, which is not a
+        /// block multiple. A real raw node shouldn't do this, but the engine must not retry
+        /// from the unaligned remainder. A one-block request is written in full.
+        public var partialBlockWriteOnCall: Int?
+        /// The same as `partialBlockWriteOnCall`, for read calls.
+        public var partialBlockReadOnCall: Int?
         /// errno returned by every sync attempt the device supports.
         public var syncError: Int32?
         /// Make `DKIOCSYNCHRONIZE` succeed, like a real USB stick. By default it fails with
@@ -35,6 +41,8 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
             failRead: InjectedFailure? = nil,
             shortWriteOnCall: Int? = nil,
             shortReadOnCall: Int? = nil,
+            partialBlockWriteOnCall: Int? = nil,
+            partialBlockReadOnCall: Int? = nil,
             syncError: Int32? = nil,
             synchronizeSupported: Bool = false,
             fullFsyncUnsupported: Bool = false
@@ -43,6 +51,8 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
             self.failRead = failRead
             self.shortWriteOnCall = shortWriteOnCall
             self.shortReadOnCall = shortReadOnCall
+            self.partialBlockWriteOnCall = partialBlockWriteOnCall
+            self.partialBlockReadOnCall = partialBlockReadOnCall
             self.syncError = syncError
             self.synchronizeSupported = synchronizeSupported
             self.fullFsyncUnsupported = fullFsyncUnsupported
@@ -131,6 +141,9 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
             if currentFaults.shortReadOnCall == reads, length > blockSize {
                 length = Self.shortened(length, blockSize: blockSize)
             }
+            if currentFaults.partialBlockReadOnCall == reads, length > blockSize {
+                length -= blockSize / 2
+            }
             return try PosixIO.pread(fd, into: UnsafeMutableRawBufferPointer(rebasing: buffer[..<length]), at: offset)
         }
     }
@@ -150,6 +163,9 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
             }
             if currentFaults.shortWriteOnCall == writes, length > blockSize {
                 length = Self.shortened(length, blockSize: blockSize)
+            }
+            if currentFaults.partialBlockWriteOnCall == writes, length > blockSize {
+                length -= blockSize / 2
             }
             return try PosixIO.pwrite(fd, from: UnsafeRawBufferPointer(rebasing: buffer[..<length]), at: offset)
         }

@@ -19,10 +19,7 @@ final class VerifierTests {
     func image(_ bytes: [UInt8]) throws -> ImageInfo {
         let url = dir.appendingPathComponent("image-\(UUID().uuidString).img")
         try Data(bytes).write(to: url)
-        return ImageInfo(
-            url: url, fileName: url.lastPathComponent, sizeBytes: UInt64(bytes.count), kind: .img,
-            hasMBR: false, hasGPT: false, isISO9660: false, bootWarning: nil
-        )
+        return try imageInfo(at: url)
     }
 
     func verifier(blockSize: Int, clock: MonotonicClock = steppingClock(step: 0)) -> Verifier {
@@ -142,6 +139,17 @@ final class VerifierTests {
         #expect(device.readCallCount == 3 + 1)
     }
 
+    @Test(arguments: [512, 4096])
+    func partialBlockReadStopsWithoutRetry(_ blockSize: Int) throws {
+        let chunk = Self.chunkBlocks * blockSize
+        let bytes = pattern(count: 3 * chunk)
+        let device = try device(holding: bytes, blockSize: blockSize, blockCount: 16, faults: .init(partialBlockReadOnCall: 2))
+        #expect(throws: VerifierError.partialBlock(atOffset: UInt64(chunk), byteCount: chunk - blockSize / 2)) {
+            _ = try self.run(self.verifier(blockSize: blockSize), self.image(bytes), device)
+        }
+        #expect(device.readCallCount == 2)
+    }
+
     @Test func readFailureIsReported() throws {
         let chunk = Self.chunkBlocks * 512
         let bytes = pattern(count: 3 * chunk)
@@ -175,6 +183,32 @@ final class VerifierTests {
             _ = try self.run(self.verifier(blockSize: 512), info, device)
         }
         #expect(device.readCallCount == 0)
+    }
+
+    @Test func imageChangedDuringVerifyFails() throws {
+        let chunk = Self.chunkBlocks * 512
+        let bytes = pattern(count: 3 * chunk)
+        let info = try image(bytes)
+        let device = try device(holding: bytes, blockSize: 512, blockCount: 16)
+        // The check runs once before opening the image and once before each chunk,
+        // so the third call comes after the first chunk matched.
+        var checks = 0
+        let changeAfterFirstChunk: () -> Bool = {
+            checks += 1
+            if checks == 3 {
+                let fd = open(info.url.path, O_WRONLY | O_CLOEXEC)
+                let junk: [UInt8] = [1, 2, 3, 4]
+                _ = junk.withUnsafeBytes { pwrite(fd, $0.baseAddress, $0.count, 0) }
+                var times = [timeval(tv_sec: 1_000_000_000, tv_usec: 0), timeval(tv_sec: 1_000_000_000, tv_usec: 0)]
+                #expect(futimes(fd, &times) == 0)
+                close(fd)
+            }
+            return false
+        }
+        #expect(throws: ImageSourceError.changed(fileName: info.fileName)) {
+            _ = try self.run(self.verifier(blockSize: 512), info, device, cancelWhen: changeAfterFirstChunk)
+        }
+        #expect(device.readCallCount == 3)
     }
 
     // MARK: - Cancellation
