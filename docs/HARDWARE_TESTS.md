@@ -86,7 +86,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H13 | Intel Mac run | Release | Not possible | Intel Mac runs macOS 13.7.8; app needs 14+ |
 | H14 | What real disks report (read-only) | none | | |
 | H15 | Drive swapped during the password dialog | Debug | PASS | Both RAM disks were `disk8`; refused with "A different drive is attached" |
-| H16 | Removable Volumes privacy prompt denied | Debug + Release | | |
+| H16 | Removable Volumes privacy prompt denied | Debug + Release | PASS | Mapped to `blockedByPrivacySettings`; fix A needs Try Again, not a relaunch; fix B needs no relaunch |
 
 **Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09). That build never tried `DKIOCSYNCHRONIZE`. **From T19 on: `DKIOCSYNCHRONIZE`** (Cruzer Glide, Release build, 2026-10-13, commit `169b386`; details under T19 in `PLAN.md`).
 
@@ -399,5 +399,15 @@ log stream --predicate 'subsystem == "com.example.raccoonwriter" OR (subsystem =
 
 **Found during the first run (2026-10-13):** after Don't Allow, Files & Folders showed only "Full Disk Access" under RaccoonWriter, with no Removable Volumes switch, although the app's Full Disk Access entry is denied (macOS adds it by itself). That is why the fixes changed from the Files & Folders switch to the two above.
 
-**Result:**
-**Notes:**
+**Result:** PASS
+**Notes:** 2026-10-13, commit `1845799`, Cruzer Glide as `disk8`.
+- Step 1 (Debug, Simulate): passed. The `disk97` screen showed the callout, the A and B fixes and both buttons in Light and Dark at minimum size, the command could be copied, the button opened Full Disk Access, and the Done and Cancelled screens were unchanged.
+- Step 2 (Release): passed. The prompt showed the new usage text; after Don't Allow and the password, the failed screen appeared and the log read:
+  ```
+  23:10:02.307037 [authopen] authopen exited(1): authopen: couldn't open /dev/rdisk8: Operation not permitted
+  23:10:02.307094 [authopen] authopen failure mapped to blockedByPrivacySettings
+  23:10:02.307176 [coordinator] Run failed in open: macOS privacy settings did not allow Raccoon Writer to open the drive.
+  ```
+- Step 3 (fix A): passed. After the `tccutil` reset the prompt did **not** appear on the failed screen; it appeared after Try Again (back on the drive list, whose refresh runs `diskutil`). After Allow, the write and verify passed. No relaunch needed.
+- Step 4 (fix B): passed. With Full Disk Access turned on, the write and verify passed without relaunching.
+- Step 5 (cancelled dialog): passed. The T18 notice appeared, not the new screen.

@@ -131,7 +131,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T21 | Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill | T16 | DONE | 2026-10-13 | Claude |
 | T24 | Smaller app: optimized raccoon layer, stripped Release binary | T23 | DONE | 2026-10-13 | Claude |
 | T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
-| T25 | 🧑 Tell a Removable Volumes privacy denial apart from a refused password | T21 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T25 | 🧑 Tell a Removable Volumes privacy denial apart from a refused password | T21 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T25 builds on T22's committed prep but not on Nick's T22 runs, so it may start while T22 is `NEEDS_HUMAN`. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -1471,6 +1471,8 @@ Also, `NSRemovableVolumesUsageDescription` (T22) says the access is for reading 
 
 **Layout revision, 2026-10-13 (Nick's review of the screen).** The text hierarchy was flat. Now the message sits in the T18 blue `NoticeCallout` (moved out of `ConfirmView.swift` into `App/NoticeCallout.swift`), but only when the failure has remedies, so every other failed screen is unchanged. Each remedy has a blue letter badge (A, B; `RemedyView.letter(for:)`) and a headline title. "Or turn on Full Disk Access" became "Turn on Full Disk Access", since the letters already mark the options. With the callout the content ran one line over at 540 × 460, so `OutcomeView` now puts the details in a `ScrollView` (`scrollBounceBehavior(.basedOnSize)`) in place of the `Spacer`. This is shared by the Done, Failed and Cancelled screens, and keeps the buttons visible in a short window. Checked with an `NSHostingView` render (`ImageRenderer` can't draw scroll views): at 580 × 500 everything fits; at 540 × 460 only "Stopped while…" scrolls below.
 
+**DONE, 2026-10-13, after Nick's H16 runs (commit `1845799`).** All five steps passed; details in `docs/HARDWARE_TESTS.md` H16. Simulate screen, callout, A/B fixes, minimum size and the Full Disk Access button checked; Release on the Cruzer Glide logged `authopen failure mapped to blockedByPrivacySettings` after Don't Allow. Fix A: the prompt returns after Try Again (not on the failed screen, since only the drive list refreshes discovery), then the write and verify pass, no relaunch. Fix B: Full Disk Access works without relaunching. The cancelled-dialog notice is unchanged. Every acceptance criterion is met, with Full Disk Access in place of Files & Folders as Nick decided (see above). Possible follow-up: the fix A text says to quit and reopen if macOS doesn't ask; "click Try Again" would be enough.
+
 ---
 
 ## 4. Future work (not in scope)
@@ -1545,3 +1547,4 @@ Also, `NSRemovableVolumesUsageDescription` (T22) says the access is for reading 
 | 2026-10-13 | T25 BLOCKED: Files & Folders shows only "Full Disk Access" (a silent denied row) for Raccoon Writer and hides the Removable Volumes switch the failed screen points to; needs a decision on the fix to offer | Claude |
 | 2026-10-13 | T25 unblocked by Nick's decision: the failed screen lists a `tccutil` reset and Full Disk Access (with a note that the app doesn't need it), and the button opens Full Disk Access; NEEDS_HUMAN for H16 | Claude |
 | 2026-10-13 | T25 layout: message in the blue notice callout, fixes labelled A and B, outcome details scroll in a short window | Claude |
+| 2026-10-13 | T25 DONE after Nick's H16 runs: the denial maps to `blockedByPrivacySettings`, and both fixes work without relaunching (fix A once Try Again refreshes the drive list) | Claude |
