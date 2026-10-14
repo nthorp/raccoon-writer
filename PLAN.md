@@ -123,7 +123,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T14 | Rename to Red Delicious Media Writer | T13 | DONE | 2026-10-12 | Claude |
 | T15 | App icon | T14 | DONE | 2026-10-12 | Claude |
 | T16 | 🧑 Password prompt before the safety check; size check after open | T15 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
-| T17 | 🧑 Layered app icon (Icon Composer) with dark variant | T15 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
+| T17 | 🧑 Layered app icon (Icon Composer) with dark variant | T15 | DONE | 2026-10-13 | Claude (prep) / Nick (check) |
 | T18 | 🧑 Make the password-cancelled notice stand out | T16 | DONE | 2026-10-13 | Claude (prep) / Nick (check) |
 | T23 | Rename to Raccoon Writer, with the raccoon icon | T16 | DONE | 2026-10-13 | Claude |
 | T19 | 🧑 Flush the drive cache with `DKIOCSYNCHRONIZE` | T16 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
@@ -939,6 +939,8 @@ This also removes the README limitation "after a cancelled password prompt the d
 - **Project:** XcodeGen 2.46 adds `AppIcon.icon` as a single `wrapper.icon` file reference in Resources, so `project.yml` is unchanged. `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` now resolves to it.
 - **Pre-26 fallback (step 4):** `actool` renders the legacy icons from the `.icon` file. With both sources present, the `.icns` (16–256 px) and the 7 flat `Assets.car` images (32–1024 px) were renders of the new icon, not the T15 PNGs. Removing the set left the `.icns` byte-identical and the same 7 images. Their digests changed, but they also change between two compiles of the same input, so the renders aren't byte-stable. The `.car` also has layered stacks for Aqua, DarkAqua and Tintable. So `App/Assets.xcassets` (it held only the icon) was deleted.
 - **Deviation:** none from the steps. Step 3's `project.yml` edit turned out not to be needed.
+- **Human results, 2026-10-13, on the T23 build or later (commit `162d647`):** Nick completed the human steps and reported that all passed. Icon Composer previews of the raccoon look right in Default, Dark, Clear and Tinted. No changes were saved, so no rebuild was needed. The installed copy's Dock and Finder icon follows each icon style, with a dark background in Dark. The README's "password dialog has no custom icon yet" limitation (step 4) is left as is until Nick confirms which icon the dialog showed.
+- **Acceptance:** every criterion is met. `scripts/test.sh` passes 374 tests and `scripts/build.sh --release` succeeds for `x86_64 arm64` with the release flag check passing, re-run on `162d647`. Marked `DONE`.
 
 ---
 
@@ -1325,3 +1327,4 @@ Keep `AppInfo.shortName` even though it now equals `displayName`, so code that u
 | 2026-10-13 | T19 prep: `DKIOCSYNCHRONIZE` is the first flush method, then `F_FULLFSYNC`, then `fsync`; skipped methods logged with their errno; NEEDS_HUMAN for the RAM-disk and Cruzer Glide runs | Claude |
 | 2026-10-13 | T19 DONE after Nick's runs: both the RAM disk and the Cruzer Glide flush with `DKIOCSYNCHRONIZE` | Claude |
 | 2026-10-13 | T18 DONE after Nick's check: the callout stands out in Light and Dark, wraps at minimum width, and is absent without a notice | Claude |
+| 2026-10-13 | T17 DONE after Nick's check: the raccoon icon follows the Default, Dark, Clear and Tinted icon styles | Claude |
