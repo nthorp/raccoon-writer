@@ -125,8 +125,13 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T16 | 🧑 Password prompt before the safety check; size check after open | T15 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
 | T17 | 🧑 Layered app icon (Icon Composer) with dark variant | T15 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
 | T18 | 🧑 Make the password-cancelled notice stand out | T16 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
+| T23 | Rename to Raccoon Writer, with the raccoon icon | T16 | TODO | | Claude |
+| T19 | 🧑 Flush the drive cache with `DKIOCSYNCHRONIZE` | T16 | TODO | | Claude (prep) / Nick (run) |
+| T20 | 🧑 Warn for drives over 500 GB; README says USB hard drives are listed | T18 | TODO | | Claude (prep) / Nick (check) |
+| T21 | Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill | T16 | TODO | | Claude |
+| T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | TODO | | Claude (prep) / Nick (run) |
 
-Tasks are written so they can be done in ID order. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
+Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
 ---
 
@@ -981,6 +986,254 @@ Out of scope (Nick chose only these two changes): new wording or a separate titl
 
 ---
 
+### T19 — 🧑 Flush the drive cache with `DKIOCSYNCHRONIZE`
+
+**Goal:** close a review finding. The final flush doesn't reach the drive on real hardware. `F_FULLFSYNC` goes to the vnode as an ioctl. A filesystem turns it into a drive cache flush, but on a raw disk node the disk driver doesn't recognise it and returns `ENOTTY`. That is why the T01 RAM disk and the H6 SanDisk Cruzer Glide both logged `fsync fallback`. And `fsync` on a character device (`/dev/rdiskN`) returns 0 without doing anything. So today the app never asks the drive to flush its write cache, and the README line "The final flush uses `F_FULLFSYNC`" is wrong. In practice the eject probably flushes the drive, which hides the problem, but a failed eject or a stick pulled straight after "Finished" isn't covered.
+
+The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize_t)`. The disk driver turns it into a SCSI SYNCHRONIZE CACHE, which USB mass storage uses. With a zeroed `dk_synchronize_t` (offset 0, length 0, no options) it flushes the whole device. Make it the first method and keep `F_FULLFSYNC` and `fsync` as fallbacks.
+
+**Order:** `WriteEngine` already flushes after the last write and before the verify, so the order doesn't change. A flush makes the write durable before success is reported. It doesn't guarantee the verify reads from flash rather than the drive's cache, so don't claim that anywhere.
+
+**Out of scope:** `DKIOCSYNCHRONIZECACHE` (`_IO('d', 22)`, the older form) as an extra fallback, unless step 1 or the hardware run shows `DKIOCSYNCHRONIZE` unsupported where the older one would work. Also `DK_SYNCHRONIZE_OPTION_BARRIER`: a barrier only orders writes and doesn't empty the cache.
+
+**Agent steps**
+1. Add `ioctlSynchronize` next to the two ioctl constants in `RawDevice`. Compute `_IOW('d', 22, dk_synchronize_t)` from the SDK header (expected `0x8018_6416`, since the struct is 24 bytes) and check it the way T01 checked the others, for example by compiling a small C file that prints the macro. Use Darwin's imported `dk_synchronize_t` if it's available in Swift; otherwise mirror it in a Swift struct and add a test that its size is 24. No device is needed for any of this.
+2. Extend `SyncMethod` and `SyncMethod.perform`: `DKIOCSYNCHRONIZE` → `F_FULLFSYNC` → `fsync`. Each step moves on only when the previous one returns `ENOTTY` or `ENOTSUP`; any other error is a real sync failure and throws with the method's name; `EINTR` retries as now. Add a `.synchronize` case, and fix the doc comments: `.fullFsync` stays for regular files and the fakes, and `.fsyncFallback` must say it doesn't reach the drive on a raw node. Reaching `fsync` is still not an error, because RAM disks may support neither command and the eject flushes the drive anyway.
+3. `RawDevice.fullSync()` passes the ioctl as the first closure (a small `PosixIO.ioctlStatus` helper, in the same shape as `fcntlStatus`). Log the method used as now (`fullSync used DKIOCSYNCHRONIZE` / `F_FULLFSYNC` / `fsync fallback`). When a method is skipped, also log which one and its errno at info level, so the hardware run shows why.
+4. `FileBackedDevice`: a regular file returns `ENOTTY` for the ioctl, so by default it lands on `F_FULLFSYNC`. Add a fault that makes the synchronize step succeed (so the coordinator tests can cover `.synchronize`) and keep `fullFsyncUnsupported`. Update `SimulatedDevice` and `PreviewSamples` if they name a method.
+5. Tests: each fallback step with `ENOTTY` and `ENOTSUP`; any other errno from each step is fatal and later steps aren't called; `EINTR` retries; `RawDevice` on a temp file returns `.fullFsync` (the ioctl falls through); the engine reports whatever method the device used.
+6. Docs: `README.md` line 70 (the flush asks the drive to empty its write cache with `DKIOCSYNCHRONIZE`, falling back to `F_FULLFSYNC` and then `fsync` where it isn't supported); section 1 "Cache and sync" note in this file; in `docs/HARDWARE_TESTS.md`, H2's and H6's expected flush method and the "Flush method on the USB stick" line. Leave the 2026-10-09 notes as they are, since they record what happened, and add a line pointing to T19.
+7. `scripts/test.sh` and `scripts/build.sh --release` pass. Write instructions for Nick, set `NEEDS_HUMAN`, stop.
+
+**Human steps (Nick)**, with `log stream --predicate 'subsystem == "com.example.reddelicious"' --info` open in a second Terminal window:
+1. RAM disk, Debug build: one full write and verify. Record the flush method and any skipped-method errno from the log.
+2. Real USB stick (the Cruzer Glide), Release build: one full write and verify. It passes. Record the flush method; `DKIOCSYNCHRONIZE` is the expected result. If it falls back, copy the log lines with the errno.
+
+**Acceptance criteria**
+- `fullSync()` tries `DKIOCSYNCHRONIZE` first and falls back to `F_FULLFSYNC` and then `fsync` only on `ENOTTY`/`ENOTSUP`. Any other error fails the write (unit tests).
+- The ioctl constant is checked against the SDK header, and the struct is 24 bytes.
+- On the Cruzer Glide, write and verify pass and the log shows which method ran. If it isn't `DKIOCSYNCHRONIZE`, the errno is recorded here and the README says what the app actually does.
+- The README and `docs/HARDWARE_TESTS.md` no longer claim the flush uses `F_FULLFSYNC` on raw devices.
+- `scripts/test.sh` and `scripts/build.sh --release` pass.
+
+**Files:** `Sources/ImageWriterCore/` (`RawDevice`, `SyncMethod`, `PosixIO`, `Fakes/FileBackedDevice`, `Simulation/SimulatedDevice`), `App/PreviewSamples.swift`, `Tests/` (`SyncMethodTests`, `RawDeviceTests`, `FileBackedDeviceTests`, coordinator and engine tests as needed), `README.md`, `docs/HARDWARE_TESTS.md`, `PLAN.md`
+
+**Handoff notes:**
+
+---
+
+### T20 — 🧑 Warn for drives over 500 GB; README says USB hard drives are listed
+
+**Goal:** close a review finding. The default drive list includes USB hard drives and SSDs, not just sticks. `DiskFilter.rejection(for:bootDisks:)` accepts a USB disk when `isRemovable || isEjectable`. USB hard drive and SSD enclosures usually report `Ejectable = true` (even the Thunderbolt T7 in `PreviewSamples` does), so a USB Time Machine or backup drive appears by default. The README says "only external, removable USB drives are listed", which is wrong. The filter stays as it is: hiding ejectable-only disks would also hide some sticks and card readers, and the user may really want to write to a USB SSD. Instead, fix the README and warn when a drive is large. balenaEtcher does the same above 128 GB; Nick chose 500 GB, because 128 and 256 GB sticks are common.
+
+**Threshold:** the drive's listed `sizeBytes` is strictly greater than 500,000,000,000 bytes. That is decimal, as `DisplayFormat` and Finder use. A "500 GB" SSD (for example 500,107,862,016 bytes, which shows as "500 GB") is therefore warned about, which is what we want. The warning doesn't depend on the bus, removable flags, or the "Show all external disks" setting.
+
+**Out of scope:** changing what `DiskFilter` accepts; blocking the write or adding an extra confirmation step (the warning is advisory, like `BootWarning`); a setting for the threshold; showing USB hard drives only when the toggle is on.
+
+**Agent steps**
+1. Add `LargeDriveWarning` to `Sources/ImageWriterCore/`, in the same shape as `DriveTooSmall`: a stored `driveBytes`, `static let thresholdBytes: UInt64 = 500_000_000_000`, `init?(drive: DiskInfo)` that returns nil at or below the threshold, and a `message`. Use the drive's size in the message, not the threshold, so a 500.1 GB drive doesn't read "larger than 500 GB" next to "500 GB". Suggested wording: "This is a large drive (1 TB). USB sticks are rarely this big, so make sure it isn't a backup or external hard drive you want to keep."
+2. Drive list (`App/DriveSection.swift`, `DriveRow`): a second caption line "Large drive" in orange, under the details and alongside "Too small for this image" if both apply. Compute it in `DriveSection` and pass a Bool in, the way `isTooSmall` is passed.
+3. Confirm screen (`App/ConfirmView.swift`): when the warning applies, show its message as an orange `exclamationmark.triangle.fill` label between the "You are about to erase…" line and the details grid, with `.fixedSize(horizontal: false, vertical: true)` so it wraps. It must not push the T18 notice callout off the top, and the screen without a warning must look exactly as it does now.
+4. Simulate mode: add `SimulatedDrive.usbHardDrive`, named "Simulated USB Hard Drive (1 TB)": 1,000,204,886,016 bytes, bus `USB`, `isRemovable: false`, `isEjectable: true`, mounted at `/Volumes/SIM96` (bsdName `disk96`), with the same scripted outcome as `.working`. It must appear in the default list, which also covers the finding itself. Update any simulation test that counts or lists the cases. Add a large USB drive to `PreviewSamples`, plus previews for the drive list and confirm screen with that drive.
+5. Tests (`LargeDriveWarningTests`): nil at 0, at a typical stick size and at exactly 500,000,000,000; non-nil at 500,000,000,001 and at 500,107,862,016; the message contains the drive's `DisplayFormat.size`. Add a `DiskFilterTests` case recording the current behaviour: a USB disk with `isRemovable: false, isEjectable: true` is listed by default. A later change to the filter then has to be deliberate.
+6. Docs:
+   - `README.md` line 13: by default the list shows external USB drives that macOS reports as removable or ejectable. That covers USB sticks and card readers, but also most USB hard drives and SSDs, so a backup or Time Machine drive can appear. Drives over 500 GB are marked "Large drive" and the confirm screen warns about them. Add a matching item under the limitations (near the SD card line).
+   - This file, section 1 "Drive filter" row: "removable or ejectable", and mention the large-drive warning.
+   - `docs/HARDWARE_TESTS.md`: add a step to H1 for the simulated USB hard drive.
+7. `scripts/test.sh` and `scripts/build.sh --release` pass. Write instructions for Nick, set `NEEDS_HUMAN`, stop.
+
+**Human steps (Nick)**
+1. Run `scripts/build.sh` (Debug), then `REDDELICIOUS_SIMULATE=1 build/RedDelicious.app/Contents/MacOS/RedDelicious`.
+2. Choose any image. "Simulated USB Hard Drive (1 TB)" is listed with "Show all external disks" off and shows "Large drive". The simulated 16 GB sticks don't.
+3. Select it and press Continue…. The confirm screen shows the large-drive warning, and it reads well in Light and Dark and at the narrowest window width. Cancel, choose "Simulated USB Stick (works)" and continue: no warning.
+4. Choose "Simulated USB Stick (password dialog cancelled)" and run it through the cancelled dialog, to check the T18 callout still sits above the title.
+5. Optional, if a USB hard drive or SSD over 500 GB is to hand: plug it in with a Release build and check it is listed with "Large drive". Don't select Erase and Write.
+
+**Acceptance criteria**
+- Drives over 500,000,000,000 bytes show "Large drive" in the list and a warning on the confirm screen. Drives at or below that show neither, and nothing else on those screens changes.
+- The warning never blocks the write.
+- The README no longer says only removable USB drives are listed, and it explains the large-drive warning. The section 1 table matches.
+- `DiskFilter` behaviour is unchanged, and a test records that ejectable-only USB disks are listed by default.
+- `scripts/test.sh` and `scripts/build.sh --release` pass.
+
+**Files:** `Sources/ImageWriterCore/LargeDriveWarning.swift`, `Sources/ImageWriterCore/Simulation/SimulatedDrive.swift`, `App/DriveSection.swift`, `App/ConfirmView.swift`, `App/PreviewSamples.swift`, `Tests/ImageWriterCoreTests/` (`LargeDriveWarningTests`, `DiskFilterTests`, `SimulationModeTests` as needed), `README.md`, `docs/HARDWARE_TESTS.md`, `PLAN.md`
+
+**Handoff notes:**
+- _(none yet)_
+
+---
+
+### T21 — Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill
+
+**Goal:** close four review findings. None is known to have happened, but each is cheap to fix, and one (D) can leave the app unable to quit. All four can be tested with temp files, fakes and stand-in scripts, so there is no human step.
+
+- **A. Device descriptor inherits into children.** `DescriptorReceiver.receive` returns the descriptor from authopen without `FD_CLOEXEC`. Descriptor flags don't travel with `SCM_RIGHTS`, and macOS `recvmsg` has no `MSG_CMSG_CLOEXEC`, so it arrives without the flag. Nothing spawns a process while the device is open today, but a child that inherited it would have write access to the raw disk and would keep it open after the app closes it, so a later eject could fail as busy. `AuthopenOpener.run` already sets the flag on every other descriptor for this reason.
+- **B. Partial-block retry is misaligned.** `WriteEngine.writeFully` and `Verifier.readFully` retry the remainder after a short transfer. If the count isn't a whole number of blocks, the retry has an unaligned offset and buffer, which `/dev/rdiskN` rejects with `EINVAL`, reported as a baffling "write at offset N: Invalid argument". Short transfers of whole blocks stay supported, as now.
+- **C. Image identity isn't checked.** `ImageSource` compares only the type and size with what `ImageInspector` saw, so a different file of the same size at the same path is written, and verify passes because it reads the same path. Its doc comment claims a replaced file fails, which is untrue today. A file changed in place during the run isn't caught either.
+- **D. Timeout path can hang.** In `ProcessCommandRunner.runBlocking`, a command that ignores SIGTERM makes `exited.wait()` after `terminate()` block forever. `readers.wait()` is also unbounded, so a grandchild that keeps stdout or stderr open blocks it even after the command exits. Neither wait observes task cancellation. A hang in the safety check or unmount leaves the run at "Cancelling" and blocks Quit (`stopAndWait`). A hang in eject sticks in finishing, which can't be cancelled. A hang in a drive list refresh stops polling silently.
+
+**Out of scope:** blocking mounts on the target with DiskArbitration (the fifth finding); it waits for a hardware check of whether anything mounts between close and eject. Also making `CommandRunner` calls cancellable (D makes them finite, which is enough); killing the command's whole process group; using `ctime` for identity (Finder and Spotlight change it by adding extended attributes, which would cause false "changed" errors).
+
+**Agent steps**
+1. **A.** In `DescriptorReceiver.receive`, set `FD_CLOEXEC` on the received descriptor before returning it. If `fcntl` fails, close the descriptor and throw `DeviceOpenError.posix(operation: "fcntl(FD_CLOEXEC)", …)`, the way `makeInputPipe` fails closed on `F_SETNOSIGPIPE`. Test in `DescriptorReceiverTests`: the received descriptor has `FD_CLOEXEC` set (`fcntl(fd, F_GETFD)`). Check the test fails without the fix.
+2. **B.**
+   - In `WriteEngine.writeFully`, after the `count > 0` guard, require `count` to be a multiple of `device.blockSize`. Otherwise throw a new `WriteEngineError.partialBlock(atOffset:byteCount:)` with no retry. The description and `FailureExplanation` say in plain words that the drive wrote part of a block and the write was stopped. Drive state is `.partiallyWritten`, like `.stalled`.
+   - Do the same in `Verifier.readFully` with `VerifierError.partialBlock(atOffset:byteCount:)` and the matching explanation, using the drive state the verify stage's other device errors use.
+   - `FileBackedDevice.Faults`: add `partialBlockWriteOnCall` and `partialBlockReadOnCall` (1-based, like `shortWriteOnCall`) that transfer a count that isn't a block multiple, for example `length - blockSize / 2` for a request longer than one block.
+   - Tests: each fault throws the new error with the right offset and byte count, and the device sees no further call after it. The existing whole-block short write and read tests still pass. `FailureExplanationTests` cover both new cases.
+3. **C.**
+   - Add `FileIdentity` (`Sources/ImageWriterCore/FileIdentity.swift`): `device`, `inode`, `sizeBytes` and the modification time in seconds and nanoseconds (`st_mtimespec`), built from a `stat`. Equatable and Sendable.
+   - `ImageInspector` records it from the `fstat` it already does. `ImageInfo` stores it as a **non-optional** field, so production code has no way to skip the check. Update the 10 places that construct `ImageInfo`. For tests, add a helper that builds an `ImageInfo` from a real temp file's `stat`. `PreviewSamples` may use a made-up value, since previews never write.
+   - `ImageSource.init` compares the `fstat` of its open descriptor with the recorded identity and throws `ImageSourceError.changed` on any difference, which replaces the size comparison. Add `ImageSource.checkUnchanged()`, which runs `fstat` on the same descriptor and compares again. `Verifier` calls it after its last comparison and before returning, so a file changed in place during the write or verify fails the run instead of reporting a verified drive. The existing `changed` explanation ("Choose the image again") covers both.
+   - Fix the `ImageSource` doc comment so it matches.
+   - Tests in `ImageSourceTests`, each failing before the fix: a same-size file renamed over the path is `changed` at init. The file rewritten in place with the same size but a different modification time is `changed` at init. A file modified after `ImageSource` opened it fails `checkUnchanged()`. An untouched file passes both. Set modification times explicitly with `futimes`, so the tests don't depend on timestamp resolution.
+4. **D.**
+   - In `ProcessCommandRunner.runBlocking`, after a timeout: `terminate()`, wait up to `killGrace`, then `kill(process.processIdentifier, SIGKILL)` if it is still running, then wait up to `killGrace` again. If it still hasn't exited, log it and throw `timedOut` without waiting further.
+   - After the command exits, normally or not, wait at most `killGrace` for the two output readers. If they don't finish, a grandchild is holding a pipe: throw `outputUnreadable` with a message saying the output stayed open after the command exited, and leave the readers to finish on their own. Don't close their handles from this thread; a descriptor closed under a blocked read could be reused for another file.
+   - `killGrace` defaults to 2 seconds. Add it as an internal init parameter so tests can shorten it. Worst case is now `timeout` + 3 × `killGrace` instead of forever. Update the type's doc comment.
+   - Tests in `ProcessCommandRunnerTests`, with `/bin/sh -c` stand-ins and sleeps of at most 5 seconds, so a failed run doesn't leave long-lived processes. Check each test hangs or fails without the fix:
+     - `trap '' TERM; exec /bin/sleep 5` with a short timeout and grace: throws `timedOut` well before 5 seconds. `sleep` inherits the ignored SIGTERM, so only the SIGKILL ends it.
+     - `/bin/sleep 5 & echo done`: the shell exits at once, the background `sleep` holds stdout, and the runner throws `outputUnreadable` within about `killGrace`.
+     - The existing timeout, signal and large-output tests still pass.
+5. Note in this task's Handoff notes which of the new tests failed without its fix. `scripts/test.sh` and `scripts/build.sh --release` pass. Mark `DONE`.
+
+**Acceptance criteria**
+- The descriptor from authopen has `FD_CLOEXEC` set before `receive` returns it (unit test).
+- A transfer that isn't a whole number of blocks stops the write or verify with a clear typed error and no further I/O. Whole-block short transfers are still retried (unit tests).
+- A same-size replacement, an in-place change before the run, and a change during the run all fail with `ImageSourceError.changed`. `ImageInfo` can't be made without a `FileIdentity` (unit tests).
+- `ProcessCommandRunner` returns or throws within `timeout` + 3 × `killGrace`, even for a command that ignores SIGTERM or leaves a pipe open (unit tests).
+- `scripts/test.sh` and `scripts/build.sh --release` pass.
+
+**Files:** `Sources/ImageWriterCore/` (`DescriptorReceiver`, `WriteEngine`, `WriteEngineError`, `Verifier`, `VerifierError`, `FailureExplanation`, `FileIdentity` (new), `ImageInfo`, `ImageInspector`, `ImageSource`, `ProcessCommandRunner`, `Fakes/FileBackedDevice`), `App/PreviewSamples.swift`, `Tests/ImageWriterCoreTests/` (`DescriptorReceiverTests`, `WriteEngineTests`, `VerifierTests`, `FailureExplanationTests`, `ImageSourceTests`, `ImageInspectorTests`, `ProcessCommandRunnerTests`, `TestSupport`, and the tests that construct `ImageInfo`), `PLAN.md`
+
+**Handoff notes:**
+- _(none yet)_
+
+---
+
+### T22 — 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime
+
+**Goal:** close four review findings. Each is a small change; D needs a hardware run, which makes this a human checkpoint.
+
+- **A. Volume names aren't shown.** `DiskInfo.volumeNames` is filled in by `DiskutilDiscovery` and never displayed. The drive list shows the media name, size, `/dev/diskN` and bus, so two identical sticks look the same, and users recognise "STICK" or "Backup" more readily than a disk number. Picking the wrong drive is the main way this app destroys data. The confirm screen shows mount paths, which contain the name only while a volume is mounted. (The review also said the confirm screen shows "Mounted volumes: none" after a cancelled prompt. That was true at T11, when the unmount came before the prompt; since T16 nothing is unmounted before the prompt, so check it rather than assume it.)
+- **B. Test fakes ship in Release.** All eight files in `Sources/ImageWriterCore/Fakes/` are public and compiled into the Release binary. T02 deviation 3 left them unwrapped because T10's Simulate mode needed them. Simulate mode is now entirely `#if DEBUG`, so that reason no longer holds. Nothing in Release creates them, but `FakeDeviceOpener` approves every request, and a Release compile error is the right outcome if future code ever wires one in.
+- **C. Info.plist is missing three keys.** `NSHumanReadableCopyright` (shown in the About window and Get Info), `LSApplicationCategoryType`, and `NSRemovableVolumesUsageDescription`. The removable-volume privacy prompt has appeared before (section 5, T14 handoff notes) and currently uses macOS's generic wording.
+- **D. Hardened Runtime is off** (`ENABLE_HARDENED_RUNTIME: NO`). Notarization requires it. Notarization is still out of scope, but turning it on now surfaces any problem while the change is one line, not later during a release.
+
+**Out of scope:** DiskArbitration notifications in place of the 2 s poll (the review's fifth item; low benefit for about 200 lines of new code); Developer ID signing and notarization; renaming "Mounted volumes"; showing volume names on the progress, done or failed screens.
+
+**Agent steps**
+1. **A. Volume names.**
+   - Add `DisplayFormat.volumeNames(of:) -> String?`: the names joined with ", " in their existing order, or nil when there are none. It sits next to `mountPoints(of:)`.
+   - `DriveRow` (`App/DriveSection.swift`): put the volume names first on the details line, for example "STICK · 16 GB · /dev/disk4 · USB". Leave the line unchanged when there are none. Keep `lineLimit(1)` and truncate in the middle so the device path doesn't disappear behind a long name list.
+   - `ConfirmView`: add a "Volume names:" grid row above "Mounted volumes:", shown only when there are names. The names come from the drive and are user-controlled, so pass them as a `String` value, never a string literal, so SwiftUI doesn't treat them as Markdown or a localization key (the same reason the title line is built from pieces).
+   - Check which fixtures under `Tests/ImageWriterCoreTests/Fixtures/` include an **unmounted** partition with a `VolumeName`. If one does, add a `DiskutilDiscoveryTests` assertion that its name is in `volumeNames` while `mountPoints` doesn't include it. If none does, say so in the Handoff notes and leave it to human step 2.
+   - `PreviewSamples`: one drive with two volume names, one with none. Update the drive list and confirm screen previews.
+   - Tests in `DisplayFormatTests`: several names, one name, none (nil), and a name containing `*` or `[` comes back unchanged.
+   - In the Simulate build, run disk93 through the cancelled prompt and record what "Mounted volumes:" shows on the confirm screen afterwards. Since T16 it should show `/Volumes/SIM93`. If it shows "none", find out why before going on.
+2. **B. Debug-only fakes.**
+   - Wrap each of the eight files in `Sources/ImageWriterCore/Fakes/` (`FakeCommandRunner`, `FakeDeviceAuthorizer`, `FakeDeviceOpener`, `FakeDiskManager`, `FakeSleepPreventer`, `FileBackedDevice`, `StaticBootDiskResolver`, `StaticDiskDiscovery`) in a whole-file `#if DEBUG` / `#endif`, the way `Simulation/` is done.
+   - Fix any Release compile error by gating the caller, not by un-gating the fake. If a production path needs one, stop and set `BLOCKED`.
+   - `swift test` builds Debug, so the test target is unaffected. `swift test -c release` stops compiling; note that in the Handoff notes, and note in T02's deviation 3 that T22 supersedes it.
+   - Add `FakeDeviceOpener`, `FileBackedDevice` and `StaticBootDiskResolver` to the strings `scripts/check-release-flags.sh` fails on, and to `ReleaseFlagCheckTests.markers`. In `scriptChecksEveryMarkerTheCodeUses`, add `String(describing:)` checks for the three types inside the existing `#if DEBUG` block.
+   - After `scripts/build.sh --release`, also run `strings` on the binary and grep it for all eight type names. Record that none are found.
+3. **C. Info.plist** (`App/Info.plist`):
+   - `NSHumanReadableCopyright`: "Copyright © 2026 Nicholas Thorp." Nick confirms the holder in human step 1.
+   - `LSApplicationCategoryType`: `public.app-category.utilities`.
+   - `NSRemovableVolumesUsageDescription`: "Red Delicious reads the disk image you choose when it is stored on a USB drive or other removable volume."
+   - Add a test that reads `App/Info.plist` from the source tree (found from `#filePath`, as `ReleaseFlagCheckTests` finds the script) and checks the three keys are present and non-empty, with the expected category value.
+   - Check the built app with `plutil -p build/RedDelicious.app/Contents/Info.plist`.
+4. **D. Hardened Runtime.**
+   - `project.yml`: `ENABLE_HARDENED_RUNTIME: YES` for all configurations.
+   - No new entitlements are expected. The app starts `authopen` and `diskutil` as separate processes, which the runtime allows. It loads only system frameworks and the statically linked `ImageWriterCore`, and it uses no JIT. Xcode still adds `get-task-allow` to Debug builds, so debugging works.
+   - `scripts/build.sh`: after the copy, fail if `codesign -dv build/RedDelicious.app` doesn't report the `runtime` flag (for example `flags=0x10002(adhoc,runtime)`). It should fail closed if `codesign` itself fails. Also run `codesign --verify --strict` on the bundle.
+   - Debug build: launch `REDDELICIOUS_SIMULATE=1` and run disk90 (works) through to Done. Simulate mode touches no disks. If the app fails to start because the Xcode 16 `.debug.dylib` is refused, set `ENABLE_DEBUG_DYLIB: NO` for Debug in `project.yml`; that only affects previews. Never add `com.apple.security.cs.disable-library-validation`. If neither approach works, set `BLOCKED` and record the crash report.
+   - README: under Limitations, the "Not signed or notarized" item says the Hardened Runtime is on, so notarization only needs a Developer ID signature.
+5. `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass. Write instructions for Nick, set `NEEDS_HUMAN`, stop.
+
+**Human steps (Nick)**, with `log stream --predicate 'subsystem == "com.example.reddelicious"' --info` open in a second Terminal window:
+1. Confirm or correct the copyright holder in `App/Info.plist`. Open the Release app's About window and check the copyright line.
+2. **Volume names, Release build, real stick:** plug in the Cruzer Glide with a named volume. The drive list shows the volume name on its row. Press Continue…: the confirm screen shows "Volume names:" and "Mounted volumes:". Cancel the password dialog: both rows still appear above the T18 notice callout. Then eject the volume in Finder (not the drive), press Refresh, and record whether the name is still listed while unmounted.
+3. **Hardened Runtime, Release build, real stick:** one full write and verify. The password dialog appears with the app's name (T13 `-extauth`), the write and verify pass, and the drive ejects. Record anything unusual in the log.
+4. **Hardened Runtime, Debug build, RAM disk:** with `REDDELICIOUS_ALLOW_VIRTUAL_DISKS=1` and a RAM disk from `hdiutil attach -nomount ram://65536`, one full write and verify passes.
+5. **Optional, privacy prompt:** with the image stored on a second USB volume (not the target), choose it in the app. Record whether the removable-volume prompt appears, and if it does, that it shows the new text. If no prompt appears, try `tccutil reset SystemPolicyRemovableVolumes com.example.reddelicious` and run the step again.
+
+**Acceptance criteria**
+- Drive rows and the confirm screen show volume names when a drive has any. Nothing changes for a drive without them (unit tests and Nick's check).
+- After a cancelled password prompt, the confirm screen shows the drive's mount paths, not "none".
+- No type from `Fakes/` is in the Release binary. The release check fails a bundle that contains one of the new markers (unit tests and `strings`).
+- `Info.plist` has the three keys (unit test, `plutil`).
+- Debug and Release builds are signed with the Hardened Runtime, and `scripts/build.sh` fails if the flag is missing. A real-stick write and verify (Release) and a RAM-disk write and verify (Debug) pass with it on.
+- `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass.
+
+**Files:** `Sources/ImageWriterCore/` (`DisplayFormat`, every file in `Fakes/`), `App/` (`DriveSection.swift`, `ConfirmView.swift`, `PreviewSamples.swift`, `Info.plist`), `project.yml`, `scripts/build.sh`, `scripts/check-release-flags.sh`, `Tests/ImageWriterCoreTests/` (`DisplayFormatTests`, `DiskutilDiscoveryTests`, `ReleaseFlagCheckTests`, a new Info.plist test), `README.md`, `docs/HARDWARE_TESTS.md` (record the results), `PLAN.md`
+
+**Handoff notes:**
+- _(none yet)_
+
+---
+
+### T23 — Rename to Raccoon Writer, with the raccoon icon
+
+**Goal:** the app is called **Raccoon Writer**. The name is short enough to be both the full and the short name. Rename the display name and every internal identifier, the same way T14 did. `ImageWriterCore` keeps its name. The GitHub repo and local folder stay `iso-sword` (see section 4).
+
+**Priority:** T23 goes ahead of T19–T22, so its tracker row sits above theirs and it depends only on T16. T19–T22 are then done on the renamed app.
+
+**Name mapping**
+
+| Old | New |
+| --- | --- |
+| `AppInfo.displayName` "Red Delicious Media Writer", `AppInfo.shortName` "Red Delicious" | both "Raccoon Writer" (14 characters, fits `CFBundleName`) |
+| `RedDelicious` (XcodeGen project, target, scheme, `PRODUCT_NAME`, `.app`, executable) | `RaccoonWriter` |
+| `RedDeliciousApp` / `App/RedDeliciousApp.swift`, `App/RedDelicious.entitlements` | `RaccoonWriterApp` / `App/RaccoonWriterApp.swift`, `App/RaccoonWriter.entitlements` |
+| `com.example.reddelicious` (bundle ID and log subsystem) | `com.example.raccoonwriter` |
+| `REDDELICIOUS_ALLOW_VIRTUAL_DISKS`, `REDDELICIOUS_SIMULATE` | `RACCOONWRITER_ALLOW_VIRTUAL_DISKS`, `RACCOONWRITER_SIMULATE` |
+| `reddelicious-*` temp prefixes, `/nonexistent/reddelicious/…` test paths | `raccoonwriter-*`, `/nonexistent/raccoonwriter/…` |
+
+Keep `AppInfo.shortName` even though it now equals `displayName`, so code that uses it doesn't change and a later rename can split them again.
+
+**Icon:** the red apple is replaced by the raccoon from Nick's pack in `raccoon-writer-branding/` (untracked). The app's only icon is `App/AppIcon.icon` (T17): an Icon Composer bundle with one transparent foreground layer (`Assets/apple.png`) on a cream fill, from which `actool` also renders the macOS 14/15 `.icns` and legacy renditions. So the swap is a new foreground layer, not a new PNG set. What the pack holds and what it's used for:
+
+| Pack file | Use |
+| --- | --- |
+| `Raccoon Writer logo with transparent background.png` (1254 px, full raccoon holding a USB stick, no tile) | The new foreground layer, `App/AppIcon.icon/Assets/raccoon.png` |
+| `source/icon-master.png` (1024 px, raccoon on the ivory rounded tile) | Reference only: the Default render should look like it, and its tile colour is the fill |
+| `macos/icon_*.png`, `source/icon-small-master.png` (tiles baked in; 16–64 px use a simplified face) | Not used. Baked-in tiles are what T17 removed, and T17 found `actool` ignores an `.appiconset` next to the `.icon`. The `.icon` is rendered at every size from the one layer |
+| `Raccoon Writer icon with transparent background.png` (head only), `web/`, `preview.png`, `README.md`, `verification.json` | Not used; the app has no web or in-app logo |
+
+**Out of scope:** an in-app logo, per-size small artwork, and renaming the repo and folder.
+
+**Agent steps**
+1. Core: `AppInfo` (both names and `bundleIdentifier`). New env keys in `DebugTestMode` and `SimulationMode`. The `FileBackedDevice` temp prefix. Update comments that name the app (`AuthopenOpener`, `DeviceAuthorizer`, `DiskFilter`, `ImageKind` and any others `git grep` finds).
+2. App and project: `git mv` the app struct file and entitlements, then rename the struct. `Info.plist` names. `AppServices.swift`. Update `project.yml` (name, target, scheme, `PRODUCT_NAME`, bundle ID, entitlements and excludes), `scripts/build.sh` and `scripts/check-release-flags.sh`. Delete the stale generated `RedDelicious.xcodeproj` and `build/RedDelicious.app`.
+3. Tests: `AppInfoTests` checks both names and that `shortName` fits 15 characters. Update the strings in `SecurityAuthorizerTests`, `ProgressDisplayTests`, `CoordinatorFaultTests`, `DebugTestModeTests`, `SimulationModeTests`, `ReleaseFlagCheckTests`, `AuthopenOpenerTests`, and every `reddelicious-` prefix and `/nonexistent/reddelicious/` path.
+4. Docs: README (heading, prose, commands, log subsystem, quarantine command; the "formerly" line becomes "formerly Red Delicious Media Writer and before that ISO Sword"). In `docs/HARDWARE_TESTS.md`, update the intro, setup and steps; leave recorded results as they are and extend the pre-T14 names line to cover pre-T23 names. Update the `AGENTS.md` title and this file's title and section 1 rows (app name, bundle ID).
+5. In this file, update the commands in the human steps of the tasks that aren't `DONE` yet (T12, T17, T18) and in T19–T22's steps, so Nick and the next agent run the new names. Leave `DONE` tasks' text, all handoff notes and the change log as history.
+6. Icon:
+   - Copy the transparent logo PNG to `App/AppIcon.icon/Assets/raccoon.png` and `git rm` `apple.png`. Check it the way T17 checked the apple: body pixels should be fully opaque (un-premultiply and set alpha to 255 if the background removal left them slightly transparent), and there should be no baked-in ground shadow, since Icon Composer adds its own. Leave anti-aliased edges alone.
+   - In `icon.json`, point the layer at `raccoon.png` and rename it `raccoon`. Set the solid fill to the ivory sampled from `source/icon-master.png`'s tile. Adjust the layer `scale` (and `translation-in-points` if needed) so the raccoon's framing matches `icon-master.png`. Keep `glass` off, translucency off and the neutral shadow.
+   - Render Default, Dark, ClearLight, ClearDark, TintedLight and TintedDark with `ictool` (inside Icon Composer.app), as T17 did, and look at each one. Also look at the 16 and 32 px renditions in the built `AppIcon.icns`: if the full raccoon is unreadable there, say so in the Handoff notes rather than adding per-size art.
+   - Update T17 so its human check covers the raccoon: its Default acceptance criterion becomes "looks like `source/icon-master.png` from the pack" instead of "looks like the T15 icon", and its human steps say "raccoon" instead of "apple". T17 stays `NEEDS_HUMAN`.
+   - `git grep -i apple -- App README.md` should find no leftover apple icon references.
+7. `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass.
+8. Once step 7 passes, delete `raccoon-writer-branding/`. It's untracked, so git can't bring it back: everything the app uses from it is now under `App/AppIcon.icon/`, and Nick keeps the originals. Don't commit any of it. Fill in Handoff notes, mark `DONE` and commit.
+
+**Acceptance criteria**
+- `plutil -p build/RaccoonWriter.app/Contents/Info.plist` shows `CFBundleDisplayName` and `CFBundleName` "Raccoon Writer", `CFBundleIdentifier` `com.example.raccoonwriter` and `CFBundleExecutable` `RaccoonWriter`.
+- The window title, the password dialog text and the menu bar say "Raccoon Writer".
+- `git grep -i -E "red ?delicious|reddelicious"` matches only history (this file's `DONE` tasks, handoff notes and change log, HARDWARE_TESTS recorded results and the pre-T23 note) and the README "formerly" line.
+- `scripts/test.sh` and `scripts/build.sh --release` pass, including the release flag check with the `RACCOONWRITER_*` markers.
+- `App/AppIcon.icon/` holds `raccoon.png` and no `apple.png`. The `ictool` Default render shows the raccoon on an ivory tile, Dark shows it on a dark tile, and Clear and Tinted show the raccoon shape, not a solid tile.
+- The built app's `AppIcon.icns` and `Assets.car` contain the raccoon.
+- `raccoon-writer-branding/` no longer exists and was never committed.
+
+**Files:** `Sources/ImageWriterCore/` (`AppInfo`, `DebugTestMode`, `Simulation/SimulationMode`, `Fakes/FileBackedDevice`, comments), `App/` (including `AppIcon.icon/`), `project.yml`, `scripts/`, `Tests/`, `README.md`, `docs/HARDWARE_TESTS.md`, `AGENTS.md`, `PLAN.md`; `raccoon-writer-branding/` deleted
+
+**Handoff notes:**
+- _(none yet)_
+
+---
+
 ## 4. Future work (not in scope)
 
 - Rename the GitHub repo and local folder from `iso-sword` to match the app (T14 left them as they are).
@@ -1031,3 +1284,8 @@ Out of scope (Nick chose only these two changes): new wording or a separate titl
 | 2026-10-12 | T16 DONE after Nick's runs: one dialog per write, H15 swap refused, H5 leaves the drive mounted, real-stick write and verify pass | Claude |
 | 2026-10-12 | T17 added: layered Icon Composer icon so the app follows the macOS 26 Dark, Clear and Tinted icon styles | Claude |
 | 2026-10-12 | T17 prep: `App/AppIcon.icon` from Nick's apple artwork replaces the T15 PNG set; NEEDS_HUMAN for the Dock and Finder check | Claude |
+| 2026-10-12 | T19 added from a review finding: the final flush never reaches the drive on raw devices (`F_FULLFSYNC` returns `ENOTTY`, `fsync` does nothing), so flush with `DKIOCSYNCHRONIZE` | Claude |
+| 2026-10-12 | T20 added from a review finding: USB hard drives and SSDs report ejectable, so the default list shows them; fix the README and warn for drives over 500 GB | Claude |
+| 2026-10-12 | T21 added from four review findings: the device descriptor isn't close-on-exec, a partial-block write or read retries misaligned, a same-size replaced image isn't caught, and a diskutil that ignores SIGTERM hangs the timeout path | Claude |
+| 2026-10-12 | T22 added from four review findings: volume names aren't shown, test fakes ship in Release, Info.plist lacks copyright, category and removable-volume usage text, and the Hardened Runtime is off. DiskArbitration (the fifth) left out | Claude |
+| 2026-10-13 | T23 added: rename to Raccoon Writer (`RaccoonWriter`, `com.example.raccoonwriter`, `RACCOONWRITER_*`) and the raccoon icon from Nick's `raccoon-writer-branding/` pack, deleted afterwards; listed above T19 so it is done before T19–T22 | Claude |
