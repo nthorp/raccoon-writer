@@ -224,7 +224,7 @@ struct FailureExplanationTests {
         #expect(reset.instructions.contains("quit and reopen Raccoon Writer"))
 
         let fullDiskAccess = remedies[1]
-        #expect(fullDiskAccess.title == "Or turn on Full Disk Access")
+        #expect(fullDiskAccess.title == "Turn on Full Disk Access")
         #expect(fullDiskAccess.instructions.contains("Privacy & Security › Full Disk Access, turn on Raccoon Writer"))
         #expect(fullDiskAccess.command == nil)
         #expect(fullDiskAccess.note == "Raccoon Writer doesn’t need full disk access, only access to removable drives, which Full Disk Access includes.")

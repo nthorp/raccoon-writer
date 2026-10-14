@@ -19,10 +19,13 @@ struct OutcomeView<Details: View>: View {
             }
             .font(.title2)
 
-            details()
-                .fixedSize(horizontal: false, vertical: true)
-
-            Spacer()
+            // Scrolls only when the window is too short, so the buttons stay in view.
+            ScrollView {
+                details()
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .scrollBounceBehavior(.basedOnSize)
 
             HStack {
                 Spacer()

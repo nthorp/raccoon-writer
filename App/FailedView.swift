@@ -24,9 +24,13 @@ struct FailedView: View {
             secondary: secondaryButton
         ) {
             VStack(alignment: .leading, spacing: 12) {
-                Text(explanation.message)
-                ForEach(explanation.remedies, id: \.title) { remedy in
-                    RemedyView(remedy: remedy)
+                if explanation.remedies.isEmpty {
+                    Text(explanation.message)
+                } else {
+                    NoticeCallout(message: explanation.message)
+                    ForEach(Array(explanation.remedies.enumerated()), id: \.offset) { index, remedy in
+                        RemedyView(letter: RemedyView.letter(for: index), remedy: remedy)
+                    }
                 }
                 Label(explanation.drive.note, systemImage: "externaldrive")
                 Text("Stopped while: \(stage.label.lowercased()).")

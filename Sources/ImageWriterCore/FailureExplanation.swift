@@ -175,7 +175,7 @@ public struct FailureExplanation: Equatable, Sendable {
                     command: "tccutil reset SystemPolicyRemovableVolumes \(AppInfo.bundleIdentifier)"
                 ),
                 FailureRemedy(
-                    title: "Or turn on Full Disk Access",
+                    title: "Turn on Full Disk Access",
                     instructions: "In System Settings, open Privacy & Security › Full Disk Access, turn on \(app), then try again. If macOS asks to quit and reopen \(app), do so.",
                     note: "\(app) doesn’t need full disk access, only access to removable drives, which Full Disk Access includes."
                 ),

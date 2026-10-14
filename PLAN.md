@@ -1469,6 +1469,8 @@ Also, `NSRemovableVolumesUsageDescription` (T22) says the access is for reading 
 - Tests: the remedies and their order, no "Files & Folders" in either, remedies and the button only for this failure, and the jargon check now also covers remedy titles, instructions and notes. 404 tests pass. Rendered with `ImageRenderer` at 540 × 460 (the minimum window) in Light and Dark: everything fits above the buttons.
 - README troubleshooting and H16 updated: step 3 tries the Terminal reset, the new step 3b tries Full Disk Access, and each records whether a relaunch was needed.
 
+**Layout revision, 2026-10-13 (Nick's review of the screen).** The text hierarchy was flat. Now the message sits in the T18 blue `NoticeCallout` (moved out of `ConfirmView.swift` into `App/NoticeCallout.swift`), but only when the failure has remedies, so every other failed screen is unchanged. Each remedy has a blue letter badge (A, B; `RemedyView.letter(for:)`) and a headline title. "Or turn on Full Disk Access" became "Turn on Full Disk Access", since the letters already mark the options. With the callout the content ran one line over at 540 × 460, so `OutcomeView` now puts the details in a `ScrollView` (`scrollBounceBehavior(.basedOnSize)`) in place of the `Spacer`. This is shared by the Done, Failed and Cancelled screens, and keeps the buttons visible in a short window. Checked with an `NSHostingView` render (`ImageRenderer` can't draw scroll views): at 580 × 500 everything fits; at 540 × 460 only "Stopped while…" scrolls below.
+
 ---
 
 ## 4. Future work (not in scope)
@@ -1542,3 +1544,4 @@ Also, `NSRemovableVolumesUsageDescription` (T22) says the access is for reading 
 | 2026-10-13 | T25 prep: `blockedByPrivacySettings` for authopen's "Operation not permitted", failed screen with an "Open Privacy Settings…" button (`FailureAction`), password-only `.permissionDenied` wording, `SimulatedDrive.privacyBlocked` (disk97), new usage text, README troubleshooting, H16; NEEDS_HUMAN for Nick's runs | Claude |
 | 2026-10-13 | T25 BLOCKED: Files & Folders shows only "Full Disk Access" (a silent denied row) for Raccoon Writer and hides the Removable Volumes switch the failed screen points to; needs a decision on the fix to offer | Claude |
 | 2026-10-13 | T25 unblocked by Nick's decision: the failed screen lists a `tccutil` reset and Full Disk Access (with a note that the app doesn't need it), and the button opens Full Disk Access; NEEDS_HUMAN for H16 | Claude |
+| 2026-10-13 | T25 layout: message in the blue notice callout, fixes labelled A and B, outcome details scroll in a short window | Claude |
