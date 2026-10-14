@@ -53,6 +53,20 @@ for required in arm64 x86_64; do
     fi
 done
 
+# Notarization needs the Hardened Runtime. Fail closed: a codesign error counts as missing.
+codesign --verify --strict build/RaccoonWriter.app
+signature="$(codesign -dv build/RaccoonWriter.app 2>&1)" || {
+    echo "error: codesign could not read the signature of build/RaccoonWriter.app:" >&2
+    echo "$signature" >&2
+    exit 1
+}
+if ! grep -Eq '^CodeDirectory .*flags=0x[0-9a-f]+\(([^)]*,)?runtime[,)]' <<<"$signature"; then
+    echo "error: build/RaccoonWriter.app is not signed with the Hardened Runtime:" >&2
+    echo "$signature" >&2
+    exit 1
+fi
+echo "Signature: $(grep -Eo 'flags=0x[0-9a-f]+\([^)]*\)' <<<"$signature" | head -1)"
+
 if [[ "$config" == Release && -x scripts/check-release-flags.sh ]]; then
     scripts/check-release-flags.sh build/RaccoonWriter.app
 fi

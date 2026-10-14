@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 
 /// A `DeviceAuthorizer` that grants a fixed external form or throws a prepared error,
@@ -51,3 +52,4 @@ public final class FakeDeviceAuthorization: DeviceAuthorization, @unchecked Send
         lock.withLock { releases += 1 }
     }
 }
+#endif

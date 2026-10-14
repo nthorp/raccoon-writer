@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 
 /// An `OpenedDevice` backed by a temporary file, for tests and the debug "Simulate" mode.
@@ -220,3 +221,4 @@ public final class FileBackedDevice: OpenedDevice, @unchecked Sendable {
         return Int(min(UInt64(length), byteCount - offset))
     }
 }
+#endif

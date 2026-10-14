@@ -130,7 +130,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T20 | 🧑 Warn for drives over 500 GB; README says USB hard drives are listed | T18 | DONE | 2026-10-13 | Claude (prep) / Nick (check) |
 | T21 | Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill | T16 | DONE | 2026-10-13 | Claude |
 | T24 | Smaller app: optimized raccoon layer, stripped Release binary | T23 | DONE | 2026-10-13 | Claude |
-| T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | TODO | | Claude (prep) / Nick (run) |
+| T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -274,7 +274,7 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - **Deviations:**
   1. `permissionDenied` and `deviceBusy` carry no payload, as the plan lists them. The stderr text goes to the log.
   2. Added `invalidDiskName`, `authopenTerminated` and `posix` cases to `DeviceOpenError`.
-  3. The fakes live in the library, not the test target, and are **not** wrapped in `#if DEBUG`, because T10's Simulate mode needs them in the app. They only touch temp files. T10 should gate its use of them behind `#if DEBUG`.
+  3. The fakes live in the library, not the test target, and are **not** wrapped in `#if DEBUG`, because T10's Simulate mode needs them in the app. They only touch temp files. T10 should gate its use of them behind `#if DEBUG`. **Superseded by T22:** every file in `Fakes/` is now wrapped in `#if DEBUG`.
   4. The process tests run `/bin/sh` stand-in scripts through the internal `AuthopenOpener(executable:)` to cover spawn, argv, stderr capture, cancel, exit 0 without an fd, a signal and `ENOENT`. The public `init()` always uses `/usr/libexec/authopen`.
 
 ---
@@ -1229,7 +1229,27 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
 **Files:** `Sources/ImageWriterCore/` (`DisplayFormat`, every file in `Fakes/`), `App/` (`DriveSection.swift`, `ConfirmView.swift`, `PreviewSamples.swift`, `Info.plist`), `project.yml`, `scripts/build.sh`, `scripts/check-release-flags.sh`, `Tests/ImageWriterCoreTests/` (`DisplayFormatTests`, `DiskutilDiscoveryTests`, `ReleaseFlagCheckTests`, a new Info.plist test), `README.md`, `docs/HARDWARE_TESTS.md` (record the results), `PLAN.md`
 
 **Handoff notes:**
-- _(none yet)_
+- **A. Volume names.** `DisplayFormat.volumeNames(of:)` returns the names joined with ", ", or nil. `DriveRow` puts them first on the details line (`lineLimit(1)`, middle truncation); `ConfirmView` has a "Volume names:" row above "Mounted volumes:" only when there are names, passed as a `String` value. `PreviewSamples` adds `twoVolumeStick` (`EFI`, `PHOTOS`) and `blankStick` (none); new previews "Two volumes" and "No volumes" in `ConfirmView`, and the drive list preview shows both.
+  - Fixture: `disk5s1` in `list.plist` is an unmounted `EFI` partition with a `VolumeName`. New test `DiskutilDiscoveryTests.unmountedVolumeNameIsListed`.
+  - **Names include `EFI`.** Discovery lists every partition's `VolumeName`, so a GPT stick formatted by Disk Utility shows "EFI, STICK". The plan says to keep the existing order and not filter, so it is left as is. Nick can say in human step 2 whether to hide `EFI`.
+  - **Cancelled prompt:** `SimulationModeTests.cancelledPromptReturnsToTheConfirmScreen` now checks that the disk in `.awaitingConfirmation` after the disk93 cancel formats as `/Volumes/SIM93`, not "none". The coordinator returns the selected `DiskInfo` unchanged and unmounts nothing before the prompt. **Deviation:** the agent can't click through the GUI in this session, so the Simulate click-through is a unit test plus code reading. It is added as human step 0.
+- **B. Debug-only fakes.** All eight `Fakes/` files are wrapped in `#if DEBUG`. Nothing outside `Fakes/` and `Simulation/` used them (only two doc comments name them), so no caller needed gating. `FakeDeviceOpener`, `FileBackedDevice` and `StaticBootDiskResolver` are new markers in `check-release-flags.sh` and `ReleaseFlagCheckTests` (with `String(describing:)` checks). `strings -a` on the Release executable finds none of the eight names. The Release executable went from 1,495,856 bytes (T24) to 1,402,256, and the app from 4,564 to 4,472 KiB by `du -sk`.
+  - `swift test -c release` already failed before T22 (`@testable import` needs `-enable-testing`). With `-Xswiftc -enable-testing` it now fails with "cannot find 'FakeDeviceOpener' in scope" and similar for all eight types, as intended.
+- **C. Info.plist.** The three keys were added; `InfoPlistTests` reads `App/Info.plist` from `#filePath`. `plutil -p` on the built app shows all three.
+- **D. Hardened Runtime.** `ENABLE_HARDENED_RUNTIME: YES` alone did **not** add the flag (`flags=0x2(adhoc)`), because Xcode skips it for ad-hoc `-` signing. **Deviation:** `OTHER_CODE_SIGN_FLAGS: "--options=runtime"` is added too; the setting stays on for a later Developer ID signature. Both builds now show `flags=0x10002(adhoc,runtime)`. No new entitlements; Release has only `app-sandbox = false`.
+  - The Debug app then crashed at launch: dyld refused `RaccoonWriter.debug.dylib` ("mapping process and mapped file (non-platform) have different Team IDs"). As the plan allows, `ENABLE_DEBUG_DYLIB: NO` is set for Debug. The app now launches with `RACCOONWRITER_SIMULATE=1` and stays up. Previews may run in Xcode's older, slower mode; that wasn't checked.
+  - `scripts/build.sh` runs `codesign --verify --strict`, then fails if `codesign -dv` fails or its `CodeDirectory` line lacks `runtime` in the flags. It prints the flags. The check failed the first build as it should.
+  - README: Limitations says the Hardened Runtime is on; the safety list and the USB hard drive item mention volume names.
+- `scripts/test.sh` (396 tests in Swift Testing's count), `scripts/build.sh` and `scripts/build.sh --release` pass. The only Release warning is the existing `PosixIO.swift:36` one.
+- `docs/HARDWARE_TESTS.md` is unchanged until Nick's results are in; record them there (H5 for step 2, H2 for step 4) and here.
+
+**Instructions for Nick.** Keep `log stream --predicate 'subsystem == "com.example.raccoonwriter"' --info` open in a second Terminal window. `scripts/build.sh` and `scripts/build.sh --release` both write `build/RaccoonWriter.app`, so build the one each step names right before it.
+0. **Simulate click-through, Debug** (added: the agent couldn't drive the GUI). `scripts/build.sh`, then `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`. Choose any image. Each simulated drive row starts with its volume name, for example "SIM90 · 16 GB · /dev/disk90 · USB". Run `disk90` through to Done. Then pick `disk93`, Continue…, Erase and Write; after the simulated dialog is cancelled, the confirm screen shows "Volume names: SIM93" and "Mounted volumes: /Volumes/SIM93", with the T18 callout on top.
+1. **Copyright.** Confirm or correct "Copyright © 2026 Nicholas Thorp." in `App/Info.plist`. Then `scripts/build.sh --release`, `open build/RaccoonWriter.app`, and check the line in Raccoon Writer > About Raccoon Writer.
+2. **Volume names, Release, Cruzer Glide.** With the stick's volume mounted, its row shows the volume name first. Continue…: the confirm screen shows "Volume names:" and "Mounted volumes:". Cancel the password dialog: both rows are still there below the callout. Then Cancel, eject the **volume** in Finder (not the drive), press Refresh, and record whether the name is still on the row. Also say whether "EFI" appears and whether it should be hidden.
+3. **Hardened Runtime, Release, Cruzer Glide.** One full write and verify. The dialog names the app, the write and verify pass, and the drive ejects. Note anything unusual in the log.
+4. **Hardened Runtime, Debug, RAM disk.** `scripts/build.sh`, make a RAM disk as in H2 step 2 (`hdiutil attach -nomount ram://65536` is enough for a 32 MiB image), then `RACCOONWRITER_ALLOW_VIRTUAL_DISKS=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`. One full write and verify passes.
+5. **Optional, privacy prompt.** With the image on a second USB volume (not the target), choose it. Record whether the removable-volume prompt appears and, if so, that it shows the new text. If none appears, run `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter` and try again.
 
 ---
 
@@ -1427,3 +1447,4 @@ Expected result: about 4.2 MB.
 | 2026-10-13 | T21 DONE: received device descriptor is close-on-exec; partial-block transfers stop with `partialBlock` errors; `FileIdentity` (inode, size, mtime) checked when the image is opened and after verify; `ProcessCommandRunner` escalates to SIGKILL and bounds every wait | Claude |
 | 2026-10-13 | T24 added: the Release app grew from 2.9 MB to 7.0 MB (icon layer and unstripped binary); swap in Nick's optimized 1024 px raccoon layer and strip Release builds; listed above T22 so it is done next | Claude |
 | 2026-10-13 | T24 DONE: optimized layer at scale 0.918 (T23 framing), Release binary stripped with its dSYM kept in `build/`, sizes printed by `build.sh`; app 7.0 → 4.67 MB. Size limit raised from 4.5 to 4.8 MB with Nick's approval, since the 4.2 MB estimate assumed a smaller raccoon | Claude |
+| 2026-10-13 | T22 prep: volume names in the drive list and on the confirm screen; `Fakes/` debug-only with three new release markers; copyright, category and removable-volume keys in Info.plist; Hardened Runtime on (needs `--options=runtime` for ad-hoc signing, and `ENABLE_DEBUG_DYLIB: NO` in Debug), checked by `build.sh`; NEEDS_HUMAN for Nick's runs | Claude |

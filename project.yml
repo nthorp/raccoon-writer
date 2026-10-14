@@ -33,13 +33,20 @@ targets:
         CODE_SIGN_ENTITLEMENTS: App/RaccoonWriter.entitlements
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Manual
-        ENABLE_HARDENED_RUNTIME: NO
+        ENABLE_HARDENED_RUNTIME: YES
+        # Xcode ignores ENABLE_HARDENED_RUNTIME for ad-hoc ("-") signing, so ask for it
+        # directly. scripts/build.sh fails if the signature lacks the runtime flag.
+        OTHER_CODE_SIGN_FLAGS: "--options=runtime"
         ARCHS: "arm64 x86_64"
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
       configs:
         Debug:
           ONLY_ACTIVE_ARCH: YES
+          # Library validation under the Hardened Runtime refuses the separately signed
+          # Xcode 16 .debug.dylib (ad-hoc signatures have no Team ID to match), and the
+          # app dies at launch. Only SwiftUI previews use that dylib.
+          ENABLE_DEBUG_DYLIB: NO
         Release:
           ONLY_ACTIVE_ARCH: NO
           # Stripping only happens when DEPLOYMENT_POSTPROCESSING is on, and plain

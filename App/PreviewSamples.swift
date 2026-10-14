@@ -29,6 +29,20 @@ enum PreviewSamples {
         isVirtual: false, isWholeDisk: true, mountPoints: ["/Volumes/STICK"], volumeNames: ["STICK"]
     )
 
+    /// A GPT stick formatted by Disk Utility: the EFI partition is named but not mounted.
+    static let twoVolumeStick = DiskInfo(
+        bsdName: "disk8", mediaName: "SanDisk Cruzer Glide", sizeBytes: 15_376_318_464, blockSize: 512,
+        busProtocol: "USB", isInternal: false, isRemovable: true, isEjectable: true,
+        isVirtual: false, isWholeDisk: true, mountPoints: ["/Volumes/PHOTOS"], volumeNames: ["EFI", "PHOTOS"]
+    )
+
+    /// No partitions with names, e.g. a stick that held a raw image diskutil can't read.
+    static let blankStick = DiskInfo(
+        bsdName: "disk9", mediaName: "Generic Flash Disk", sizeBytes: 7_864_320_000, blockSize: 512,
+        busProtocol: "USB", isInternal: false, isRemovable: true, isEjectable: true,
+        isVirtual: false, isWholeDisk: true
+    )
+
     static let ssd = DiskInfo(
         bsdName: "disk5", mediaName: "Samsung T7", sizeBytes: 500_107_862_016, blockSize: 512,
         busProtocol: "PCI-Express", isInternal: false, isRemovable: false, isEjectable: true,
@@ -48,7 +62,7 @@ enum PreviewSamples {
         isVirtual: false, isWholeDisk: true, mountPoints: ["/Volumes/OLD"], volumeNames: ["OLD"]
     )
 
-    static let drives = [stick, ssd]
+    static let drives = [stick, twoVolumeStick, ssd]
 
     static func progress(_ fraction: Double, speed: Double? = 31_400_000) -> TransferProgress {
         TransferProgress(

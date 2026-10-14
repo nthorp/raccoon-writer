@@ -35,6 +35,14 @@ struct ConfirmView: View {
             }
 
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
+                // A String value, not a literal, so a name is never read as Markdown or a
+                // localization key.
+                if let names = DisplayFormat.volumeNames(of: disk) {
+                    GridRow {
+                        Text("Volume names:").foregroundStyle(.secondary)
+                        Text(names)
+                    }
+                }
                 GridRow {
                     Text("Mounted volumes:").foregroundStyle(.secondary)
                     Text(DisplayFormat.mountPoints(of: disk))
@@ -91,6 +99,18 @@ private struct NoticeCallout: View {
 #if DEBUG
 #Preview("Awaiting confirmation") {
     ConfirmView(image: PreviewSamples.image, disk: PreviewSamples.stick, notice: nil, onCancel: {}, onConfirm: {})
+        .padding(24)
+        .frame(width: 580, height: 500)
+}
+
+#Preview("Two volumes") {
+    ConfirmView(image: PreviewSamples.image, disk: PreviewSamples.twoVolumeStick, notice: nil, onCancel: {}, onConfirm: {})
+        .padding(24)
+        .frame(width: 580, height: 500)
+}
+
+#Preview("No volumes") {
+    ConfirmView(image: PreviewSamples.image, disk: PreviewSamples.blankStick, notice: nil, onCancel: {}, onConfirm: {})
         .padding(24)
         .frame(width: 580, height: 500)
 }

@@ -104,6 +104,9 @@ private struct DriveRow: View {
                 Text(details)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    // Middle, so a long list of volume names can't push the device path out.
+                    .truncationMode(.middle)
                 if isTooSmall {
                     Text("Too small for this image")
                         .font(.caption)
@@ -119,8 +122,10 @@ private struct DriveRow: View {
         .padding(.vertical, 2)
     }
 
+    /// Volume names first: "STICK" tells two identical sticks apart better than "disk4".
     private var details: String {
         var parts = [DisplayFormat.size(disk.sizeBytes), disk.devicePath]
+        if let names = DisplayFormat.volumeNames(of: disk) { parts.insert(names, at: 0) }
         if let bus = disk.busProtocol { parts.append(bus) }
         return parts.joined(separator: " · ")
     }
@@ -136,14 +141,14 @@ private struct DriveRow: View {
     .frame(width: 540, height: 240)
 }
 
-#Preview("Drives, one large") {
+#Preview("Drives, one large, one unnamed") {
     DriveSection(
-        drives: PreviewSamples.drives + [PreviewSamples.usbHardDrive], image: PreviewSamples.image,
+        drives: PreviewSamples.drives + [PreviewSamples.usbHardDrive, PreviewSamples.blankStick], image: PreviewSamples.image,
         selected: PreviewSamples.usbHardDrive, isEnabled: true, hasLoaded: true, errorMessage: nil,
         showAllExternal: .constant(true), onSelect: { _ in }, onRefresh: {}
     )
     .padding()
-    .frame(width: 540, height: 300)
+    .frame(width: 540, height: 340)
 }
 
 #Preview("Error") {

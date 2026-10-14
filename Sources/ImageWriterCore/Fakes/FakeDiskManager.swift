@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 
 /// A `DiskManager` that records calls and fails on request, for tests and the debug
@@ -49,3 +50,4 @@ public final class FakeDiskManager: DiskManager, @unchecked Sendable {
         if let error { throw error }
     }
 }
+#endif

@@ -41,6 +41,13 @@ struct DiskutilDiscoveryTests {
         #expect(container.mountPoints == ["/Volumes/Backup"])
     }
 
+    /// disk5s1 (EFI) has a `VolumeName` and no mount point; the name is still listed.
+    @Test func unmountedVolumeNameIsListed() async throws {
+        let ssd = try #require(try await disks()["disk5"])
+        #expect(ssd.volumeNames.contains("EFI"))
+        #expect(!ssd.mountPoints.contains { $0.hasSuffix("/EFI") })
+    }
+
     @Test func realInternalCaptures() async throws {
         let disks = try await disks()
         let builtIn = try #require(disks["disk0"])

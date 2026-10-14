@@ -8,7 +8,8 @@ set -euo pipefail
 # Keep in sync with Sources/ImageWriterCore/DebugTestMode.swift and
 # Simulation/SimulationMode.swift; a unit test checks that the environment keys match.
 # The type and property names catch the code itself leaking even if a key string were
-# to change.
+# to change. The Fakes/ names are the ones that would do harm in a shipped app: an opener
+# that approves everything, a temp file posing as a device, and a fixed boot disk.
 markers=(
     RACCOONWRITER_ALLOW_VIRTUAL_DISKS
     DebugTestMode
@@ -16,6 +17,9 @@ markers=(
     RACCOONWRITER_SIMULATE
     SimulationMode
     SimulatedDrive
+    FakeDeviceOpener
+    FileBackedDevice
+    StaticBootDiskResolver
 )
 
 if [[ $# -ne 1 ]]; then

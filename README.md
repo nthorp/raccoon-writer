@@ -12,7 +12,8 @@ Several checks keep the wrong disk from being written:
 
 - **The drive list hides disks that are never safe targets.** The boot disk (including its APFS container and the physical disk behind it) and every internal disk never appear, under any setting. By default the list shows external USB drives that macOS reports as removable or ejectable. That covers USB sticks and card readers, but also most USB hard drives and SSDs, so a backup or Time Machine drive can appear. "Show all external disks" adds other external disks, such as Thunderbolt SSDs. If the app can't work out which disk is the boot disk, the list stays empty.
 - **Drives over 500 GB are marked "Large drive"** in the list, and the confirm screen warns that the drive may be a backup or external hard drive. USB sticks are rarely that big. The warning doesn't stop the write.
-- **A confirm screen** shows the drive's name, size, `/dev/diskN` and mounted volumes, and requires a click on **Erase and Write**.
+- **Volume names are shown** on each drive's row in the list (for example "STICK · 16 GB · /dev/disk4 · USB") and on the confirm screen, so two identical sticks can be told apart.
+- **A confirm screen** shows the drive's name, size, `/dev/diskN`, volume names and mounted volumes, and requires a click on **Erase and Write**.
 - **macOS asks for an administrator password** before every write, in a dialog that names Raccoon Writer. The app hands the resulting authorization to `authopen`, the macOS tool that opens the disk and passes it back. The app itself never runs as root.
 - **A safety check right after the password dialog** queries the disk again and stops if it has disappeared, changed (different size, name, block size or bus), or no longer passes the filter. It runs after the dialog, not before, because the dialog can stay open indefinitely: if the drive is unplugged meanwhile, another disk can take over its `/dev/diskN` name.
 - **The opened disk is checked too.** Its size and block size must match the disk the safety check just approved, or nothing is written.
@@ -79,11 +80,11 @@ Select image → Select drive → Confirm
 - **No compressed images.** Decompress `.xz`, `.gz` or `.zip` images first (for example `xz -dk image.img.xz`).
 - **One drive at a time.** No persistence partitions.
 - **SD cards in a Mac's built-in slot are not listed.** macOS reports the built-in reader as an internal disk, and Raccoon Writer never shows internal disks. Use a USB card reader instead.
-- **USB hard drives and SSDs are listed by default.** macOS reports most of them as ejectable, like sticks, so the app can't tell them apart reliably. Drives over 500 GB get a "Large drive" warning; a smaller backup drive doesn't, so check the name and size on the confirm screen.
+- **USB hard drives and SSDs are listed by default.** macOS reports most of them as ejectable, like sticks, so the app can't tell them apart reliably. Drives over 500 GB get a "Large drive" warning; a smaller backup drive doesn't, so check the name, volume names and size on the confirm screen.
 - **A password prompt on every write.** The app discards the authorization as soon as the disk is open, so the next write asks again.
 - **Two identical drives look the same.** The checks compare size, name, block size and bus. If you swap in an identical drive while the password dialog is open, that drive is written. Don't swap drives during a write.
 - **The password dialog has no custom icon yet.** macOS also adds its own headline above the app's message, which can't be removed.
-- **Not signed or notarized.** Build from source. A copy downloaded or AirDropped from elsewhere is blocked by Gatekeeper until you remove the quarantine flag (`xattr -dr com.apple.quarantine RaccoonWriter.app`).
+- **Not signed or notarized.** Build from source. A copy downloaded or AirDropped from elsewhere is blocked by Gatekeeper until you remove the quarantine flag (`xattr -dr com.apple.quarantine RaccoonWriter.app`). The Hardened Runtime is already on, so notarization only needs a Developer ID signature.
 - English only. No drag-and-drop and no checksum display.
 
 ## Roadmap

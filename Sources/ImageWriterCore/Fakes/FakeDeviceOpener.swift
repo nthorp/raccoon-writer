@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 
 /// A `DeviceOpener` that grants every authorization (or throws a prepared error) and
@@ -84,3 +85,4 @@ public final class FakeDeviceGrant: DeviceGrant, @unchecked Sendable {
         lock.withLock { releases += 1 }
     }
 }
+#endif

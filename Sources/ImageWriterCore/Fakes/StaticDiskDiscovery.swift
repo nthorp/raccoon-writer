@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 
 /// A `DiskDiscovery` that always lists the same disks, for the debug Simulate mode.
@@ -10,3 +11,4 @@ public struct StaticDiskDiscovery: DiskDiscovery {
 
     public func listDisks() async throws -> [DiskInfo] { disks }
 }
+#endif

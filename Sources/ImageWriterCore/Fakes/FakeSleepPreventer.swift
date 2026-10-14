@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 
 /// A `SleepPreventer` that only counts, for tests and the debug Simulate mode.
@@ -39,3 +40,4 @@ public final class FakeSleepPreventer: SleepPreventer, @unchecked Sendable {
         }
     }
 }
+#endif

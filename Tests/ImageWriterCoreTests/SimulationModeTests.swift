@@ -87,7 +87,14 @@ final class SimulationModeTests {
 
     @Test func cancelledPromptReturnsToTheConfirmScreen() async throws {
         let state = try await run(on: .promptCancelled)
-        #expect(state.phase == .awaitingConfirmation)
+        guard case .awaitingConfirmation(_, let disk) = state else {
+            Issue.record("Expected awaitingConfirmation, got \(state)")
+            return
+        }
+        // Since T16 nothing is unmounted before the prompt, so the confirm screen still
+        // shows the volume rather than "none".
+        #expect(DisplayFormat.mountPoints(of: disk) == "/Volumes/SIM93")
+        #expect(DisplayFormat.volumeNames(of: disk) == "SIM93")
     }
 
     @Test func usbHardDriveFinishesWithTheLargeDriveWarning() async throws {

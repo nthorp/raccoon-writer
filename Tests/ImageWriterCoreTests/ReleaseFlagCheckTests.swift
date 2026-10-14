@@ -14,6 +14,7 @@ struct ReleaseFlagCheckTests {
     static let markers = [
         "RACCOONWRITER_ALLOW_VIRTUAL_DISKS", "DebugTestMode", "allowVirtualDisks",
         "RACCOONWRITER_SIMULATE", "SimulationMode", "SimulatedDrive",
+        "FakeDeviceOpener", "FileBackedDevice", "StaticBootDiskResolver",
     ]
 
     /// A minimal `.app` whose executable holds `contents`. Removed by the caller.
@@ -95,6 +96,9 @@ struct ReleaseFlagCheckTests {
         #expect(Self.markers.contains(SimulationMode.environmentKey))
         #expect(String(describing: SimulationMode.self) == "SimulationMode")
         #expect(String(describing: SimulatedDrive.self) == "SimulatedDrive")
+        #expect(String(describing: FakeDeviceOpener.self) == "FakeDeviceOpener")
+        #expect(String(describing: FileBackedDevice.self) == "FileBackedDevice")
+        #expect(String(describing: StaticBootDiskResolver.self) == "StaticBootDiskResolver")
 #endif
     }
 }

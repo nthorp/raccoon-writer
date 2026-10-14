@@ -58,6 +58,12 @@ public enum DisplayFormat {
         disk.mountPoints.isEmpty ? "none" : disk.mountPoints.joined(separator: ", ")
     }
 
+    /// Volume names as diskutil lists them, mounted or not: "STICK, DATA". Nil when the
+    /// drive has none, so callers can leave the name out rather than show a placeholder.
+    public static func volumeNames(of disk: DiskInfo) -> String? {
+        disk.volumeNames.isEmpty ? nil : disk.volumeNames.joined(separator: ", ")
+    }
+
     private static func rounded(_ value: Double) -> Double {
         value < 100 ? (value * 10).rounded() / 10 : value.rounded()
     }

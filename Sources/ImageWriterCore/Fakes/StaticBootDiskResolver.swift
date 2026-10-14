@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 
 /// A `BootDiskResolving` that always returns the same boot disks, for the debug
@@ -17,3 +18,4 @@ public struct StaticBootDiskResolver: BootDiskResolving {
         return bootDisks
     }
 }
+#endif

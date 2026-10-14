@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 
 /// A `CommandRunner` that answers from canned results (fixture plists), for tests
@@ -31,3 +32,4 @@ public final class FakeCommandRunner: CommandRunner, @unchecked Sendable {
         return try handler(executable, arguments)
     }
 }
+#endif

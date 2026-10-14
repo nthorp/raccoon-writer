@@ -68,4 +68,21 @@ struct DisplayFormatTests {
         disk.mountPoints = []
         #expect(DisplayFormat.mountPoints(of: disk) == "none")
     }
+
+    @Test func volumeNames() {
+        var disk = DiskInfo.usbStick()
+        disk.volumeNames = ["STICK", "DATA", "EFI"]
+        #expect(DisplayFormat.volumeNames(of: disk) == "STICK, DATA, EFI")
+        disk.volumeNames = ["STICK"]
+        #expect(DisplayFormat.volumeNames(of: disk) == "STICK")
+        disk.volumeNames = []
+        #expect(DisplayFormat.volumeNames(of: disk) == nil)
+    }
+
+    /// Names are user-controlled; they must come back as typed, not escaped or parsed.
+    @Test func volumeNamesWithMarkdownCharactersAreUnchanged() {
+        var disk = DiskInfo.usbStick()
+        disk.volumeNames = ["*BOLD*", "[link](x)"]
+        #expect(DisplayFormat.volumeNames(of: disk) == "*BOLD*, [link](x)")
+    }
 }
