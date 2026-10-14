@@ -126,7 +126,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T17 | 🧑 Layered app icon (Icon Composer) with dark variant | T15 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
 | T18 | 🧑 Make the password-cancelled notice stand out | T16 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
 | T23 | Rename to Raccoon Writer, with the raccoon icon | T16 | DONE | 2026-10-13 | Claude |
-| T19 | 🧑 Flush the drive cache with `DKIOCSYNCHRONIZE` | T16 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T19 | 🧑 Flush the drive cache with `DKIOCSYNCHRONIZE` | T16 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
 | T20 | 🧑 Warn for drives over 500 GB; README says USB hard drives are listed | T18 | TODO | | Claude (prep) / Nick (check) |
 | T21 | Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill | T16 | TODO | | Claude |
 | T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | TODO | | Claude (prep) / Nick (run) |
@@ -1036,6 +1036,11 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
   2. **Real USB stick (the Cruzer Glide), Release build.** Run `scripts/build.sh --release`, then `open build/RaccoonWriter.app`. Write any image to the stick, for example the Fedora ISO from H6, and let it verify. It should pass. **Copy the `fullSync used …` line.** The expected result is `DKIOCSYNCHRONIZE`. If it says `F_FULLFSYNC` or `fsync fallback`, also copy the `fullSync skipped …` lines, because they give the errno.
 
   Then tell the agent the results. If the stick used `DKIOCSYNCHRONIZE`, the agent records the results here and in `docs/HARDWARE_TESTS.md` and marks T19 `DONE`. If not, the agent updates the README to say what the app actually does and decides with Nick whether the older `DKIOCSYNCHRONIZECACHE` is worth trying.
+- **Human results, 2026-10-13, commit `169b386`:**
+  - **Step 1 (Debug, RAM disk):** write and verify passed, and the RAM disk was ejected. Log: `20:32:18.191924 … RaccoonWriter: (RaccoonWriter.debug.dylib) [com.example.raccoonwriter:device] fullSync used DKIOCSYNCHRONIZE`, with no `skipped` lines. So the RAM disk driver supports `DKIOCSYNCHRONIZE`, though it returned `ENOTTY` for `F_FULLFSYNC` in T01.
+  - **Step 2 (Release, the Cruzer Glide):** `ram-test.img` written; write and verify passed, and the stick was ejected. Log: `20:35:54.857664 … RaccoonWriter: [com.example.raccoonwriter:device] fullSync used DKIOCSYNCHRONIZE`, with no `skipped` lines. The stick now gets a real cache flush before success is reported.
+  - The verify passing is inferred from the eject: the coordinator ejects only after `Verifier` succeeds.
+- **Acceptance:** every criterion is met. `DKIOCSYNCHRONIZECACHE` isn't needed. Marked `DONE`.
 
 ---
 
@@ -1316,3 +1321,4 @@ Keep `AppInfo.shortName` even though it now equals `displayName`, so code that u
 | 2026-10-13 | T23 added: rename to Raccoon Writer (`RaccoonWriter`, `com.example.raccoonwriter`, `RACCOONWRITER_*`) and the raccoon icon from Nick's `raccoon-writer-branding/` pack, deleted afterwards; listed above T19 so it is done before T19–T22 | Claude |
 | 2026-10-13 | T23 DONE: app renamed to Raccoon Writer (`RaccoonWriter`, `com.example.raccoonwriter`, `RACCOONWRITER_*`); raccoon layer in `App/AppIcon.icon`; branding folder deleted | Claude |
 | 2026-10-13 | T19 prep: `DKIOCSYNCHRONIZE` is the first flush method, then `F_FULLFSYNC`, then `fsync`; skipped methods logged with their errno; NEEDS_HUMAN for the RAM-disk and Cruzer Glide runs | Claude |
+| 2026-10-13 | T19 DONE after Nick's runs: both the RAM disk and the Cruzer Glide flush with `DKIOCSYNCHRONIZE` | Claude |
