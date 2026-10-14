@@ -10,7 +10,7 @@ struct CancelledView: View {
             systemImage: "stop.circle.fill",
             tint: .secondary,
             title: "Cancelled",
-            buttonTitle: "Start Again",
+            buttonTitle: "Start Over",
             action: onStartAgain
         ) {
             VStack(alignment: .leading, spacing: 12) {

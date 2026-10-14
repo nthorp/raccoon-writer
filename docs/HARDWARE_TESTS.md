@@ -243,7 +243,7 @@ The main end-to-end test. Also records the flush method on a real stick.
 **Expected**
 - The button changes to "Cancelling…" and is disabled. Within a second or two the screen shows "Cancelled", "Stopped while: writing." and "The drive may be partially written and is not bootable…".
 - The log shows no `fullSync used` line for this run.
-- **Start Again** returns to the setup screen with the image kept, and the drive must be picked again.
+- **Start Over** returns to the setup screen with the image kept, and the drive must be picked again.
 - Writing again to the same stick then succeeds (it can be combined with H9).
 
 **Result:** PASS
