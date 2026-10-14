@@ -34,8 +34,8 @@ final class SimulationModeTests {
         let usb = try await lister.targets(filter: DiskFilter(showAllExternal: false)).map(\.bsdName)
         let all = try await lister.targets(filter: DiskFilter(showAllExternal: true)).map(\.bsdName)
 
-        #expect(usb == ["disk90", "disk91", "disk92", "disk93", "disk94"])
-        #expect(all == usb + ["disk95"])
+        #expect(usb == ["disk90", "disk91", "disk92", "disk93", "disk94", "disk96"])
+        #expect(all == ["disk90", "disk91", "disk92", "disk93", "disk94", "disk95", "disk96"])
         #expect(!all.contains(SimulatedDrive.internalDisk.bsdName))
     }
 
@@ -88,6 +88,17 @@ final class SimulationModeTests {
     @Test func cancelledPromptReturnsToTheConfirmScreen() async throws {
         let state = try await run(on: .promptCancelled)
         #expect(state.phase == .awaitingConfirmation)
+    }
+
+    @Test func usbHardDriveFinishesWithTheLargeDriveWarning() async throws {
+        #expect(LargeDriveWarning(drive: SimulatedDrive.usbHardDrive.disk) != nil)
+        #expect(LargeDriveWarning(drive: SimulatedDrive.working.disk) == nil)
+        let state = try await run(on: .usbHardDrive)
+        guard case .finished(let summary) = state else {
+            Issue.record("Expected finished, got \(state)")
+            return
+        }
+        #expect(summary.bsdName == "disk96")
     }
 
     @Test func smallDriveCannotBeConfirmed() async throws {

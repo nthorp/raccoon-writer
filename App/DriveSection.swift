@@ -57,7 +57,11 @@ struct DriveSection: View {
             )
         } else {
             List(drives, selection: selection) { disk in
-                DriveRow(disk: disk, isTooSmall: image.flatMap { DriveTooSmall(image: $0, drive: disk) } != nil)
+                DriveRow(
+                    disk: disk,
+                    isTooSmall: image.flatMap { DriveTooSmall(image: $0, drive: disk) } != nil,
+                    isLarge: LargeDriveWarning(drive: disk) != nil
+                )
             }
             .listStyle(.bordered(alternatesRowBackgrounds: false))
         }
@@ -87,6 +91,7 @@ struct DriveSection: View {
 private struct DriveRow: View {
     let disk: DiskInfo
     let isTooSmall: Bool
+    let isLarge: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -101,6 +106,11 @@ private struct DriveRow: View {
                     .foregroundStyle(.secondary)
                 if isTooSmall {
                     Text("Too small for this image")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                if isLarge {
+                    Text("Large drive")
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
@@ -124,6 +134,16 @@ private struct DriveRow: View {
     )
     .padding()
     .frame(width: 540, height: 240)
+}
+
+#Preview("Drives, one large") {
+    DriveSection(
+        drives: PreviewSamples.drives + [PreviewSamples.usbHardDrive], image: PreviewSamples.image,
+        selected: PreviewSamples.usbHardDrive, isEnabled: true, hasLoaded: true, errorMessage: nil,
+        showAllExternal: .constant(true), onSelect: { _ in }, onRefresh: {}
+    )
+    .padding()
+    .frame(width: 540, height: 300)
 }
 
 #Preview("Error") {

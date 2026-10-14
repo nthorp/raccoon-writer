@@ -28,6 +28,12 @@ struct ConfirmView: View {
             )
             .fixedSize(horizontal: false, vertical: true)
 
+            if let largeDrive = LargeDriveWarning(drive: disk) {
+                Label(largeDrive.message, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
                 GridRow {
                     Text("Mounted volumes:").foregroundStyle(.secondary)
@@ -87,6 +93,18 @@ private struct NoticeCallout: View {
     ConfirmView(image: PreviewSamples.image, disk: PreviewSamples.stick, notice: nil, onCancel: {}, onConfirm: {})
         .padding(24)
         .frame(width: 580, height: 500)
+}
+
+#Preview("Large drive") {
+    ConfirmView(image: PreviewSamples.image, disk: PreviewSamples.usbHardDrive, notice: nil, onCancel: {}, onConfirm: {})
+        .padding(24)
+        .frame(width: 580, height: 500)
+}
+
+#Preview("Large drive, back after the password dialog was cancelled") {
+    ConfirmView(image: PreviewSamples.image, disk: PreviewSamples.usbHardDrive, notice: .passwordPromptCancelled, onCancel: {}, onConfirm: {})
+        .padding(24)
+        .frame(width: 540, height: 500)
 }
 
 #Preview("Back after the password dialog was cancelled") {

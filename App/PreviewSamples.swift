@@ -30,6 +30,13 @@ enum PreviewSamples {
         isVirtual: false, isWholeDisk: true, mountPoints: ["/Volumes/Backup"], volumeNames: ["Backup"]
     )
 
+    /// Over the `LargeDriveWarning` threshold; ejectable-only, as USB hard drives report.
+    static let usbHardDrive = DiskInfo(
+        bsdName: "disk7", mediaName: "WD Elements", sizeBytes: 2_000_398_934_016, blockSize: 512,
+        busProtocol: "USB", isInternal: false, isRemovable: false, isEjectable: true,
+        isVirtual: false, isWholeDisk: true, mountPoints: ["/Volumes/Time Machine"], volumeNames: ["Time Machine"]
+    )
+
     static let tinyStick = DiskInfo(
         bsdName: "disk6", mediaName: "Kingston DataTraveler", sizeBytes: 2_000_683_008, blockSize: 512,
         busProtocol: "USB", isInternal: false, isRemovable: true, isEjectable: true,

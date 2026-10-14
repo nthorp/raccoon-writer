@@ -83,4 +83,14 @@ struct DiskFilterTests {
         disk.isRemovable = false
         #expect(rejections(disk) == [nil, nil])
     }
+
+    /// Records current behaviour (T20): USB hard drives and SSDs usually report
+    /// ejectable but not removable, so they are listed by default and get a
+    /// `LargeDriveWarning` instead. Changing this must be a deliberate decision.
+    @Test func ejectableOnlyUSBHardDriveIsListedByDefault() {
+        var disk = DiskInfo.usbStick(sizeBytes: 1_000_204_886_016)
+        disk.isRemovable = false
+        disk.isEjectable = true
+        #expect(DiskFilter(showAllExternal: false).rejection(for: disk, bootDisks: boot) == nil)
+    }
 }

@@ -14,6 +14,9 @@ public enum SimulatedDrive: String, CaseIterable, Sendable {
     case tooSmall
     /// Not USB, so it appears only with "Show all external disks".
     case thunderbolt
+    /// Ejectable but not removable, as USB hard drives report, so it is listed by default
+    /// with the large-drive warning. Otherwise behaves like `working`.
+    case usbHardDrive
 
     static let writeBytesPerSecond = 40_000_000.0
     static let readBytesPerSecond = 80_000_000.0
@@ -30,6 +33,7 @@ public enum SimulatedDrive: String, CaseIterable, Sendable {
         case .promptCancelled: return "disk93"
         case .tooSmall: return "disk94"
         case .thunderbolt: return "disk95"
+        case .usbHardDrive: return "disk96"
         }
     }
 
@@ -46,6 +50,12 @@ public enum SimulatedDrive: String, CaseIterable, Sendable {
                 bsdName: bsdName, mediaName: mediaName, sizeBytes: 500_107_862_016, blockSize: 512,
                 busProtocol: "PCI-Express", isInternal: false, isRemovable: false, isEjectable: true,
                 isVirtual: false, isWholeDisk: true, mountPoints: ["/Volumes/Backup"], volumeNames: ["Backup"]
+            )
+        case .usbHardDrive:
+            return DiskInfo(
+                bsdName: bsdName, mediaName: mediaName, sizeBytes: 1_000_204_886_016, blockSize: 512,
+                busProtocol: "USB", isInternal: false, isRemovable: false, isEjectable: true,
+                isVirtual: false, isWholeDisk: true, mountPoints: ["/Volumes/SIM96"], volumeNames: ["SIM96"]
             )
         default:
             return DiskInfo(
@@ -66,6 +76,7 @@ public enum SimulatedDrive: String, CaseIterable, Sendable {
         case .tooSmall: return "Simulated USB Stick (16 MB)"
         case .internalDisk: return "Simulated Internal SSD"
         case .thunderbolt: return "Simulated Thunderbolt SSD"
+        case .usbHardDrive: return "Simulated USB Hard Drive (1 TB)"
         }
     }
 

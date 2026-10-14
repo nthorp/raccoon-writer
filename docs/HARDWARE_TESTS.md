@@ -102,6 +102,7 @@ Nothing touches a disk. This is a visual check of every screen, which agents cou
 2. `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`
 3. Choose `/tmp/sim.img`. Write to `disk90` (success), `disk91` (pulled out mid-write) and `disk92` (verify mismatch). Try `disk93` (cancelled password prompt) and `disk94` (too small).
 4. Switch to Dark Mode (System Settings → Appearance) and look at the setup, progress and done screens again.
+5. (Added in T20.) With "Show all external disks" off, check that `disk96`, "Simulated USB Hard Drive (1 TB)", is listed with "Large drive" under it, and the 16 GB sticks aren't. Select it and press Continue…: the confirm screen shows an orange large-drive warning under the "You are about to erase…" line. A write to it succeeds like `disk90`.
 
 **Expected**
 - A yellow banner says it's a simulation.

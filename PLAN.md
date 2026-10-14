@@ -40,7 +40,7 @@
 | Privilege model | **`authopen`** now, behind a `DeviceOpener` protocol so an SMAppService helper can replace it later |
 | Image formats | `.iso` and `.img` only, raw block copy |
 | Verification | Always on (no toggle) |
-| Drive filter | Default: external, removable, USB-attached physical disks only. Toggle "Show all external disks". The boot disk and internal disks are **never** shown. |
+| Drive filter | Default: external, USB-attached physical disks that report removable or ejectable (sticks and card readers, but also most USB hard drives and SSDs). Drives over 500 GB get a "Large drive" warning in the list and on the confirm screen (T20), which never blocks the write. Toggle "Show all external disks". The boot disk and internal disks are **never** shown. |
 | Confirmation | Show drive name, size, mount points; explicit "Erase and Write" click |
 | Distribution | Personal / open source now. App Sandbox **off**. No Mac App Store. Signing and notarization deferred. |
 | Features | Minimal v1: no drag-and-drop, no SHA-256 display, no localization |
@@ -127,7 +127,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T18 | 🧑 Make the password-cancelled notice stand out | T16 | DONE | 2026-10-13 | Claude (prep) / Nick (check) |
 | T23 | Rename to Raccoon Writer, with the raccoon icon | T16 | DONE | 2026-10-13 | Claude |
 | T19 | 🧑 Flush the drive cache with `DKIOCSYNCHRONIZE` | T16 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
-| T20 | 🧑 Warn for drives over 500 GB; README says USB hard drives are listed | T18 | TODO | | Claude (prep) / Nick (check) |
+| T20 | 🧑 Warn for drives over 500 GB; README says USB hard drives are listed | T18 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
 | T21 | Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill | T16 | TODO | | Claude |
 | T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | TODO | | Claude (prep) / Nick (run) |
 
@@ -1085,7 +1085,25 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
 **Files:** `Sources/ImageWriterCore/LargeDriveWarning.swift`, `Sources/ImageWriterCore/Simulation/SimulatedDrive.swift`, `App/DriveSection.swift`, `App/ConfirmView.swift`, `App/PreviewSamples.swift`, `Tests/ImageWriterCoreTests/` (`LargeDriveWarningTests`, `DiskFilterTests`, `SimulationModeTests` as needed), `README.md`, `docs/HARDWARE_TESTS.md`, `PLAN.md`
 
 **Handoff notes:**
-- _(none yet)_
+- **Agent prep done 2026-10-13, now `NEEDS_HUMAN`.** `scripts/test.sh` passes 379 tests. `scripts/build.sh --release` succeeds for `x86_64 arm64` with no Swift warnings, and the release flag check passes. `build/` holds the Release build, so run `scripts/build.sh` first for the Debug-only Simulate mode.
+- **What was built:**
+  - `LargeDriveWarning` (`Sources/ImageWriterCore/LargeDriveWarning.swift`), shaped like `DriveTooSmall`: `driveBytes`, `thresholdBytes = 500_000_000_000`, `init?(drive:)` (nil at or below), and a `message` that names the drive's size, worded as suggested in step 1.
+  - `DriveRow` takes `isLarge`, computed in `DriveSection`, and shows an orange "Large drive" caption under "Too small for this image" when both apply.
+  - `ConfirmView` shows the message as an orange `exclamationmark.triangle.fill` label between the "You are about to erase…" line and the grid, inside `if let`, so the screen without a warning is unchanged.
+  - `SimulatedDrive.usbHardDrive` (`disk96`, "Simulated USB Hard Drive (1 TB)", 1,000,204,886,016 bytes, USB, not removable, ejectable, `/Volumes/SIM96`). Its open has no faults, so it behaves like `.working`. It is the last case, so it is listed after the other sticks and after the Thunderbolt SSD when the toggle is on.
+  - `PreviewSamples.usbHardDrive` (a 2 TB "WD Elements" mounted as "Time Machine"), with previews "Drives, one large" in `DriveSection` and "Large drive" plus "Large drive, back after the password dialog was cancelled" (540 pt wide) in `ConfirmView`. The existing `PreviewSamples.ssd` (500,107,862,016 bytes) now shows "Large drive" in previews too, which is correct.
+  - Tests: `LargeDriveWarningTests` (the step 5 sizes, plus a check that the message says "(1 TB)" and not "500 GB"); `DiskFilterTests.ejectableOnlyUSBHardDriveIsListedByDefault`; `SimulationModeTests` lists `disk96` in the default list and runs it to `finished`.
+  - Docs: README safety list (filter wording and a "Large drive" bullet), the Simulate mode line and a limitation after the SD card line; section 1 "Drive filter" row; H1 step 5 in `docs/HARDWARE_TESTS.md`. H1's PASS result is left as recorded, since it predates the step.
+- **Rendering check:** the agent rendered standalone copies of the confirm screen (with and without the T18 callout) and the drive row with `ImageRenderer` at 540 pt, in Light and Dark. The warning wraps onto two lines, the callout stays above the title, and both captions stack in the row. This wasn't the running app, so the human steps are still needed.
+- **Deviation:** none.
+- **Nick: run these on the T20 commit.**
+  1. `scripts/build.sh`, then `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`.
+  2. Choose any `.iso` or `.img` file, for example `~/iso-sword-test/ram-test.img`. With "Show all external disks" off, "Simulated USB Hard Drive (1 TB)" is in the list with "Large drive" under it. The simulated 16 GB sticks don't have it.
+  3. Select the hard drive and press Continue…. The confirm screen shows the orange large-drive warning under the "You are about to erase…" line. Check it in Light and Dark (System Settings › Appearance) and at the narrowest window width. Then press Cancel, choose "Simulated USB Stick (works)" and press Continue…: no warning.
+  4. Choose "Simulated USB Stick (password dialog cancelled)", press Continue… and Erase and Write. When the confirm screen comes back, the blue T18 box is still above the red title.
+  5. Optional, if a USB hard drive or SSD over 500 GB is to hand: `scripts/build.sh --release`, `open build/RaccoonWriter.app`, plug it in and check it is listed with "Large drive". **Don't press Erase and Write.**
+
+  Then tell the agent the results. If they meet the acceptance criteria, the agent records them here and marks T20 `DONE`.
 
 ---
 
@@ -1328,3 +1346,4 @@ Keep `AppInfo.shortName` even though it now equals `displayName`, so code that u
 | 2026-10-13 | T19 DONE after Nick's runs: both the RAM disk and the Cruzer Glide flush with `DKIOCSYNCHRONIZE` | Claude |
 | 2026-10-13 | T18 DONE after Nick's check: the callout stands out in Light and Dark, wraps at minimum width, and is absent without a notice | Claude |
 | 2026-10-13 | T17 DONE after Nick's check: the raccoon icon follows the Default, Dark, Clear and Tinted icon styles | Claude |
+| 2026-10-13 | T20 prep: `LargeDriveWarning` over 500 GB in the drive list and on the confirm screen, `SimulatedDrive.usbHardDrive`, README says USB hard drives are listed; NEEDS_HUMAN for the Simulate mode check | Claude |
