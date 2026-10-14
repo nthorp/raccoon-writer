@@ -20,7 +20,7 @@ final class CoordinatorFaultTests {
     let sleep = FakeSleepPreventer()
 
     init() throws {
-        dir = FileManager.default.temporaryDirectory.appendingPathComponent("reddelicious-faults-\(UUID().uuidString)")
+        dir = FileManager.default.temporaryDirectory.appendingPathComponent("raccoonwriter-faults-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false)
     }
 
@@ -305,7 +305,7 @@ final class CoordinatorFaultTests {
     }
 
     @Test func processInfoActivityCanBeEndedTwice() {
-        let activity = ProcessInfoSleepPreventer().preventSleep(reason: "Red Delicious unit test")
+        let activity = ProcessInfoSleepPreventer().preventSleep(reason: "Raccoon Writer unit test")
         activity.end()
         activity.end()
     }

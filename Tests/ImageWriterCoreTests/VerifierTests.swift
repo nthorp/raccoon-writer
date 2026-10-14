@@ -8,7 +8,7 @@ final class VerifierTests {
     let dir: URL
 
     init() throws {
-        dir = FileManager.default.temporaryDirectory.appendingPathComponent("reddelicious-verify-\(UUID().uuidString)")
+        dir = FileManager.default.temporaryDirectory.appendingPathComponent("raccoonwriter-verify-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false)
     }
 

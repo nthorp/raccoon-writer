@@ -6,7 +6,7 @@ import Foundation
 /// USB stick. The whole type is compiled out of Release builds, and
 /// `scripts/check-release-flags.sh` fails a Release build that still contains it.
 public enum DebugTestMode {
-    public static let environmentKey = "REDDELICIOUS_ALLOW_VIRTUAL_DISKS"
+    public static let environmentKey = "RACCOONWRITER_ALLOW_VIRTUAL_DISKS"
 
     /// True only when the variable is exactly `1`.
     public static func allowsVirtualDisks(

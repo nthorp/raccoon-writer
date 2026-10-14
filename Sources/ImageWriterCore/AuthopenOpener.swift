@@ -4,7 +4,7 @@ import os
 /// Opens raw disks through `/usr/libexec/authopen`, which passes back an open
 /// descriptor, so the app never runs as root. The app shows the admin prompt itself
 /// (`DeviceAuthorizer`) and hands the authorization over with `-extauth`, so the
-/// dialog names Red Delicious and authopen itself doesn't prompt. Each `authorize`
+/// dialog names Raccoon Writer and authopen itself doesn't prompt. Each `authorize`
 /// prompts again.
 public struct AuthopenOpener: DeviceOpener {
     static let defaultExecutable = "/usr/libexec/authopen"

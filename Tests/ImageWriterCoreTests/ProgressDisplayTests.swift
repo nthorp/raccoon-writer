@@ -29,7 +29,7 @@ struct ProgressDisplayTests {
     @Test func thePromptStageNamesTheAppsOwnDialog() throws {
         let prompt = try #require(ProgressDisplay(state: .preparing(.authorize), isCancelling: false))
         #expect(prompt.title == "Getting permission to write")
-        #expect(prompt.detail?.contains("dialog from Red Delicious") == true)
+        #expect(prompt.detail?.contains("dialog from Raccoon Writer") == true)
         #expect(prompt.detail?.contains("authopen") == false)
     }
 

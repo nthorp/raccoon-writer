@@ -21,7 +21,7 @@ func pattern(count: Int, seed: UInt8 = 0xA5) -> [UInt8] {
 
 /// A fresh empty file in the temp directory, opened read-write. Caller closes and removes it.
 func makeTempFile() throws -> (url: URL, fd: Int32) {
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent("reddelicious-test-\(UUID().uuidString)")
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("raccoonwriter-test-\(UUID().uuidString)")
     let fd = open(url.path, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
     guard fd >= 0 else { throw DeviceIOError.posix(operation: "open", code: errno) }
     return (url, fd)

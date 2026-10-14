@@ -1,7 +1,7 @@
 import Foundation
 
 /// Obtains the authorization authopen needs to open a disk, so the password dialog
-/// names Red Delicious rather than authopen (`authopen -extauth`).
+/// names Raccoon Writer rather than authopen (`authopen -extauth`).
 /// `SecurityAuthorizer` is the production implementation.
 public protocol DeviceAuthorizer: Sendable {
     /// Authorizes `sys.openfile.readwrite.<devicePath>`. Blocks while the dialog is up,

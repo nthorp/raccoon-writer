@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct RedDeliciousApp: App {
+struct RaccoonWriterApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     private let services = AppServices.shared
 

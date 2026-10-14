@@ -19,7 +19,7 @@ final class WriteCoordinatorTests {
     let disk = DiskInfo.usbStick(sizeBytes: deviceBlocks * UInt64(blockSize))
 
     init() throws {
-        dir = FileManager.default.temporaryDirectory.appendingPathComponent("reddelicious-coordinator-\(UUID().uuidString)")
+        dir = FileManager.default.temporaryDirectory.appendingPathComponent("raccoonwriter-coordinator-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false)
     }
 

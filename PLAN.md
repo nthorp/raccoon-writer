@@ -1,4 +1,4 @@
-# Red Delicious Media Writer (repo: iso-sword) — Implementation Plan
+# Raccoon Writer (repo: iso-sword) — Implementation Plan
 
 > A native macOS app (Swift/SwiftUI) that writes `.iso` / `.img` images to removable USB drives.
 > Similar in function to balenaEtcher and Fedora Media Writer.
@@ -31,8 +31,8 @@
 
 | Area | Decision |
 | --- | --- |
-| App name / folder | **Red Delicious Media Writer**, short name "Red Delicious", target `RedDelicious`. Folder and repo stay `iso-sword`. Was "ISO Sword" / `IsoSword` until T14 |
-| Bundle ID | `com.example.reddelicious` (placeholder; change before any public release). Was `com.example.isosword` until T14 |
+| App name / folder | **Raccoon Writer** (full and short name), target `RaccoonWriter`. Folder and repo stay `iso-sword`. Was "ISO Sword" / `IsoSword` until T14, then "Red Delicious Media Writer" / `RedDelicious` until T23 |
+| Bundle ID | `com.example.raccoonwriter` (placeholder; change before any public release). Was `com.example.isosword` until T14, then `com.example.reddelicious` until T23 |
 | Language / UI | Swift 5 language mode (targeted concurrency checking on), SwiftUI, Observation framework |
 | Platform | macOS 14+, universal binary (arm64 + x86_64) |
 | Project structure | Swift Package `ImageWriterCore` (UI-free, testable) + thin SwiftUI app target |
@@ -125,7 +125,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T16 | 🧑 Password prompt before the safety check; size check after open | T15 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
 | T17 | 🧑 Layered app icon (Icon Composer) with dark variant | T15 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
 | T18 | 🧑 Make the password-cancelled notice stand out | T16 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
-| T23 | Rename to Raccoon Writer, with the raccoon icon | T16 | TODO | | Claude |
+| T23 | Rename to Raccoon Writer, with the raccoon icon | T16 | DONE | 2026-10-13 | Claude |
 | T19 | 🧑 Flush the drive cache with `DKIOCSYNCHRONIZE` | T16 | TODO | | Claude (prep) / Nick (run) |
 | T20 | 🧑 Warn for drives over 500 GB; README says USB hard drives are listed | T18 | TODO | | Claude (prep) / Nick (check) |
 | T21 | Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill | T16 | TODO | | Claude |
@@ -684,6 +684,7 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - **Deviations:** added H1 (Simulate look-through), H12 (drive in use) and H14 (disk reports) beyond the plan's list, so the requests from T03, T07, T10 and T11 have a place to be recorded.
 - **2026-10-12: T13 runs before the remaining tests.** H1–H9 ran on the authopen-named-dialog build. Run H10, H11, H12 and H14 only after T13 is `DONE`, on the T13 build, and put the build's commit in each test's notes. See T13 "Order with T12".
 - **2026-10-12: run them on the T14 build instead.** T14 renames the app to Red Delicious (`build/RedDelicious.app`, `REDDELICIOUS_*` env vars, subsystem `com.example.reddelicious`), and the checklist's unrun steps use the new names.
+- **2026-10-13: and on the T23 build or later.** T23 renames the app to Raccoon Writer (`build/RaccoonWriter.app`, `RACCOONWRITER_*` env vars, subsystem `com.example.raccoonwriter`), and the checklist's steps use the new names.
 
 ---
 
@@ -917,15 +918,15 @@ This also removes the README limitation "after a cancelled password prompt the d
 4. Pre-26 fallback: build, then inspect `Assets.car` (`assetutil --info`) and `AppIcon.icns`. If Xcode generates legacy renditions from the `.icon` file, delete `AppIcon.appiconset`. If not, keep the set as the macOS 14/15 icon, and make sure the two don't clash under the same name. Record which one applied in the Handoff notes.
 5. `scripts/test.sh` and `scripts/build.sh --release` pass. Write instructions for Nick, set `NEEDS_HUMAN`, stop.
 
-**Human steps (Nick)**
+**Human steps (Nick)**, on the T23 build or later. T23 replaced the apple with the raccoon from Nick's branding pack, so these steps check the raccoon.
 1. Open `App/AppIcon.icon` in Icon Composer (`/Applications/Xcode.app/Contents/Applications/Icon Composer.app`). Check the cutout edges and preview Default, Dark, Clear and Tinted. Adjust if you like and save. If you change anything, tell the agent so it rebuilds.
-2. `scripts/build.sh --release`, then copy `build/RedDelicious.app` somewhere new (for example `~/Applications`) and open it there. This avoids the stale icon cache. Under System Settings › Appearance, switch the icon style through Default, Dark, Clear and Tinted. Check that the Dock and Finder icon follows each one, and that in Dark it sits on the dark background like the other apps.
+2. `scripts/build.sh --release`, then copy `build/RaccoonWriter.app` somewhere new (for example `~/Applications`) and open it there. This avoids the stale icon cache. Under System Settings › Appearance, switch the icon style through Default, Dark, Clear and Tinted. Check that the Dock and Finder icon follows each one, and that in Dark it sits on the dark background like the other apps.
 3. Optional, if you have a macOS 14 or 15 machine: check that the icon still shows there.
-4. While the app is open, start a write to a RAM disk or the test stick and look at the password dialog. If it shows the apple, the README's "The password dialog has no custom icon yet" limitation can go (left over from T15). Cancel the dialog.
+4. While the app is open, start a write to a RAM disk or the test stick and look at the password dialog. If it shows the raccoon, the README's "The password dialog has no custom icon yet" limitation can go (left over from T15). Cancel the dialog.
 
 **Acceptance criteria**
-- In Dark icon style on macOS 26 the icon has a dark background, and in Default it looks like the T15 icon.
-- Clear and Tinted show the apple shape, not a solid tile.
+- In Dark icon style on macOS 26 the icon has a dark background, and in Default it looks like the raccoon on the ivory tile from Nick's pack (`source/icon-master.png`; changed from "the T15 icon" by T23).
+- Clear and Tinted show the raccoon shape, not a solid tile.
 - The bundle still carries an icon that macOS 14/15 can use (`AppIcon.icns` or legacy renditions in `Assets.car`).
 - `scripts/test.sh` and `scripts/build.sh --release` pass.
 
@@ -958,7 +959,7 @@ Out of scope (Nick chose only these two changes): new wording or a separate titl
 4. `scripts/test.sh` and `scripts/build.sh --release` pass. Write instructions for Nick, set `NEEDS_HUMAN`, stop.
 
 **Human steps (Nick)**
-1. Run `scripts/build.sh` (Debug), then `REDDELICIOUS_SIMULATE=1 build/RedDelicious.app/Contents/MacOS/RedDelicious`.
+1. Run `scripts/build.sh` (Debug), then `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`.
 2. Choose any `.iso` or `.img` image, select "Simulated USB Stick (password dialog cancelled)", then Continue… and Erase and Write. After the simulated dialog delay, the confirm screen comes back.
 3. Check the callout catches your eye before the red title, and that it reads well in both Light and Dark appearance (System Settings › Appearance). Also check it at the narrowest window width.
 4. Press Cancel, choose the same drive again and continue. The confirm screen should show no callout and look as it did before T18.
@@ -976,8 +977,8 @@ Out of scope (Nick chose only these two changes): new wording or a separate titl
 - **What was built:** a private `NoticeCallout` view in `ConfirmView.swift`, as specified in step 1. It's the first item in the screen's `VStack`, above the title, and only appears when there's a notice, so the screen without one is unchanged. `WriteNotice` and the coordinator are untouched.
 - **Rendering check:** the agent rendered the callout above the title with `ImageRenderer` at 540 pt wide (the minimum window width), in Light and Dark. In both, the text is easy to read, the box is clearly tinted, and the message wraps onto two lines. This was a standalone copy of the view, not the running app, so step 3 below is still needed.
 - **Deviation:** none.
-- **Nick: run these on the T18 commit.**
-  1. `scripts/build.sh`, then `REDDELICIOUS_SIMULATE=1 build/RedDelicious.app/Contents/MacOS/RedDelicious`.
+- **Nick: run these on the T23 build or later** (T23 renamed the app; the commands below use the new names).
+  1. `scripts/build.sh`, then `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`.
   2. Choose any `.iso` or `.img` file, for example `~/iso-sword-test/ram-test.img`. Select "Simulated USB Stick (password dialog cancelled)", then Continue… and Erase and Write. The progress screen waits a moment as if the dialog were up, then the confirm screen comes back with the blue box at the top.
   3. Check that the box catches your eye before the red title. Switch System Settings › Appearance between Light and Dark while the app is open, and drag the window to its narrowest width. The text should stay readable and wrap rather than be cut off.
   4. Press Cancel, choose the same drive again and Continue…. The confirm screen should have no box and look as it did before T18.
@@ -1005,7 +1006,7 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
 6. Docs: `README.md` line 70 (the flush asks the drive to empty its write cache with `DKIOCSYNCHRONIZE`, falling back to `F_FULLFSYNC` and then `fsync` where it isn't supported); section 1 "Cache and sync" note in this file; in `docs/HARDWARE_TESTS.md`, H2's and H6's expected flush method and the "Flush method on the USB stick" line. Leave the 2026-10-09 notes as they are, since they record what happened, and add a line pointing to T19.
 7. `scripts/test.sh` and `scripts/build.sh --release` pass. Write instructions for Nick, set `NEEDS_HUMAN`, stop.
 
-**Human steps (Nick)**, with `log stream --predicate 'subsystem == "com.example.reddelicious"' --info` open in a second Terminal window:
+**Human steps (Nick)**, with `log stream --predicate 'subsystem == "com.example.raccoonwriter"' --info` open in a second Terminal window:
 1. RAM disk, Debug build: one full write and verify. Record the flush method and any skipped-method errno from the log.
 2. Real USB stick (the Cruzer Glide), Release build: one full write and verify. It passes. Record the flush method; `DKIOCSYNCHRONIZE` is the expected result. If it falls back, copy the log lines with the errno.
 
@@ -1043,7 +1044,7 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
 7. `scripts/test.sh` and `scripts/build.sh --release` pass. Write instructions for Nick, set `NEEDS_HUMAN`, stop.
 
 **Human steps (Nick)**
-1. Run `scripts/build.sh` (Debug), then `REDDELICIOUS_SIMULATE=1 build/RedDelicious.app/Contents/MacOS/RedDelicious`.
+1. Run `scripts/build.sh` (Debug), then `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`.
 2. Choose any image. "Simulated USB Hard Drive (1 TB)" is listed with "Show all external disks" off and shows "Large drive". The simulated 16 GB sticks don't.
 3. Select it and press Continue…. The confirm screen shows the large-drive warning, and it reads well in Light and Dark and at the narrowest window width. Cancel, choose "Simulated USB Stick (works)" and continue: no warning.
 4. Choose "Simulated USB Stick (password dialog cancelled)" and run it through the cancelled dialog, to check the T18 callout still sits above the title.
@@ -1140,23 +1141,23 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
 3. **C. Info.plist** (`App/Info.plist`):
    - `NSHumanReadableCopyright`: "Copyright © 2026 Nicholas Thorp." Nick confirms the holder in human step 1.
    - `LSApplicationCategoryType`: `public.app-category.utilities`.
-   - `NSRemovableVolumesUsageDescription`: "Red Delicious reads the disk image you choose when it is stored on a USB drive or other removable volume."
+   - `NSRemovableVolumesUsageDescription`: "Raccoon Writer reads the disk image you choose when it is stored on a USB drive or other removable volume."
    - Add a test that reads `App/Info.plist` from the source tree (found from `#filePath`, as `ReleaseFlagCheckTests` finds the script) and checks the three keys are present and non-empty, with the expected category value.
-   - Check the built app with `plutil -p build/RedDelicious.app/Contents/Info.plist`.
+   - Check the built app with `plutil -p build/RaccoonWriter.app/Contents/Info.plist`.
 4. **D. Hardened Runtime.**
    - `project.yml`: `ENABLE_HARDENED_RUNTIME: YES` for all configurations.
    - No new entitlements are expected. The app starts `authopen` and `diskutil` as separate processes, which the runtime allows. It loads only system frameworks and the statically linked `ImageWriterCore`, and it uses no JIT. Xcode still adds `get-task-allow` to Debug builds, so debugging works.
-   - `scripts/build.sh`: after the copy, fail if `codesign -dv build/RedDelicious.app` doesn't report the `runtime` flag (for example `flags=0x10002(adhoc,runtime)`). It should fail closed if `codesign` itself fails. Also run `codesign --verify --strict` on the bundle.
-   - Debug build: launch `REDDELICIOUS_SIMULATE=1` and run disk90 (works) through to Done. Simulate mode touches no disks. If the app fails to start because the Xcode 16 `.debug.dylib` is refused, set `ENABLE_DEBUG_DYLIB: NO` for Debug in `project.yml`; that only affects previews. Never add `com.apple.security.cs.disable-library-validation`. If neither approach works, set `BLOCKED` and record the crash report.
+   - `scripts/build.sh`: after the copy, fail if `codesign -dv build/RaccoonWriter.app` doesn't report the `runtime` flag (for example `flags=0x10002(adhoc,runtime)`). It should fail closed if `codesign` itself fails. Also run `codesign --verify --strict` on the bundle.
+   - Debug build: launch `RACCOONWRITER_SIMULATE=1` and run disk90 (works) through to Done. Simulate mode touches no disks. If the app fails to start because the Xcode 16 `.debug.dylib` is refused, set `ENABLE_DEBUG_DYLIB: NO` for Debug in `project.yml`; that only affects previews. Never add `com.apple.security.cs.disable-library-validation`. If neither approach works, set `BLOCKED` and record the crash report.
    - README: under Limitations, the "Not signed or notarized" item says the Hardened Runtime is on, so notarization only needs a Developer ID signature.
 5. `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass. Write instructions for Nick, set `NEEDS_HUMAN`, stop.
 
-**Human steps (Nick)**, with `log stream --predicate 'subsystem == "com.example.reddelicious"' --info` open in a second Terminal window:
+**Human steps (Nick)**, with `log stream --predicate 'subsystem == "com.example.raccoonwriter"' --info` open in a second Terminal window:
 1. Confirm or correct the copyright holder in `App/Info.plist`. Open the Release app's About window and check the copyright line.
 2. **Volume names, Release build, real stick:** plug in the Cruzer Glide with a named volume. The drive list shows the volume name on its row. Press Continue…: the confirm screen shows "Volume names:" and "Mounted volumes:". Cancel the password dialog: both rows still appear above the T18 notice callout. Then eject the volume in Finder (not the drive), press Refresh, and record whether the name is still listed while unmounted.
 3. **Hardened Runtime, Release build, real stick:** one full write and verify. The password dialog appears with the app's name (T13 `-extauth`), the write and verify pass, and the drive ejects. Record anything unusual in the log.
-4. **Hardened Runtime, Debug build, RAM disk:** with `REDDELICIOUS_ALLOW_VIRTUAL_DISKS=1` and a RAM disk from `hdiutil attach -nomount ram://65536`, one full write and verify passes.
-5. **Optional, privacy prompt:** with the image stored on a second USB volume (not the target), choose it in the app. Record whether the removable-volume prompt appears, and if it does, that it shows the new text. If no prompt appears, try `tccutil reset SystemPolicyRemovableVolumes com.example.reddelicious` and run the step again.
+4. **Hardened Runtime, Debug build, RAM disk:** with `RACCOONWRITER_ALLOW_VIRTUAL_DISKS=1` and a RAM disk from `hdiutil attach -nomount ram://65536`, one full write and verify passes.
+5. **Optional, privacy prompt:** with the image stored on a second USB volume (not the target), choose it in the app. Record whether the removable-volume prompt appears, and if it does, that it shows the new text. If no prompt appears, try `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter` and run the step again.
 
 **Acceptance criteria**
 - Drive rows and the confirm screen show volume names when a drive has any. Nothing changes for a drive without them (unit tests and Nick's check).
@@ -1230,7 +1231,15 @@ Keep `AppInfo.shortName` even though it now equals `displayName`, so code that u
 **Files:** `Sources/ImageWriterCore/` (`AppInfo`, `DebugTestMode`, `Simulation/SimulationMode`, `Fakes/FileBackedDevice`, comments), `App/` (including `AppIcon.icon/`), `project.yml`, `scripts/`, `Tests/`, `README.md`, `docs/HARDWARE_TESTS.md`, `AGENTS.md`, `PLAN.md`; `raccoon-writer-branding/` deleted
 
 **Handoff notes:**
-- _(none yet)_
+- **Done 2026-10-13.** `scripts/test.sh` passes 371 tests. `scripts/build.sh` and `scripts/build.sh --release` succeed for `x86_64 arm64`. The Release log has no Swift or asset warnings (only the usual AppIntents metadata note), and the release flag check passes with the `RACCOONWRITER_*` markers. `plutil -p build/RaccoonWriter.app/Contents/Info.plist` shows `CFBundleDisplayName` and `CFBundleName` "Raccoon Writer", `CFBundleIdentifier` `com.example.raccoonwriter` and `CFBundleExecutable` `RaccoonWriter`. `build/` holds the Release build. No disk was touched.
+- **Rename:** everything in the name mapping. `AppInfo.shortName` now equals `displayName`, with a comment saying why it's kept. The window title, the password dialog text (`SecurityAuthorizer.prompt`) and the menu bar all come from `AppInfo` and `Info.plist`, so they say "Raccoon Writer". The stale gitignored `RedDelicious.xcodeproj` and `build/RedDelicious.app` were deleted. Remaining `git grep -i -E "red ?delicious|reddelicious"` matches are only history (section 1's "Was" notes, `DONE` tasks, handoff notes, change log), T23's own mapping, and the "formerly" lines in the README and the `docs/HARDWARE_TESTS.md` intro.
+- **Icon layer:** `App/AppIcon.icon/Assets/raccoon.png` is the pack's transparent logo at its native 1254 px. As with the apple, the background removal had left the body slightly transparent (alpha 252–253 on ~900k pixels). Pixels at alpha 250–254 were set to 255; the PNG stores straight (un-premultiplied) colour, so no colour changed. The anti-aliased edge (alpha below 250) is unchanged. 333 stray specks outside the raccoon (890 pixels, alpha at most 3, invisible) were cleared. There was no baked-in ground shadow.
+- **`icon.json`:** layer renamed `raccoon`, scale 0.75 (the apple was 0.8), no translation. Scales 0.6–0.8 were rendered next to `icon-master.png`; 0.75 matches its framing, and 0.8 pushes the tail against the tile edge. Solid fill `srgb:0.992,0.957,0.894` (253, 244, 228), sampled mid-tile from `icon-master.png`. The pack's tile has a slight top-to-bottom gradient, from (253, 251, 244) to (249, 236, 211). A solid fill was used, as the task said, since Icon Composer adds its own lighting. `glass`, translucency and the neutral shadow are unchanged. `ictool` renders of Default, Dark, ClearLight, ClearDark, TintedLight and TintedDark all look right: ivory tile in Default, dark tile in Dark, raccoon shape in Clear and Tinted.
+- **Built icon:** `AppIcon.icns` (16, 32, 128 and 256 px) and `Assets.car` (layered stacks for Aqua, DarkAqua and Tintable, plus flat 32–1024 px images) are all the raccoon. **Small sizes:** at 32 px the full raccoon still reads as a raccoon holding a blue stick, but at 16 px it's a brown blob with a blue spot. The pack's simplified-face art for 16–64 px is clearer, but a `.icon` file has one layer for all sizes, so it wasn't used (see the icon table above). If the 16 px icon (Finder list view, some menus) bothers Nick, that's a separate task.
+- **Plan updates:** title, section 1 rows, a T12 note about the T23 names, T17's human steps and acceptance criteria (raccoon instead of apple; still `NEEDS_HUMAN`), T18's human steps and its instructions for Nick, and T19–T22's steps now use the new names.
+- **Branding folder:** `raccoon-writer-branding/` was deleted after the builds passed. It was never committed, so the only copy of its other files is Nick's own.
+- **Deviation:** T18's handoff said to run its checks "on the T18 commit". That now says "on the T23 build or later", with the new names, since those are the builds Nick will run. Otherwise the handoff notes are unchanged.
+- **For Nick:** the new bundle ID makes macOS treat this as a new app, so the removable-volume privacy prompt may appear again. Log predicates use `com.example.raccoonwriter`. The env vars are `RACCOONWRITER_SIMULATE` and `RACCOONWRITER_ALLOW_VIRTUAL_DISKS`. Finder and the Dock may show the apple until the icon cache refreshes; T17's step 2 (copy the app somewhere new) avoids that.
 
 ---
 
@@ -1289,3 +1298,4 @@ Keep `AppInfo.shortName` even though it now equals `displayName`, so code that u
 | 2026-10-12 | T21 added from four review findings: the device descriptor isn't close-on-exec, a partial-block write or read retries misaligned, a same-size replaced image isn't caught, and a diskutil that ignores SIGTERM hangs the timeout path | Claude |
 | 2026-10-12 | T22 added from four review findings: volume names aren't shown, test fakes ship in Release, Info.plist lacks copyright, category and removable-volume usage text, and the Hardened Runtime is off. DiskArbitration (the fifth) left out | Claude |
 | 2026-10-13 | T23 added: rename to Raccoon Writer (`RaccoonWriter`, `com.example.raccoonwriter`, `RACCOONWRITER_*`) and the raccoon icon from Nick's `raccoon-writer-branding/` pack, deleted afterwards; listed above T19 so it is done before T19–T22 | Claude |
+| 2026-10-13 | T23 DONE: app renamed to Raccoon Writer (`RaccoonWriter`, `com.example.raccoonwriter`, `RACCOONWRITER_*`); raccoon layer in `App/AppIcon.icon`; branding folder deleted | Claude |

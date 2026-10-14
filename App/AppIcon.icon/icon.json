@@ -1,16 +1,16 @@
 {
   "fill" : {
-    "solid" : "srgb:0.97647,0.95686,0.90980,1.00000"
+    "solid" : "srgb:0.99216,0.95686,0.89412,1.00000"
   },
   "groups" : [
     {
       "layers" : [
         {
           "glass" : false,
-          "image-name" : "apple.png",
-          "name" : "apple",
+          "image-name" : "raccoon.png",
+          "name" : "raccoon",
           "position" : {
-            "scale" : 0.8,
+            "scale" : 0.75,
             "translation-in-points" : [
               0,
               0

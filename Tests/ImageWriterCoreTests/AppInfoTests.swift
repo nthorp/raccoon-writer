@@ -3,11 +3,11 @@ import Testing
 
 struct AppInfoTests {
     @Test func displayName() {
-        #expect(AppInfo.displayName == "Red Delicious Media Writer")
+        #expect(AppInfo.displayName == "Raccoon Writer")
     }
 
     @Test func shortName() {
-        #expect(AppInfo.shortName == "Red Delicious")
+        #expect(AppInfo.shortName == "Raccoon Writer")
     }
 
     /// macOS truncates a longer `CFBundleName` in the menu bar.

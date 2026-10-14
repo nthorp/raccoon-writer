@@ -12,19 +12,19 @@ struct ReleaseFlagCheckTests {
         .appendingPathComponent("scripts/check-release-flags.sh")
 
     static let markers = [
-        "REDDELICIOUS_ALLOW_VIRTUAL_DISKS", "DebugTestMode", "allowVirtualDisks",
-        "REDDELICIOUS_SIMULATE", "SimulationMode", "SimulatedDrive",
+        "RACCOONWRITER_ALLOW_VIRTUAL_DISKS", "DebugTestMode", "allowVirtualDisks",
+        "RACCOONWRITER_SIMULATE", "SimulationMode", "SimulatedDrive",
     ]
 
     /// A minimal `.app` whose executable holds `contents`. Removed by the caller.
     func makeBundle(executable contents: Data?, extraFile: (name: String, contents: Data)? = nil) throws -> URL {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("reddelicious-flagcheck-\(UUID().uuidString)")
-        let app = root.appendingPathComponent("RedDelicious.app")
+            .appendingPathComponent("raccoonwriter-flagcheck-\(UUID().uuidString)")
+        let app = root.appendingPathComponent("RaccoonWriter.app")
         let macOS = app.appendingPathComponent("Contents/MacOS")
         try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
         if let contents {
-            try contents.write(to: macOS.appendingPathComponent("RedDelicious"))
+            try contents.write(to: macOS.appendingPathComponent("RaccoonWriter"))
         }
         if let extraFile {
             let frameworks = app.appendingPathComponent("Contents/Frameworks")
@@ -71,14 +71,14 @@ struct ReleaseFlagCheckTests {
     @Test func leakedMarkerInAnyBundleFileFails() throws {
         let app = try makeBundle(
             executable: binary(containing: nil),
-            extraFile: ("ImageWriterCore", binary(containing: "REDDELICIOUS_ALLOW_VIRTUAL_DISKS"))
+            extraFile: ("ImageWriterCore", binary(containing: "RACCOONWRITER_ALLOW_VIRTUAL_DISKS"))
         )
         defer { try? FileManager.default.removeItem(at: app.deletingLastPathComponent()) }
         #expect(try run(on: app.path) == 1)
     }
 
     @Test func missingOrEmptyBundleFailsClosed() throws {
-        #expect(try run(on: "/nonexistent/reddelicious/RedDelicious.app") == 2)
+        #expect(try run(on: "/nonexistent/raccoonwriter/RaccoonWriter.app") == 2)
         let empty = try makeBundle(executable: nil)
         defer { try? FileManager.default.removeItem(at: empty.deletingLastPathComponent()) }
         #expect(try run(on: empty.path) == 2)

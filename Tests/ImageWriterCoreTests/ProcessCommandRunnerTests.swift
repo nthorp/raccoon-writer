@@ -36,10 +36,10 @@ struct ProcessCommandRunnerTests {
 
     @Test func missingExecutableIsLaunchFailure() async {
         do {
-            _ = try await runner.run("/nonexistent/reddelicious/diskutil", arguments: [])
+            _ = try await runner.run("/nonexistent/raccoonwriter/diskutil", arguments: [])
             Issue.record("expected a launch failure")
         } catch CommandRunnerError.launchFailed(let executable, _) {
-            #expect(executable == "/nonexistent/reddelicious/diskutil")
+            #expect(executable == "/nonexistent/raccoonwriter/diskutil")
         } catch {
             Issue.record("unexpected error \(error)")
         }
