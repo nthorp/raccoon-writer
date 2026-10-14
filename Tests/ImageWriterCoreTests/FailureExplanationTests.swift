@@ -61,13 +61,21 @@ struct FailureExplanationTests {
         for jargon in ["errno", "exit status", "authopen", "OSStatus", "posix", "recvmsg", "Optional(", "TCC", "EPERM"] {
             #expect(!explanation.message.contains(jargon), "\(failure.error) message: \(explanation.message)")
             #expect(!explanation.title.contains(jargon))
+            // Remedy commands are meant to be technical; the words around them aren't.
+            for remedy in explanation.remedies {
+                for text in [remedy.title, remedy.instructions, remedy.note ?? ""] {
+                    #expect(!text.contains(jargon), "\(failure.error) remedy: \(text)")
+                }
+            }
         }
     }
 
     @Test(arguments: everyFailure)
-    func onlyAPrivacyBlockOffersTheSettingsButton(_ failure: WriteFailure) {
-        let expected: FailureAction? = failure.error as? DeviceOpenError == .blockedByPrivacySettings ? .openPrivacySettings : nil
-        #expect(FailureExplanation(failure).action == expected)
+    func onlyAPrivacyBlockOffersRemediesAndTheSettingsButton(_ failure: WriteFailure) {
+        let isPrivacyBlock = failure.error as? DeviceOpenError == .blockedByPrivacySettings
+        let explanation = FailureExplanation(failure)
+        #expect(explanation.action == (isPrivacyBlock ? .openFullDiskAccessSettings : nil))
+        #expect(explanation.remedies.isEmpty == !isPrivacyBlock)
     }
 
     @Test(arguments: everyFailure)
@@ -197,10 +205,33 @@ struct FailureExplanationTests {
     @Test func privacyBlockNamesTheSettingToChange() {
         let explanation = explain(.open, DeviceOpenError.blockedByPrivacySettings)
         #expect(explanation.title == "macOS blocked access to removable drives")
-        #expect(explanation.message == "Raccoon Writer isn’t allowed to use removable drives. In System Settings, open Privacy & Security › Files & Folders, turn on Removable Volumes under Raccoon Writer, then try again.")
+        #expect(explanation.message == "macOS privacy settings don’t allow Raccoon Writer to use removable drives, so the drive wasn’t opened. To fix this, do one of the following.")
         #expect(explanation.drive == .untouched)
         #expect(explanation.details == nil)
-        #expect(explanation.action == .openPrivacySettings)
+        #expect(explanation.action == .openFullDiskAccessSettings)
+    }
+
+    /// Files & Folders hides the Removable Volumes switch once macOS has added its own
+    /// denied Full Disk Access entry, so neither fix sends people there.
+    @Test func privacyBlockOffersATerminalResetThenFullDiskAccess() throws {
+        let remedies = explain(.open, DeviceOpenError.blockedByPrivacySettings).remedies
+        try #require(remedies.count == 2)
+
+        let reset = remedies[0]
+        #expect(reset.title == "Reset the permission in Terminal")
+        #expect(reset.command == "tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter")
+        #expect(reset.instructions.contains("click Allow, then try again"))
+        #expect(reset.instructions.contains("quit and reopen Raccoon Writer"))
+
+        let fullDiskAccess = remedies[1]
+        #expect(fullDiskAccess.title == "Or turn on Full Disk Access")
+        #expect(fullDiskAccess.instructions.contains("Privacy & Security › Full Disk Access, turn on Raccoon Writer"))
+        #expect(fullDiskAccess.command == nil)
+        #expect(fullDiskAccess.note == "Raccoon Writer doesn’t need full disk access, only access to removable drives, which Full Disk Access includes.")
+
+        for remedy in remedies {
+            #expect(!remedy.instructions.contains("Files & Folders"))
+        }
     }
 
     @Test func refusedPermissionIsAboutThePasswordOnly() {

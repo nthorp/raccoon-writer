@@ -25,6 +25,9 @@ struct FailedView: View {
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(explanation.message)
+                ForEach(explanation.remedies, id: \.title) { remedy in
+                    RemedyView(remedy: remedy)
+                }
                 Label(explanation.drive.note, systemImage: "externaldrive")
                 Text("Stopped while: \(stage.label.lowercased()).")
                     .foregroundStyle(.secondary)
@@ -40,9 +43,9 @@ struct FailedView: View {
 
     private var secondaryButton: OutcomeButton? {
         switch explanation.action {
-        case .openPrivacySettings:
-            guard let url = PrivacySettingsLink.filesAndFolders else { return nil }
-            return OutcomeButton(title: "Open Privacy Settings…") { NSWorkspace.shared.open(url) }
+        case .openFullDiskAccessSettings:
+            guard let url = PrivacySettingsLink.fullDiskAccess else { return nil }
+            return OutcomeButton(title: "Open Full Disk Access Settings…") { NSWorkspace.shared.open(url) }
         case nil:
             return nil
         }

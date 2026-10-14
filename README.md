@@ -79,10 +79,12 @@ Select image → Select drive → Confirm
 
 At launch macOS may ask whether Raccoon Writer can access files on a removable volume. Listing drives triggers it, and writing needs the access. If you press Don't Allow, the drive list still works, but every write fails right after you enter the password, and the failed screen says macOS blocked access to removable drives.
 
-To fix it, either:
+The failed screen lists two fixes:
 
-- press **Open Privacy Settings…** on that screen (or open System Settings › Privacy & Security › Files & Folders), turn on **Removable Volumes** under Raccoon Writer, then try again; or
-- run `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter`, relaunch the app and press Allow when asked.
+- **Reset the permission (recommended).** Run `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter` in Terminal. When macOS asks again, click Allow, then try again. If it doesn't ask, quit and reopen Raccoon Writer.
+- **Or turn on Full Disk Access.** Press **Open Full Disk Access Settings…** (or open System Settings › Privacy & Security › Full Disk Access), turn on Raccoon Writer, then try again. Raccoon Writer doesn't need full disk access, only access to removable drives, which Full Disk Access includes.
+
+Files & Folders usually has no Removable Volumes switch for Raccoon Writer. macOS adds a denied Full Disk Access entry for the app by itself, and Files & Folders then shows only "Full Disk Access" under the app's name, even though that access is off.
 
 If you build from source: macOS treats each ad-hoc-signed rebuild as a new app (the log shows tccd "Failed to match existing code requirement"), so the prompt can come back after rebuilding.
 

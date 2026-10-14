@@ -377,7 +377,7 @@ Checks that a disk which takes over the drive's `/dev/diskN` name while the pass
 
 ### H16 — Removable Volumes privacy prompt denied (T25)
 
-At launch, drive discovery makes macOS ask whether Raccoon Writer may access removable volumes. If that is denied, the password is still accepted but authopen's open fails with "Operation not permitted". From T25 on, the app says macOS blocked access to removable drives and offers a button to the setting, instead of blaming the password.
+At launch, drive discovery makes macOS ask whether Raccoon Writer may access removable volumes. If that is denied, the password is still accepted but authopen's open fails with "Operation not permitted". From T25 on, the app says macOS blocked access to removable drives and lists two fixes (a `tccutil` reset in Terminal, or Full Disk Access), instead of blaming the password.
 
 Keep this running in a second Terminal window for the whole test:
 
@@ -386,15 +386,18 @@ log stream --predicate 'subsystem == "com.example.raccoonwriter" OR (subsystem =
 ```
 
 **Steps**
-1. **Simulate, Debug.** `scripts/build.sh`, then `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`. Choose any image, pick `disk97` "Simulated USB Stick (privacy settings blocked)", Continue, Erase and Write. After the simulated password wait, the failed screen should say "macOS blocked access to removable drives", name Privacy & Security › Files & Folders, and show "Open Privacy Settings…" next to "Try Again". Check Light and Dark, and the window at its minimum width. Press "Open Privacy Settings…" and note which pane opens. Quit.
+1. **Simulate, Debug.** `scripts/build.sh`, then `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`. Choose any image, pick `disk97` "Simulated USB Stick (privacy settings blocked)", Continue, Erase and Write. After the simulated password wait, the failed screen should say "macOS blocked access to removable drives" and list two fixes: "Reset the permission in Terminal" with the `tccutil` command, and "Or turn on Full Disk Access" with a note that the app doesn't need full disk access. "Open Full Disk Access Settings…" sits next to "Try Again". Check Light and Dark and the window at its minimum width, and that the command can be selected and copied. Press "Open Full Disk Access Settings…" and note which pane opens. Quit.
 2. **Deny, Release, Cruzer Glide.** `scripts/build.sh --release`, then `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter`. Plug in the stick and launch `build/RaccoonWriter.app`. The prompt should show the new text ("…to list them and write disk images to them."); press **Don't Allow**. Choose an image and the stick, Continue, Erase and Write, and enter your password.
-3. **Fix without relaunching.** On the failed screen press "Open Privacy Settings…", turn on Removable Volumes for Raccoon Writer, switch back, press Try Again and write again. If the write and verify don't pass, quit, relaunch and try once more.
+3. **Fix 1, the Terminal reset.** Leave the app on the failed screen. Copy the command from the screen and run it in Terminal. Note whether the prompt comes back without relaunching (the drive list refreshes every few seconds). Click Allow, press Try Again and write again. If there is no prompt, or the write fails, quit and reopen, Allow, and write again; note that a relaunch was needed.
+3b. **Fix 2, Full Disk Access.** Run `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter`, relaunch and press Don't Allow again, then write until the failed screen appears. Press "Open Full Disk Access Settings…", turn on Raccoon Writer, and note whether macOS asks to quit and reopen. Press Try Again and write again; if it fails, quit and reopen and try once more. Afterwards turn Full Disk Access off again.
 4. **Optional: cancelled dialog unchanged.** Cancel the password dialog once. The T18 cancelled notice on the confirm screen should appear, not the new failed screen.
 
 **Expected**
-- Step 1: the wording and both buttons as above, readable in Light and Dark and at minimum width. The button opens Privacy & Security, ideally at Files & Folders.
+- Step 1: the wording, both fixes and both buttons as above, readable in Light and Dark and at minimum width. The button opens Privacy & Security › Full Disk Access.
 - Step 2: the failed screen from step 1, "Nothing was written to the drive." The log shows the `authopen: couldn't open /dev/rdiskN: Operation not permitted` line followed by `authopen failure mapped to blockedByPrivacySettings`. The stick's contents are untouched. Note: the app unmounts the drive just before the open, so its volume will probably have left Finder; note whether it did.
-- Step 3: the write and verify pass. Note whether a relaunch was needed.
+- Steps 3 and 3b: the write and verify pass after each fix. Note for each whether a relaunch was needed.
+
+**Found during the first run (2026-10-13):** after Don't Allow, Files & Folders showed only "Full Disk Access" under RaccoonWriter, with no Removable Volumes switch, although the app's Full Disk Access entry is denied (macOS adds it by itself). That is why the fixes changed from the Files & Folders switch to the two above.
 
 **Result:**
 **Notes:**

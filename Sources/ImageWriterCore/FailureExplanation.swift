@@ -10,6 +10,8 @@ public struct FailureExplanation: Equatable, Sendable {
     public var drive: DriveCondition
     /// The raw error text, for a details line. Nil when the message already says it all.
     public var details: String?
+    /// Ways to fix it, in the order to try them. Empty for almost every failure.
+    public var remedies: [FailureRemedy]
     /// A fix the screen can offer next to Try Again. Nil for almost every failure.
     public var action: FailureAction?
 
@@ -18,12 +20,14 @@ public struct FailureExplanation: Equatable, Sendable {
         message: String,
         drive: DriveCondition,
         details: String? = nil,
+        remedies: [FailureRemedy] = [],
         action: FailureAction? = nil
     ) {
         self.title = title
         self.message = message
         self.drive = drive
         self.details = details
+        self.remedies = remedies
         self.action = action
     }
 
@@ -131,13 +135,7 @@ public struct FailureExplanation: Equatable, Sendable {
                 drive: .untouched
             )
         case .blockedByPrivacySettings:
-            let app = AppInfo.shortName
-            return FailureExplanation(
-                title: "macOS blocked access to removable drives",
-                message: "\(app) isn’t allowed to use removable drives. In System Settings, open Privacy & Security › Files & Folders, turn on Removable Volumes under \(app), then try again.",
-                drive: .untouched,
-                action: .openPrivacySettings
-            )
+            return privacyBlocked
         case .deviceBusy:
             return FailureExplanation(
                 title: "The drive is in use",
@@ -159,6 +157,31 @@ public struct FailureExplanation: Equatable, Sendable {
                 details: error.localizedDescription
             )
         }
+    }
+
+    /// The Removable Volumes switch in Files & Folders is usually hidden (see
+    /// `FailureAction`), so the fixes are a Terminal reset, which brings the prompt
+    /// back, or Full Disk Access, which includes removable drives.
+    private static var privacyBlocked: FailureExplanation {
+        let app = AppInfo.shortName
+        return FailureExplanation(
+            title: "macOS blocked access to removable drives",
+            message: "macOS privacy settings don’t allow \(app) to use removable drives, so the drive wasn’t opened. To fix this, do one of the following.",
+            drive: .untouched,
+            remedies: [
+                FailureRemedy(
+                    title: "Reset the permission in Terminal",
+                    instructions: "Run this command in Terminal. When macOS asks whether \(app) can access files on a removable volume, click Allow, then try again. If macOS doesn’t ask, quit and reopen \(app).",
+                    command: "tccutil reset SystemPolicyRemovableVolumes \(AppInfo.bundleIdentifier)"
+                ),
+                FailureRemedy(
+                    title: "Or turn on Full Disk Access",
+                    instructions: "In System Settings, open Privacy & Security › Full Disk Access, turn on \(app), then try again. If macOS asks to quit and reopen \(app), do so.",
+                    note: "\(app) doesn’t need full disk access, only access to removable drives, which Full Disk Access includes."
+                ),
+            ],
+            action: .openFullDiskAccessSettings
+        )
     }
 
     // MARK: - Write
