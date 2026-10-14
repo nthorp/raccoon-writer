@@ -1244,6 +1244,14 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
 - `scripts/test.sh` (396 tests in Swift Testing's count), `scripts/build.sh` and `scripts/build.sh --release` pass. The only Release warning is the existing `PosixIO.swift:36` one.
 - `docs/HARDWARE_TESTS.md` is unchanged until Nick's results are in; record them there (H5 for step 2, H2 for step 4) and here.
 
+**Nick's results** (2026-10-13, commit `214f99c`):
+- Step 1 PASS: the About window shows "Copyright © 2026 Nicholas Thorp."; the holder is correct.
+- Step 2 PASS on the Cruzer Glide (TESTSTICK). Nick is fine with "EFI" appearing among the names, so it stays. Not yet reported: whether the name stays on the row after `diskutil unmount /Volumes/TESTSTICK` and Refresh.
+- Step 3 PASS: full write and verify with the Hardened Runtime, Release build.
+- Step 5 PASS: the removable-volume prompt check passed.
+- At first the stick was missing from the list. USB still enumerated the Cruzer Glide, but there was no disk node, because it had been ejected and not unplugged. Replugging fixed it. A leftover 512 MiB RAM disk was still attached as `disk9`.
+- Still to do: steps 0 and 4 (Debug build).
+
 **Instructions for Nick.** Keep `log stream --predicate 'subsystem == "com.example.raccoonwriter"' --info` open in a second Terminal window. `scripts/build.sh` and `scripts/build.sh --release` both write `build/RaccoonWriter.app`, so build the one each step names right before it.
 0. **Simulate click-through, Debug** (added: the agent couldn't drive the GUI). `scripts/build.sh`, then `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`. Choose any image. Each simulated drive row starts with its volume name, for example "SIM90 · 16 GB · /dev/disk90 · USB". Run `disk90` through to Done. Then pick `disk93`, Continue…, Erase and Write; after the simulated dialog is cancelled, the confirm screen shows "Volume names: SIM93" and "Mounted volumes: /Volumes/SIM93", with the T18 callout on top.
 1. **Copyright.** Confirm or correct "Copyright © 2026 Nicholas Thorp." in `App/Info.plist`. Then `scripts/build.sh --release`, `open build/RaccoonWriter.app`, and check the line in Raccoon Writer > About Raccoon Writer.
