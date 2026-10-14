@@ -42,6 +42,12 @@ targets:
           ONLY_ACTIVE_ARCH: YES
         Release:
           ONLY_ACTIVE_ARCH: NO
+          # Stripping only happens when DEPLOYMENT_POSTPROCESSING is on, and plain
+          # `xcodebuild build` leaves it off. The two STRIP_ values are the defaults,
+          # spelled out because they do nothing without it. Symbols stay in the dSYM.
+          DEPLOYMENT_POSTPROCESSING: YES
+          STRIP_INSTALLED_PRODUCT: YES
+          STRIP_STYLE: all
 schemes:
   RaccoonWriter:
     build:

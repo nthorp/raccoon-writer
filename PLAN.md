@@ -129,9 +129,10 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T19 | 🧑 Flush the drive cache with `DKIOCSYNCHRONIZE` | T16 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
 | T20 | 🧑 Warn for drives over 500 GB; README says USB hard drives are listed | T18 | DONE | 2026-10-13 | Claude (prep) / Nick (check) |
 | T21 | Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill | T16 | DONE | 2026-10-13 | Claude |
+| T24 | Smaller app: optimized raccoon layer, stripped Release binary | T23 | DONE | 2026-10-13 | Claude |
 | T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | TODO | | Claude (prep) / Nick (run) |
 
-Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
+Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
 ---
 
@@ -1301,6 +1302,66 @@ Keep `AppInfo.shortName` even though it now equals `displayName`, so code that u
 
 ---
 
+### T24 — Smaller app: optimized raccoon layer, stripped Release binary
+
+**Goal:** bring the Release app back down from about 7.0 MB. It was 2.9 MB at T00 (no icon), 5.8 MB after T17 and 7.0 MB after T23. Measured on the T23 Release build:
+
+| Part | Size | Why |
+| --- | --- | --- |
+| `Contents/Resources/Assets.car` | 3.90 MB | The `.icon` compiles to two 1024 px renders (1.26 MB each), the raw 1024 px `raccoon` layer kept for runtime rendering (0.85 MB), a 512@2x render (0.35 MB) and smaller ones. The T23 layer is a 1254 px, 1.8 MB RGBA PNG with a lot of fine fur detail, which compresses poorly |
+| `Contents/MacOS/RaccoonWriter` | 3.16 MB | Universal, about 1.5 MB per architecture, of which about 0.95 MB is `__LINKEDIT` (symbols). `xcodebuild build` never strips: `STRIP_INSTALLED_PRODUCT` is already `YES` but only applies when `DEPLOYMENT_POSTPROCESSING` is `YES`, and it's `NO` |
+| `Contents/Resources/AppIcon.icns` | 0.10 MB | Pre-26 fallback |
+
+Two fixes, both measured in a scratch build when this task was written:
+- **Optimized layer.** Nick supplied `raccoon-optimized.png` (untracked, repo root): the same raccoon at 1024 × 1024, 8-bit palette with transparency, 278 KB, SHA-256 `9f169f1b6ac86acc3759a6acabb43d9d38ec4e48a744d309187e52beba772656`. Compiled with `actool` in place of the T23 layer: `Assets.car` 3.90 → 2.76 MB (1024 renders 1.01 MB each, layer 0.31 MB) and `AppIcon.icns` 104 → 82 KB. `actool` re-encodes everything, so most of the saving comes from the palette reducing detail, not from the smaller source file.
+- **Strip the Release binary.** `strip -rSTx` on a copy of the T23 Release binary: 3.16 → 1.43 MB. The Swift type names that `scripts/check-release-flags.sh` and T22 look for (`FakeDeviceOpener`, `FileBackedDevice`) were still found after stripping, because they're in Swift type metadata, not only the symbol table. So the release check doesn't go blind.
+
+Expected result: about 4.2 MB.
+
+**Out of scope:** going back to a flat `.appiconset` (loses the macOS 26 icon styles from T17); dropping the x86_64 slice; `DEAD_CODE_STRIPPING` and other linker or optimisation changes (measure them in a separate task if wanted); per-size small icon art.
+
+**Agent steps**
+1. **Layer.**
+   - Check `raccoon-optimized.png` against the SHA-256 above. If it's missing or different, set `BLOCKED` and ask Nick for it.
+   - Check it the way T23 checked the original: body pixels fully opaque (set alpha 250–254 to 255; leave the anti-aliased edge alone), clear near-invisible specks outside the raccoon (alpha ≤ 3), no baked-in ground shadow. Record the counts. If you change pixels, keep it a palette PNG, or re-encode and record both sizes. The goal is a small file.
+   - Replace `App/AppIcon.icon/Assets/raccoon.png` with it. Same file name, so `icon.json` keeps `image-name`.
+   - The new layer is 1024 px, not 1254. Render Default with `ictool` before and after the swap and compare the raccoon's size and position on the tile. If the framing changed, adjust the layer `scale` in `icon.json` until it matches the T23 render, and record the new value.
+   - Render Default, Dark, ClearLight, ClearDark, TintedLight and TintedDark, as T17 and T23 did. Look at each one at full size and compare it with the T23 render. Look for banding in the fur shading, a halo or fringe at the edge, and colour shifts in the blue stick. Note anything visible in the Handoff notes; if it's clearly worse, set `BLOCKED` with the renders' paths rather than tuning the art yourself.
+2. **Strip.**
+   - In `project.yml`, set `DEPLOYMENT_POSTPROCESSING: YES` for the Release configuration of the `RaccoonWriter` target only. `STRIP_INSTALLED_PRODUCT` (`YES`) and `STRIP_STYLE` (`all`) already have the right defaults, but set them explicitly next to it with a comment saying why, since they do nothing without it. Debug stays unstripped so debugging works.
+   - Check that Xcode strips before it signs: `codesign --verify --strict build/RaccoonWriter.app` passes after `scripts/build.sh --release`. If the setting doesn't take effect with `xcodebuild build`, fall back to a `strip -rSTx` step in `scripts/build.sh` for Release, followed by an ad hoc re-sign (`codesign --force --sign -`, and keep any flags T22 adds by then). Record which approach you used.
+   - The dSYM (`RaccoonWriter.app.dSYM`, `DEBUG_INFORMATION_FORMAT` is already `dwarf-with-dsym`) holds the symbols that were stripped. `scripts/build.sh --release` copies it to `build/` next to the app so crash logs from a given build can be symbolicated. Check it with `dwarfdump --uuid` against the binary.
+   - Release flag check still works on the stripped binary: run `scripts/check-release-flags.sh` and confirm it passes. Then confirm the grep can still see Swift type names. `grep -caF WriteCoordinator` on the stripped Release binary must find it. Record the count. If it doesn't find it, stop and set `BLOCKED`: stripping would have hidden a leaked debug type from the check.
+3. **Size check in the build.** At the end of `scripts/build.sh`, print the app's total size and the sizes of the executable and `Assets.car`. Print only; don't fail on size.
+4. Delete `raccoon-optimized.png` from the repo root once step 5 passes. It's untracked; its content is now `App/AppIcon.icon/Assets/raccoon.png`.
+5. `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass. Record the Release sizes (total, executable, `Assets.car`, `AppIcon.icns`) next to the T23 numbers above. Fill in Handoff notes, mark `DONE` and commit.
+
+**Acceptance criteria**
+- `App/AppIcon.icon/Assets/raccoon.png` is the optimized layer (1024 px). The `ictool` renders show the raccoon framed as in T23, an ivory tile in Default, a dark tile in Dark and the raccoon shape in Clear and Tinted, with no visible banding or fringe.
+- The Release executable is stripped (about 1.4 MB). The Debug build is not.
+- `codesign --verify --strict` passes on the Release app, and the dSYM's UUIDs match the binary.
+- The release flag check passes, and a known Swift type name is still found in the stripped binary.
+- The Release `RaccoonWriter.app` is at most 4.8 MB (`du -sk`; was 4.5 MB, raised by Nick on 2026-10-13, see Handoff notes). `scripts/build.sh` prints its sizes.
+- `raccoon-optimized.png` is gone from the repo root, and was never committed there.
+- `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass.
+
+**Files:** `App/AppIcon.icon/` (`Assets/raccoon.png`, maybe `icon.json`), `project.yml`, `scripts/build.sh`, `PLAN.md`; `raccoon-optimized.png` deleted
+
+**Handoff notes:**
+- **Done 2026-10-13.** `scripts/test.sh` passes 391 tests. `scripts/build.sh` and `scripts/build.sh --release` succeed for `x86_64 arm64`, and the release flag check passes. `build/` holds the Release build and its dSYM. No disk was touched.
+- **Release sizes** (bytes; T23 in brackets): app 4,564 KiB by `du -sk`, about 4.67 MB [7.0 MB]; executable 1,495,856 [3.16 MB]; `Assets.car` 3,053,656 [3.90 MB]; `AppIcon.icns` 103,985 [about 104 KB, unchanged].
+- **Size limit raised from 4.5 to 4.8 MB, with Nick's approval.** The 4.2 MB estimate above was measured with the 1024 px layer still at T23's scale 0.75. Icon Composer sizes a layer by its pixel count, so that drew the raccoon about 18% smaller than T23. `actool` at scale 0.75 reproduces the estimate (`Assets.car` 2,734,872 bytes, `.icns` 82,076). At the T23 framing that step 1 requires, the 1024 px renders are 1.13 MB each, not 1.01 MB, and the `.icns` is back to 104 KB. So most of the icon saving the plan expected came from drawing the raccoon smaller, not from the palette. What the palette saves is the raw layer: 0.85 MB down to 0.31 MB in `Assets.car`. Nick chose to keep the framing and raise the limit rather than shrink the raccoon.
+- **Layer:** SHA-256 matched. It's the T23 layer scaled down by 1024/1254: the raccoon's bounding box is 917 × 967 px, against 1126 × 1188, with the same relative centre. The palette had no fully opaque entries: the body was alpha 251–254 (608,978 pixels). The 241 palette entries at alpha 250–254 were set to 255 in the `tRNS` chunk alone. The compressed pixel data is byte-identical, it's still an 8-bit palette PNG, and the file is the same size (278,457 bytes). PNG stores straight colour, so no colour changed. Edge alphas (13–245, 15,439 pixels) are unchanged. There were no specks at alpha 1–3, so none were cleared. There's no ground shadow: nothing visible lies below the lowest opaque row, and the 534 semi-transparent pixels more than 3 px from the body are thin fur strands spread over the whole height.
+- **`icon.json`:** layer `scale` 0.75 → 0.918 (0.75 × 1254/1024). At 0.918 the Default render's raccoon bounding box (diffed against a tile-only render) is 841 × 888 px at (540, 514), the same as T23. Scale 0.92 is 2 px larger. Nothing else changed.
+- **Renders:** Default, Dark, ClearLight, ClearDark, TintedLight and TintedDark all look right and match the T23 renders: ivory tile in Default, dark tile in Dark, raccoon shape in Clear and Tinted. Only 140–8,900 pixels per render differ from T23 by more than 24 levels. At 3× zoom there's no banding in the tail fur and no halo or fringe on the dark tile. The new render is very slightly softer, with faint palette dither on the blue stick that isn't visible at 1×. The stick's mean colour is (49, 159, 225) both before and after.
+- **Strip:** the `project.yml` setting works with `xcodebuild build`, so no `build.sh` fallback was needed. Release runs `GenerateDSYMFile`, then `Strip` (`strip -D`), then `CodeSign`. `codesign --verify --strict` passes. The dSYM's UUIDs (arm64 `1F8AA339-…`, x86_64 `7179900A-…`) match the binary's. The Debug build has no `Strip` step: its code is in `RaccoonWriter.debug.dylib` (36,542 defined symbols), and the main executable there is a 122 KB stub, so `build.sh` prints a small executable size for Debug.
+- **Release check on the stripped binary:** `check-release-flags.sh` passes. `grep -caF WriteCoordinator` finds 6 matches, so type names in Swift metadata survive stripping.
+- **Possible follow-up:** Xcode's `STRIP_STYLE` `all` keeps 778 symbol-table entries per architecture, almost all undefined Swift imports. `strip -T` (Swift symbols) removes them: 86 KB less (1,410,160 bytes). Binding goes through chained fixups, so they aren't needed. Not done, since only the strip setting was in scope; `STRIPFLAGS: -T` would be the change if wanted.
+- **Unrelated:** the Release log has one Swift warning, `PosixIO.swift:36` ("forming 'UnsafeMutableRawPointer' to a variable of type 'Argument'"). It comes from T19's code, not this task.
+- **`raccoon-optimized.png`** was deleted from the repo root after the builds passed. It was never committed. Its pixels are in `App/AppIcon.icon/Assets/raccoon.png`, with only the `tRNS` chunk changed.
+
+---
+
 ## 4. Future work (not in scope)
 
 - Rename the GitHub repo and local folder from `iso-sword` to match the app (T14 left them as they are).
@@ -1364,3 +1425,5 @@ Keep `AppInfo.shortName` even though it now equals `displayName`, so code that u
 | 2026-10-13 | T20 prep: `LargeDriveWarning` over 500 GB in the drive list and on the confirm screen, `SimulatedDrive.usbHardDrive`, README says USB hard drives are listed; NEEDS_HUMAN for the Simulate mode check | Claude |
 | 2026-10-13 | T20 DONE after Nick's check: "Large drive" in the list and the confirm screen warning pass in Simulate mode, Light and Dark, at minimum width | Claude |
 | 2026-10-13 | T21 DONE: received device descriptor is close-on-exec; partial-block transfers stop with `partialBlock` errors; `FileIdentity` (inode, size, mtime) checked when the image is opened and after verify; `ProcessCommandRunner` escalates to SIGKILL and bounds every wait | Claude |
+| 2026-10-13 | T24 added: the Release app grew from 2.9 MB to 7.0 MB (icon layer and unstripped binary); swap in Nick's optimized 1024 px raccoon layer and strip Release builds; listed above T22 so it is done next | Claude |
+| 2026-10-13 | T24 DONE: optimized layer at scale 0.918 (T23 framing), Release binary stripped with its dSYM kept in `build/`, sizes printed by `build.sh`; app 7.0 → 4.67 MB. Size limit raised from 4.5 to 4.8 MB with Nick's approval, since the 4.2 MB estimate assumed a smaller raccoon | Claude |

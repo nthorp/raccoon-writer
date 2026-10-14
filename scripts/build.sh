@@ -37,8 +37,12 @@ xcodebuild \
     build
 
 app_src="$derived/Build/Products/$config/RaccoonWriter.app"
-rm -rf build/RaccoonWriter.app
+rm -rf build/RaccoonWriter.app build/RaccoonWriter.app.dSYM
 cp -R "$app_src" build/RaccoonWriter.app
+# Release binaries are stripped, so keep the dSYM beside the app to symbolicate its crash logs.
+if [[ "$config" == Release ]]; then
+    cp -R "$app_src.dSYM" build/RaccoonWriter.app.dSYM
+fi
 
 archs="$(lipo -archs build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter)"
 echo "Built build/RaccoonWriter.app ($config) — architectures: $archs"
@@ -52,3 +56,8 @@ done
 if [[ "$config" == Release && -x scripts/check-release-flags.sh ]]; then
     scripts/check-release-flags.sh build/RaccoonWriter.app
 fi
+
+kib() { echo "$(( ($(stat -f %z "$1") + 1023) / 1024 )) KB"; }
+echo "Size: $(du -sk build/RaccoonWriter.app | cut -f1) KB total," \
+    "executable $(kib build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter)," \
+    "Assets.car $(kib build/RaccoonWriter.app/Contents/Resources/Assets.car)"
