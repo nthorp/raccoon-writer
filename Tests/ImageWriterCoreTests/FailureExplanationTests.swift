@@ -24,6 +24,7 @@ struct FailureExplanationTests {
         WriteFailure(stage: .open, error: DeviceOpenError.invalidDiskName("disk4s1")),
         WriteFailure(stage: .open, error: DeviceOpenError.userCancelled),
         WriteFailure(stage: .open, error: DeviceOpenError.permissionDenied),
+        WriteFailure(stage: .open, error: DeviceOpenError.blockedByPrivacySettings),
         WriteFailure(stage: .open, error: DeviceOpenError.deviceBusy),
         WriteFailure(stage: .open, error: DeviceOpenError.authorizationFailed(status: -60008)),
         WriteFailure(stage: .open, error: DeviceOpenError.authopenFailed(status: 1, message: "boom")),
@@ -57,10 +58,16 @@ struct FailureExplanationTests {
         #expect(!explanation.title.isEmpty)
         #expect(!explanation.message.isEmpty)
         // Technical text belongs in the details line, never the main message.
-        for jargon in ["errno", "exit status", "authopen", "OSStatus", "posix", "recvmsg", "Optional("] {
+        for jargon in ["errno", "exit status", "authopen", "OSStatus", "posix", "recvmsg", "Optional(", "TCC", "EPERM"] {
             #expect(!explanation.message.contains(jargon), "\(failure.error) message: \(explanation.message)")
             #expect(!explanation.title.contains(jargon))
         }
+    }
+
+    @Test(arguments: everyFailure)
+    func onlyAPrivacyBlockOffersTheSettingsButton(_ failure: WriteFailure) {
+        let expected: FailureAction? = failure.error as? DeviceOpenError == .blockedByPrivacySettings ? .openPrivacySettings : nil
+        #expect(FailureExplanation(failure).action == expected)
     }
 
     @Test(arguments: everyFailure)
@@ -183,6 +190,24 @@ struct FailureExplanationTests {
         let explanation = explain(.open, DeviceOpenError.authopenFailed(status: 3, message: "no such device"))
         #expect(explanation.title == "The drive couldn’t be opened")
         #expect(explanation.details?.contains("exit status 3") == true)
+        #expect(explanation.drive == .untouched)
+    }
+
+    /// T25: a denied Removable Volumes prompt, not the password.
+    @Test func privacyBlockNamesTheSettingToChange() {
+        let explanation = explain(.open, DeviceOpenError.blockedByPrivacySettings)
+        #expect(explanation.title == "macOS blocked access to removable drives")
+        #expect(explanation.message == "Raccoon Writer isn’t allowed to use removable drives. In System Settings, open Privacy & Security › Files & Folders, turn on Removable Volumes under Raccoon Writer, then try again.")
+        #expect(explanation.drive == .untouched)
+        #expect(explanation.details == nil)
+        #expect(explanation.action == .openPrivacySettings)
+    }
+
+    @Test func refusedPermissionIsAboutThePasswordOnly() {
+        let explanation = explain(.open, DeviceOpenError.permissionDenied)
+        #expect(explanation.title == "Permission was refused")
+        #expect(explanation.message.contains("administrator name and password"))
+        #expect(!explanation.message.contains("macOS did not allow"))
         #expect(explanation.drive == .untouched)
     }
 

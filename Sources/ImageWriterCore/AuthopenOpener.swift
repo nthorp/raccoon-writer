@@ -72,8 +72,10 @@ public struct AuthopenOpener: DeviceOpener {
         if let fd = outcome.descriptor {
             Darwin.close(fd)
         }
+        let error = failure(for: outcome.termination, stderr: outcome.stderr)
         log.error("authopen \(String(describing: outcome.termination), privacy: .public): \(outcome.stderr, privacy: .public)")
-        throw failure(for: outcome.termination, stderr: outcome.stderr)
+        log.error("authopen failure mapped to \(String(describing: error), privacy: .public)")
+        throw error
     }
 
     // MARK: - Error mapping
@@ -91,6 +93,9 @@ public struct AuthopenOpener: DeviceOpener {
 
     /// authopen exits 1 for every failure, so only its stderr text tells them apart.
     /// T01 observed the cancel text: "AuthorizationCreate failed: The authorization was canceled by the user."
+    /// The password is checked before authopen runs (`-extauth`), so `EPERM` from its open
+    /// ("authopen: couldn't open <path>: Operation not permitted") is the system policy,
+    /// on a removable drive the Removable Volumes privacy setting (T25), not the password.
     /// With `-extauth` the app shows the dialog, but the cancel text still matters if
     /// authopen finds the external authorization insufficient and shows its own.
     static func failure(for termination: Termination, stderr: String) -> DeviceOpenError {
@@ -103,6 +108,7 @@ public struct AuthopenOpener: DeviceOpener {
             return .authopenTerminated(signal: signal)
         case .exited(let status):
             if text.contains("busy") { return .deviceBusy }
+            if text.contains("operation not permitted") { return .blockedByPrivacySettings }
             if text.contains("not permitted") || text.contains("denied") { return .permissionDenied }
             return .authopenFailed(status: status, message: stderr.trimmingCharacters(in: .whitespacesAndNewlines))
         }

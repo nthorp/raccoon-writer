@@ -17,9 +17,21 @@ struct AuthopenOpenerTests {
         #expect(AuthopenOpener.failure(for: .exited(1), stderr: "open: Resource busy") == .deviceBusy)
     }
 
-    @Test(arguments: ["open: Operation not permitted", "open: Permission denied", "AuthorizationCopyRights denied"])
+    /// T25: the password was already accepted, so EPERM from the open is the Removable
+    /// Volumes privacy setting. The first line is Nick's, from a denied prompt.
+    @Test(arguments: [
+        "authopen: couldn't open /dev/rdisk8: Operation not permitted\n",
+        "AUTHOPEN: COULDN'T OPEN /DEV/RDISK8: OPERATION NOT PERMITTED",
+    ])
+    func operationNotPermittedMapsToPrivacySettings(_ stderr: String) {
+        #expect(AuthopenOpener.failure(for: .exited(1), stderr: stderr) == .blockedByPrivacySettings)
+        #expect(AuthopenOpener.failure(for: .exited(2), stderr: stderr) == .blockedByPrivacySettings)
+    }
+
+    @Test(arguments: ["open: Permission denied", "AuthorizationCopyRights denied"])
     func refusalMapsToPermissionDenied(_ stderr: String) {
         #expect(AuthopenOpener.failure(for: .exited(1), stderr: stderr) == .permissionDenied)
+        #expect(AuthopenOpener.failure(for: .exited(2), stderr: stderr) == .permissionDenied)
     }
 
     @Test func unrecognizedTextIsGenericFailure() {

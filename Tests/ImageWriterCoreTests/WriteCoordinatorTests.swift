@@ -257,6 +257,20 @@ final class WriteCoordinatorTests {
         #expect(opener.grants.map(\.releaseCount) == [1])
     }
 
+    /// T25: same path as `.permissionDenied`; only the wording differs.
+    @Test func privacyBlockedOpenDoesNotEject() async throws {
+        let diskManager = FakeDiskManager()
+        let opener = FakeDeviceOpener(openError: .blockedByPrivacySettings)
+        let (coordinator, _) = coordinator(diskManager: diskManager, opener: opener)
+
+        try await runToEnd(coordinator, image: try image())
+
+        #expect(coordinator.state == .failed(WriteFailure(stage: .open, error: DeviceOpenError.blockedByPrivacySettings)))
+        #expect(diskManager.calls == [.unmount("disk4")])
+        #expect(opener.openAttempts == ["disk4"])
+        #expect(opener.grants.map(\.releaseCount) == [1])
+    }
+
     @Test func authorizationFailureStopsBeforeEverything() async throws {
         let diskManager = FakeDiskManager()
         let opener = FakeDeviceOpener(authorizeError: .authorizationFailed(status: errAuthorizationInternal))

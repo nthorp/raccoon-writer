@@ -45,7 +45,7 @@ The Xcode project is generated from `project.yml` and is not checked in. The app
 
 These exist only in Debug builds. The Release build check fails if any of them leaks into a Release app.
 
-- `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter` runs the whole UI against simulated drives backed by temp files. It never calls `diskutil` or `authopen`. Each simulated drive scripts one outcome (success, drive pulled out, verification mismatch, password prompt cancelled, drive too small, and a 1 TB USB hard drive that shows the large-drive warning). See T10 in `PLAN.md`.
+- `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter` runs the whole UI against simulated drives backed by temp files. It never calls `diskutil` or `authopen`. Each simulated drive scripts one outcome (success, drive pulled out, verification mismatch, password prompt cancelled, drive too small, a 1 TB USB hard drive that shows the large-drive warning, and an open blocked by the privacy settings). See T10 in `PLAN.md`.
 - `RACCOONWRITER_ALLOW_VIRTUAL_DISKS=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter` also lists **unmounted** disk images, so you can test a real write against a RAM disk (`hdiutil attach -nomount ram://1048576`) without a USB stick. See H2 in `docs/HARDWARE_TESTS.md`.
 
 ### Logs
@@ -72,6 +72,19 @@ Select image → Select drive → Confirm
 - Writes go to the raw device (`/dev/rdiskN`) in about 4 MiB chunks, with aligned buffers and the system cache bypassed. The final flush asks the drive to empty its write cache with `DKIOCSYNCHRONIZE`, falling back to `F_FULLFSYNC` and then `fsync` where it isn't supported. On a raw device `fsync` doesn't reach the drive; the eject that follows flushes it.
 - Verification is always on. It compares every byte of the image with what the drive returns.
 - The Mac is kept from idle-sleeping during a write. The window can't be closed mid-write, and quitting asks first, then stops the write cleanly.
+
+## Troubleshooting
+
+### "macOS blocked access to removable drives"
+
+At launch macOS may ask whether Raccoon Writer can access files on a removable volume. Listing drives triggers it, and writing needs the access. If you press Don't Allow, the drive list still works, but every write fails right after you enter the password, and the failed screen says macOS blocked access to removable drives.
+
+To fix it, either:
+
+- press **Open Privacy Settings…** on that screen (or open System Settings › Privacy & Security › Files & Folders), turn on **Removable Volumes** under Raccoon Writer, then try again; or
+- run `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter`, relaunch the app and press Allow when asked.
+
+If you build from source: macOS treats each ad-hoc-signed rebuild as a new app (the log shows tccd "Failed to match existing code requirement"), so the prompt can come back after rebuilding.
 
 ## Known limitations
 

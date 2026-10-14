@@ -131,7 +131,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T21 | Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill | T16 | DONE | 2026-10-13 | Claude |
 | T24 | Smaller app: optimized raccoon layer, stripped Release binary | T23 | DONE | 2026-10-13 | Claude |
 | T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
-| T25 | 🧑 Tell a Removable Volumes privacy denial apart from a refused password | T21 | TODO | | Claude (prep) / Nick (run) |
+| T25 | 🧑 Tell a Removable Volumes privacy denial apart from a refused password | T21 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T25 builds on T22's committed prep but not on Nick's T22 runs, so it may start while T22 is `NEEDS_HUMAN`. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -1447,6 +1447,20 @@ Also, `NSRemovableVolumesUsageDescription` (T22) says the access is for reading 
 
 **Handoff notes:**
 
+**Prep, 2026-10-13 (Claude).** All agent steps done; `scripts/test.sh` (403 tests), `scripts/build.sh` and `scripts/build.sh --release` pass (Release 4.47 MB, flag check clean). Waiting for Nick's runs (H16 in `docs/HARDWARE_TESTS.md`).
+
+- **Core.** `DeviceOpenError.blockedByPrivacySettings` with description "macOS privacy settings did not allow Raccoon Writer to open the drive." `AuthopenOpener.failure(for:stderr:)` checks "operation not permitted" (case-insensitive) after cancel, signal and busy, before the generic "not permitted"/"denied" → `.permissionDenied`. `obtainDescriptor` logs a second line, `authopen failure mapped to <case>`, right after the existing stderr line (category `authopen`). `SecurityAuthorizer` unchanged.
+- **Wording.** New `FailureAction` (one case, `openPrivacySettings`) and `FailureExplanation.action` (nil by default; set only for the new case). `.permissionDenied` now reads "The administrator name and password weren’t accepted, so the drive wasn’t opened. Use the name and password of an administrator account." The jargon test also rejects "TCC" and "EPERM".
+- **App.** `OutcomeView` takes an optional `secondary: OutcomeButton?` (new `App/OutcomeButton.swift`), shown left of the main button. `FailedView` maps `.openPrivacySettings` to "Open Privacy Settings…", which calls `NSWorkspace.shared.open` on `PrivacySettingsLink.filesAndFolders` (`App/PrivacySettingsLink.swift`, an optional `URL`; nil hides the button). New `PreviewSamples.privacyFailure` and a "Failed: privacy settings" preview.
+- **Simulate.** `SimulatedDrive.privacyBlocked` (`disk97`, `/Volumes/SIM97`, "Simulated USB Stick (privacy settings blocked)"). Its authorization succeeds and the open throws `.blockedByPrivacySettings` in `SimulationMode.makeCoordinator`'s factory.
+- **Info.plist / README.** New `NSRemovableVolumesUsageDescription`; `InfoPlistTests` checks the exact text. README has a Troubleshooting section (prompt, both fixes, rebuilds re-prompting) and lists the new simulated drive. The section 5 risk row already pointed at T25.
+- **Tests.** `AuthopenOpenerTests` split as specified (exit 1 and 2); `FailureExplanationTests` new-case wording, action only on the new case, `.permissionDenied` wording; `SimulationModeTests` disk97 fails at `.open` with nothing written, and the list includes disk97; `WriteCoordinatorTests.privacyBlockedOpenDoesNotEject`.
+- **Step 9 check.** I couldn't click through the app here, so I rendered `FailedView` for the disk97 failure with `ImageRenderer` (Light, Dark, and 540 pt, the window's minimum width). Wording and both buttons are correct and the message wraps cleanly. `SimulationModeTests` covers the Simulate-mode flow itself. Nick's step 1 is the real UI check.
+- **Deviation.** Step 8 and Nick's step 2 say an open failure leaves the drive "mounted". It doesn't: the coordinator unmounts just before the open, and the `.permissionDenied` test the plan cites (`openFailureDoesNotEject`) asserts `[.unmount("disk4")]`. The new test asserts the same (unmounted, not ejected, grant released), and H16 asks Nick to record whether the volume left Finder rather than expecting it to stay.
+- **Not verified:** that `x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders` opens Files & Folders on macOS 26, rather than just Privacy & Security. Nick's step 1 records it.
+
+**Instructions for Nick:** run H16 in `docs/HARDWARE_TESTS.md` (steps 1–3, step 4 optional) and report back: what the failed screen showed in Simulate and in Release, which pane the button opened, the two log lines from step 2, whether the stick's volume stayed mounted, and whether the write after turning on Removable Volumes passed with or without a relaunch.
+
 ---
 
 ## 4. Future work (not in scope)
@@ -1517,3 +1531,4 @@ Also, `NSRemovableVolumesUsageDescription` (T22) says the access is for reading 
 | 2026-10-13 | T22 prep: volume names in the drive list and on the confirm screen; `Fakes/` debug-only with three new release markers; copyright, category and removable-volume keys in Info.plist; Hardened Runtime on (needs `--options=runtime` for ad-hoc signing, and `ENABLE_DEBUG_DYLIB: NO` in Debug), checked by `build.sh`; NEEDS_HUMAN for Nick's runs | Claude |
 | 2026-10-13 | T22 DONE after Nick's runs: volume names, copyright, Release write on the Cruzer Glide and Debug RAM-disk write pass with the Hardened Runtime; privacy-prompt findings moved to T25 | Claude |
 | 2026-10-13 | T25 added from Nick's test: denying the Removable Volumes prompt (shown at launch by `diskutil` discovery) makes authopen fail with "Operation not permitted", which was reported as a refused password. New `blockedByPrivacySettings` case, failed screen with a Privacy Settings button, corrected usage text. T22's optional privacy-prompt step is superseded | Claude |
+| 2026-10-13 | T25 prep: `blockedByPrivacySettings` for authopen's "Operation not permitted", failed screen with an "Open Privacy Settings…" button (`FailureAction`), password-only `.permissionDenied` wording, `SimulatedDrive.privacyBlocked` (disk97), new usage text, README troubleshooting, H16; NEEDS_HUMAN for Nick's runs | Claude |

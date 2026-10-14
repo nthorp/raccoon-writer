@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import ImageWriterCore
 
@@ -19,7 +20,8 @@ struct FailedView: View {
             tint: .red,
             title: explanation.title,
             buttonTitle: "Try Again",
-            action: onTryAgain
+            action: onTryAgain,
+            secondary: secondaryButton
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(explanation.message)
@@ -35,6 +37,16 @@ struct FailedView: View {
             }
         }
     }
+
+    private var secondaryButton: OutcomeButton? {
+        switch explanation.action {
+        case .openPrivacySettings:
+            guard let url = PrivacySettingsLink.filesAndFolders else { return nil }
+            return OutcomeButton(title: "Open Privacy Settings…") { NSWorkspace.shared.open(url) }
+        case nil:
+            return nil
+        }
+    }
 }
 
 #if DEBUG
@@ -46,6 +58,12 @@ struct FailedView: View {
 
 #Preview("Failed: verification") {
     FailedView(failure: PreviewSamples.verifyFailure, onTryAgain: {})
+        .padding(24)
+        .frame(width: 580, height: 500)
+}
+
+#Preview("Failed: privacy settings") {
+    FailedView(failure: PreviewSamples.privacyFailure, onTryAgain: {})
         .padding(24)
         .frame(width: 580, height: 500)
 }

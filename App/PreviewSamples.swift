@@ -94,5 +94,10 @@ enum PreviewSamples {
         stage: .safetyCheck,
         error: SafetyGuardError.diskMissing(bsdName: "disk4")
     )
+
+    static let privacyFailure = WriteFailure(
+        stage: .open,
+        error: DeviceOpenError.blockedByPrivacySettings
+    )
 }
 #endif

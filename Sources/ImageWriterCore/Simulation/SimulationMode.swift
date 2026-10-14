@@ -38,6 +38,7 @@ public enum SimulationMode {
             guard let drive = SimulatedDrive(bsdName: bsdName) else {
                 throw DeviceOpenError.authopenFailed(status: 1, message: "Simulate: no simulated drive \(bsdName)")
             }
+            if drive == .privacyBlocked { throw DeviceOpenError.blockedByPrivacySettings }
             return try drive.openDevice(in: directory)
         }
         return WriteCoordinator(

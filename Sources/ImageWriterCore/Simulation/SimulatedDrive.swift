@@ -17,6 +17,9 @@ public enum SimulatedDrive: String, CaseIterable, Sendable {
     /// Ejectable but not removable, as USB hard drives report, so it is listed by default
     /// with the large-drive warning. Otherwise behaves like `working`.
     case usbHardDrive
+    /// The password dialog succeeds, then the open is refused as when the Removable
+    /// Volumes privacy prompt was denied.
+    case privacyBlocked
 
     static let writeBytesPerSecond = 40_000_000.0
     static let readBytesPerSecond = 80_000_000.0
@@ -34,6 +37,7 @@ public enum SimulatedDrive: String, CaseIterable, Sendable {
         case .tooSmall: return "disk94"
         case .thunderbolt: return "disk95"
         case .usbHardDrive: return "disk96"
+        case .privacyBlocked: return "disk97"
         }
     }
 
@@ -77,6 +81,7 @@ public enum SimulatedDrive: String, CaseIterable, Sendable {
         case .internalDisk: return "Simulated Internal SSD"
         case .thunderbolt: return "Simulated Thunderbolt SSD"
         case .usbHardDrive: return "Simulated USB Hard Drive (1 TB)"
+        case .privacyBlocked: return "Simulated USB Stick (privacy settings blocked)"
         }
     }
 

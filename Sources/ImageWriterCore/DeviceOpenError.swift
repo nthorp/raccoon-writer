@@ -7,8 +7,12 @@ public enum DeviceOpenError: Error, Equatable, Sendable {
     case invalidDiskName(String)
     /// The administrator prompt was cancelled.
     case userCancelled
-    /// Authorization was refused or the open was not permitted.
+    /// Authorization was refused, or the open was refused for a reason other than
+    /// the privacy settings (e.g. `EACCES`).
     case permissionDenied
+    /// macOS's privacy settings (Removable Volumes) refused the open after authorization
+    /// succeeded. authopen reports this as `EPERM`.
+    case blockedByPrivacySettings
     /// The disk is in use (usually still mounted).
     case deviceBusy
     /// Security.framework refused to create the authorization, for a reason other than
@@ -31,6 +35,8 @@ extension DeviceOpenError: LocalizedError {
             return "The administrator password prompt was cancelled."
         case .permissionDenied:
             return "macOS did not allow the drive to be opened for writing."
+        case .blockedByPrivacySettings:
+            return "macOS privacy settings did not allow \(AppInfo.shortName) to open the drive."
         case .deviceBusy:
             return "The drive is in use. Close any files on it and try again."
         case .authorizationFailed(let status):

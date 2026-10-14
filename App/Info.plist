@@ -29,6 +29,6 @@
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSRemovableVolumesUsageDescription</key>
-	<string>Raccoon Writer reads the disk image you choose when it is stored on a USB drive or other removable volume.</string>
+	<string>Raccoon Writer needs access to removable drives to list them and write disk images to them.</string>
 </dict>
 </plist>

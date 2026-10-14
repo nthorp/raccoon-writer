@@ -86,6 +86,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H13 | Intel Mac run | Release | Not possible | Intel Mac runs macOS 13.7.8; app needs 14+ |
 | H14 | What real disks report (read-only) | none | | |
 | H15 | Drive swapped during the password dialog | Debug | PASS | Both RAM disks were `disk8`; refused with "A different drive is attached" |
+| H16 | Removable Volumes privacy prompt denied | Debug + Release | | |
 
 **Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09). That build never tried `DKIOCSYNCHRONIZE`. **From T19 on: `DKIOCSYNCHRONIZE`** (Cruzer Glide, Release build, 2026-10-13, commit `169b386`; details under T19 in `PLAN.md`).
 
@@ -373,3 +374,27 @@ Checks that a disk which takes over the drive's `/dev/diskN` name while the pass
 
 **Result:** PASS
 **Notes:** 2026-10-12, Debug build, commit `e55abea`. First attempt: leftover RAM disks `disk10` and `disk11` were attached, so A became `disk12` and B took `disk8`; the names differed, so it was redone. After detaching the leftovers, A and B were both `disk8`, and after the password the app showed "A different drive is attached" (size changed).
+
+### H16 — Removable Volumes privacy prompt denied (T25)
+
+At launch, drive discovery makes macOS ask whether Raccoon Writer may access removable volumes. If that is denied, the password is still accepted but authopen's open fails with "Operation not permitted". From T25 on, the app says macOS blocked access to removable drives and offers a button to the setting, instead of blaming the password.
+
+Keep this running in a second Terminal window for the whole test:
+
+```sh
+log stream --predicate 'subsystem == "com.example.raccoonwriter" OR (subsystem == "com.apple.TCC" AND eventMessage CONTAINS[c] "raccoonwriter")' --info
+```
+
+**Steps**
+1. **Simulate, Debug.** `scripts/build.sh`, then `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`. Choose any image, pick `disk97` "Simulated USB Stick (privacy settings blocked)", Continue, Erase and Write. After the simulated password wait, the failed screen should say "macOS blocked access to removable drives", name Privacy & Security › Files & Folders, and show "Open Privacy Settings…" next to "Try Again". Check Light and Dark, and the window at its minimum width. Press "Open Privacy Settings…" and note which pane opens. Quit.
+2. **Deny, Release, Cruzer Glide.** `scripts/build.sh --release`, then `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter`. Plug in the stick and launch `build/RaccoonWriter.app`. The prompt should show the new text ("…to list them and write disk images to them."); press **Don't Allow**. Choose an image and the stick, Continue, Erase and Write, and enter your password.
+3. **Fix without relaunching.** On the failed screen press "Open Privacy Settings…", turn on Removable Volumes for Raccoon Writer, switch back, press Try Again and write again. If the write and verify don't pass, quit, relaunch and try once more.
+4. **Optional: cancelled dialog unchanged.** Cancel the password dialog once. The T18 cancelled notice on the confirm screen should appear, not the new failed screen.
+
+**Expected**
+- Step 1: the wording and both buttons as above, readable in Light and Dark and at minimum width. The button opens Privacy & Security, ideally at Files & Folders.
+- Step 2: the failed screen from step 1, "Nothing was written to the drive." The log shows the `authopen: couldn't open /dev/rdiskN: Operation not permitted` line followed by `authopen failure mapped to blockedByPrivacySettings`. The stick's contents are untouched. Note: the app unmounts the drive just before the open, so its volume will probably have left Finder; note whether it did.
+- Step 3: the write and verify pass. Note whether a relaunch was needed.
+
+**Result:**
+**Notes:**

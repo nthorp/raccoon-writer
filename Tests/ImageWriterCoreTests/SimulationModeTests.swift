@@ -34,8 +34,8 @@ final class SimulationModeTests {
         let usb = try await lister.targets(filter: DiskFilter(showAllExternal: false)).map(\.bsdName)
         let all = try await lister.targets(filter: DiskFilter(showAllExternal: true)).map(\.bsdName)
 
-        #expect(usb == ["disk90", "disk91", "disk92", "disk93", "disk94", "disk96"])
-        #expect(all == ["disk90", "disk91", "disk92", "disk93", "disk94", "disk95", "disk96"])
+        #expect(usb == ["disk90", "disk91", "disk92", "disk93", "disk94", "disk96", "disk97"])
+        #expect(all == ["disk90", "disk91", "disk92", "disk93", "disk94", "disk95", "disk96", "disk97"])
         #expect(!all.contains(SimulatedDrive.internalDisk.bsdName))
     }
 
@@ -106,6 +106,16 @@ final class SimulationModeTests {
             return
         }
         #expect(summary.bsdName == "disk96")
+    }
+
+    @Test func privacyBlockedDriveFailsAtTheOpenAfterThePassword() async throws {
+        let failure = try #require(failure(try await run(on: .privacyBlocked)))
+        #expect(failure.stage == .open)
+        #expect(failure.error as? DeviceOpenError == .blockedByPrivacySettings)
+        // The open threw before a device file was made, so nothing was written.
+        let devices = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0.hasPrefix("raccoonwriter-fake-") }
+        #expect(devices.isEmpty)
+        #expect(FailureExplanation(failure).drive == .untouched)
     }
 
     @Test func smallDriveCannotBeConfirmed() async throws {

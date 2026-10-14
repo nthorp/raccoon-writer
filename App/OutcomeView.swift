@@ -7,6 +7,7 @@ struct OutcomeView<Details: View>: View {
     let title: String
     let buttonTitle: String
     let action: () -> Void
+    var secondary: OutcomeButton? = nil
     @ViewBuilder let details: () -> Details
 
     var body: some View {
@@ -25,6 +26,9 @@ struct OutcomeView<Details: View>: View {
 
             HStack {
                 Spacer()
+                if let secondary {
+                    Button(secondary.title, action: secondary.action)
+                }
                 Button(buttonTitle, action: action)
                     .keyboardShortcut(.defaultAction)
             }

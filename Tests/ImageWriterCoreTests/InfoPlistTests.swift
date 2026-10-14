@@ -26,6 +26,12 @@ struct InfoPlistTests {
         #expect(value?.trimmingCharacters(in: .whitespaces).isEmpty == false)
     }
 
+    /// T25: the prompt comes from drive discovery, and writing needs the access too.
+    @Test func removableVolumesTextIsAboutListingAndWriting() throws {
+        let text = try #require(try entries()["NSRemovableVolumesUsageDescription"] as? String)
+        #expect(text == "Raccoon Writer needs access to removable drives to list them and write disk images to them.")
+    }
+
     @Test func categoryIsUtilities() throws {
         #expect(try entries()["LSApplicationCategoryType"] as? String == "public.app-category.utilities")
     }

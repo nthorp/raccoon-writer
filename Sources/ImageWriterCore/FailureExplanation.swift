@@ -10,12 +10,21 @@ public struct FailureExplanation: Equatable, Sendable {
     public var drive: DriveCondition
     /// The raw error text, for a details line. Nil when the message already says it all.
     public var details: String?
+    /// A fix the screen can offer next to Try Again. Nil for almost every failure.
+    public var action: FailureAction?
 
-    public init(title: String, message: String, drive: DriveCondition, details: String? = nil) {
+    public init(
+        title: String,
+        message: String,
+        drive: DriveCondition,
+        details: String? = nil,
+        action: FailureAction? = nil
+    ) {
         self.title = title
         self.message = message
         self.drive = drive
         self.details = details
+        self.action = action
     }
 
     public init(_ failure: WriteFailure) {
@@ -118,8 +127,16 @@ public struct FailureExplanation: Equatable, Sendable {
         case .permissionDenied:
             return FailureExplanation(
                 title: "Permission was refused",
-                message: "macOS did not allow the drive to be opened for writing. Use the name and password of an administrator account.",
+                message: "The administrator name and password weren’t accepted, so the drive wasn’t opened. Use the name and password of an administrator account.",
                 drive: .untouched
+            )
+        case .blockedByPrivacySettings:
+            let app = AppInfo.shortName
+            return FailureExplanation(
+                title: "macOS blocked access to removable drives",
+                message: "\(app) isn’t allowed to use removable drives. In System Settings, open Privacy & Security › Files & Folders, turn on Removable Volumes under \(app), then try again.",
+                drive: .untouched,
+                action: .openPrivacySettings
             )
         case .deviceBusy:
             return FailureExplanation(
