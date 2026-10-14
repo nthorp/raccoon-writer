@@ -130,7 +130,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T20 | 🧑 Warn for drives over 500 GB; README says USB hard drives are listed | T18 | DONE | 2026-10-13 | Claude (prep) / Nick (check) |
 | T21 | Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill | T16 | DONE | 2026-10-13 | Claude |
 | T24 | Smaller app: optimized raccoon layer, stripped Release binary | T23 | DONE | 2026-10-13 | Claude |
-| T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
 | T25 | 🧑 Tell a Removable Volumes privacy denial apart from a refused password | T21 | TODO | | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T25 builds on T22's committed prep but not on Nick's T22 runs, so it may start while T22 is `NEEDS_HUMAN`. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
@@ -1248,9 +1248,11 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
 - Step 1 PASS: the About window shows "Copyright © 2026 Nicholas Thorp."; the holder is correct.
 - Step 2 PASS on the Cruzer Glide (TESTSTICK). Nick is fine with "EFI" appearing among the names, so it stays. Not yet reported: whether the name stays on the row after `diskutil unmount /Volumes/TESTSTICK` and Refresh.
 - Step 3 PASS: full write and verify with the Hardened Runtime, Release build.
-- Step 5 PASS: the removable-volume prompt check passed.
+- Step 5 (optional): the prompt appeared, but at launch, from `diskutil` drive discovery, not when choosing an image, so the T22 usage text is wrong. Denying it makes authopen fail as if the password had been refused. Both are moved to **T25**, which supersedes this step.
 - At first the stick was missing from the list. USB still enumerated the Cruzer Glide, but there was no disk node, because it had been ejected and not unplugged. Replugging fixed it. A leftover 512 MiB RAM disk was still attached as `disk9`.
-- Still to do: steps 0 and 4 (Debug build).
+- Step 0 PASS: Simulate click-through in the Debug build with the Hardened Runtime.
+- Step 4 PASS: RAM-disk write and verify in the Debug build with the Hardened Runtime.
+- Every agent and human step is complete, and the acceptance criteria are met. The unmount observation in step 2 was never reported; it was a "record whether", not a pass condition. The results are also in `docs/HARDWARE_TESTS.md` (H1, H2, H5).
 
 **Instructions for Nick.** Keep `log stream --predicate 'subsystem == "com.example.raccoonwriter"' --info` open in a second Terminal window. `scripts/build.sh` and `scripts/build.sh --release` both write `build/RaccoonWriter.app`, so build the one each step names right before it.
 0. **Simulate click-through, Debug** (added: the agent couldn't drive the GUI). `scripts/build.sh`, then `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`. Choose any image. Each simulated drive row starts with its volume name, for example "SIM90 · 16 GB · /dev/disk90 · USB". Run `disk90` through to Done. Then pick `disk93`, Continue…, Erase and Write; after the simulated dialog is cancelled, the confirm screen shows "Volume names: SIM93" and "Mounted volumes: /Volumes/SIM93", with the T18 callout on top.
@@ -1513,4 +1515,5 @@ Also, `NSRemovableVolumesUsageDescription` (T22) says the access is for reading 
 | 2026-10-13 | T24 added: the Release app grew from 2.9 MB to 7.0 MB (icon layer and unstripped binary); swap in Nick's optimized 1024 px raccoon layer and strip Release builds; listed above T22 so it is done next | Claude |
 | 2026-10-13 | T24 DONE: optimized layer at scale 0.918 (T23 framing), Release binary stripped with its dSYM kept in `build/`, sizes printed by `build.sh`; app 7.0 → 4.67 MB. Size limit raised from 4.5 to 4.8 MB with Nick's approval, since the 4.2 MB estimate assumed a smaller raccoon | Claude |
 | 2026-10-13 | T22 prep: volume names in the drive list and on the confirm screen; `Fakes/` debug-only with three new release markers; copyright, category and removable-volume keys in Info.plist; Hardened Runtime on (needs `--options=runtime` for ad-hoc signing, and `ENABLE_DEBUG_DYLIB: NO` in Debug), checked by `build.sh`; NEEDS_HUMAN for Nick's runs | Claude |
+| 2026-10-13 | T22 DONE after Nick's runs: volume names, copyright, Release write on the Cruzer Glide and Debug RAM-disk write pass with the Hardened Runtime; privacy-prompt findings moved to T25 | Claude |
 | 2026-10-13 | T25 added from Nick's test: denying the Removable Volumes prompt (shown at launch by `diskutil` discovery) makes authopen fail with "Operation not permitted", which was reported as a refused password. New `blockedByPrivacySettings` case, failed screen with a Privacy Settings button, corrected usage text. T22's optional privacy-prompt step is superseded | Claude |

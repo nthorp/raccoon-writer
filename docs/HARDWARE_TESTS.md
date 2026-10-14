@@ -111,6 +111,7 @@ Nothing touches a disk. This is a visual check of every screen, which agents cou
 
 **Result:** PASS
 **Notes:** 2026-10-09, Debug build. Nick reports every expected result, in Light and Dark Mode. Step 5 added and passed 2026-10-13 on commit `d77a66b` (T20).
+**T22, 2026-10-13, Debug build with the Hardened Runtime, commit `446d4f5` (app code as in `214f99c`):** PASS. Each drive row starts with its volume name, `disk90` runs to Done, and after the `disk93` cancel the confirm screen shows "Volume names: SIM93" and "Mounted volumes: /Volumes/SIM93".
 
 ### H2 — RAM-disk dry run (debug flag)
 
@@ -141,6 +142,7 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 **Notes:** 2026-10-09, Debug build, 512 MiB RAM disk with `root:operator` nodes. Nick reports every expected result, including the authopen password dialog and the `fullSync used fsync fallback` log line. Afterwards the agent checked `hdiutil info`: the 512 MiB RAM disk was no longer attached. The agent also found that `log show` afterwards returned no lines from the app, because info-level lines aren't stored, so the flush method can only be seen live with `log stream`.
 - T19 adds `DKIOCSYNCHRONIZE` as the first flush method and re-runs this test; see T19 in `PLAN.md`.
 - T19 re-run, 2026-10-13, Debug build, commit `169b386`: write and verify passed, the RAM disk was ejected, and the log showed `fullSync used DKIOCSYNCHRONIZE` with no skipped methods.
+- T22 re-run, 2026-10-13, Debug build with the Hardened Runtime and `ENABLE_DEBUG_DYLIB: NO`: PASS. Nick reports the RAM-disk write and verify passed.
 
 ### H3 — Boot and internal disks never listed
 
@@ -191,6 +193,7 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 **Result:** PASS
 **Notes:** 2026-10-09, Release build, stick formatted ExFAT/GPT as `TESTSTICK` with one test file. Clicking Cancel in the authopen dialog returned the app to the confirm screen with the notice, not an error screen. "Mounted volumes" read none and `TESTSTICK` left Finder. After a replug, `TESTSTICK` remounted. The agent checked read-only afterwards: `disk7` still had its GPT layout (EFI + `TESTSTICK`) and the test file was intact.
 **Re-run on T16, 2026-10-12, Release build, commit `e55abea`:** stick erased to ExFAT `TESTSTICK` with a test file. Cancel returned to the confirm screen with "…nothing was written and the drive was left as it was", and the volume stayed mounted. A full write and verify on the same stick then passed.
+**T22, 2026-10-13, Release build with the Hardened Runtime, commit `214f99c`:** PASS on the Cruzer Glide (`TESTSTICK`). The row and the confirm screen show the volume names, which include `EFI` from the GPT layout; Nick is fine with that. After the cancelled dialog, both "Volume names:" and "Mounted volumes:" were still shown. A full write and verify then passed, and the drive ejected. Not reported: whether the name stays on the row after `diskutil unmount`.
 
 ### H6 — Hybrid Linux ISO, boots on a test machine
 
