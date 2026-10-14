@@ -127,7 +127,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T18 | 🧑 Make the password-cancelled notice stand out | T16 | DONE | 2026-10-13 | Claude (prep) / Nick (check) |
 | T23 | Rename to Raccoon Writer, with the raccoon icon | T16 | DONE | 2026-10-13 | Claude |
 | T19 | 🧑 Flush the drive cache with `DKIOCSYNCHRONIZE` | T16 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
-| T20 | 🧑 Warn for drives over 500 GB; README says USB hard drives are listed | T18 | NEEDS_HUMAN | | Claude (prep) / Nick (check) |
+| T20 | 🧑 Warn for drives over 500 GB; README says USB hard drives are listed | T18 | DONE | 2026-10-13 | Claude (prep) / Nick (check) |
 | T21 | Hardening: close-on-exec device descriptor, partial-block I/O, image identity, diskutil kill | T16 | TODO | | Claude |
 | T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | TODO | | Claude (prep) / Nick (run) |
 
@@ -1104,6 +1104,8 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
   5. Optional, if a USB hard drive or SSD over 500 GB is to hand: `scripts/build.sh --release`, `open build/RaccoonWriter.app`, plug it in and check it is listed with "Large drive". **Don't press Erase and Write.**
 
   Then tell the agent the results. If they meet the acceptance criteria, the agent records them here and marks T20 `DONE`.
+- **Human results, 2026-10-13, commit `d77a66b`:** Nick reports that all steps, 1–5 including the optional real-drive check, were completed and passed. The simulated hard drive is listed by default with "Large drive" and the sticks aren't; the confirm screen warning reads well in Light and Dark and at the narrowest width, and is absent for the working stick; the T18 callout still sits above the title.
+- **Acceptance:** every criterion is met. `scripts/test.sh` passes 379 tests and `scripts/build.sh --release` succeeds for `x86_64 arm64` with the release flag check passing, re-run on `d77a66b`. Marked `DONE`.
 
 ---
 
@@ -1347,3 +1349,4 @@ Keep `AppInfo.shortName` even though it now equals `displayName`, so code that u
 | 2026-10-13 | T18 DONE after Nick's check: the callout stands out in Light and Dark, wraps at minimum width, and is absent without a notice | Claude |
 | 2026-10-13 | T17 DONE after Nick's check: the raccoon icon follows the Default, Dark, Clear and Tinted icon styles | Claude |
 | 2026-10-13 | T20 prep: `LargeDriveWarning` over 500 GB in the drive list and on the confirm screen, `SimulatedDrive.usbHardDrive`, README says USB hard drives are listed; NEEDS_HUMAN for the Simulate mode check | Claude |
+| 2026-10-13 | T20 DONE after Nick's check: "Large drive" in the list and the confirm screen warning pass in Simulate mode, Light and Dark, at minimum width | Claude |

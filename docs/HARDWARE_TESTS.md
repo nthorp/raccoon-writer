@@ -110,7 +110,7 @@ Nothing touches a disk. This is a visual check of every screen, which agents cou
 - The window is a sensible size, and resizing it doesn't break the layout.
 
 **Result:** PASS
-**Notes:** 2026-10-09, Debug build. Nick reports every expected result, in Light and Dark Mode.
+**Notes:** 2026-10-09, Debug build. Nick reports every expected result, in Light and Dark Mode. Step 5 added and passed 2026-10-13 on commit `d77a66b` (T20).
 
 ### H2 — RAM-disk dry run (debug flag)
 
