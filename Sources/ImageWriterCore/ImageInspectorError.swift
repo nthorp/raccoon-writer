@@ -4,6 +4,9 @@ import Foundation
 public enum ImageInspectorError: Error, Equatable, Sendable {
     case notAFileURL(String)
     case unsupportedExtension(fileName: String)
+    /// A `.dmg` or `.udif`. Has its own case because the open panel offers these: macOS gives
+    /// `.img` the same type as `.dmg`, so the panel can't filter them out.
+    case macDiskImage(fileName: String)
     case notFound(fileName: String)
     case isDirectory(fileName: String)
     /// A device node, FIFO, socket or similar.
@@ -20,6 +23,8 @@ extension ImageInspectorError: LocalizedError {
             return "\(url) is not a local file."
         case .unsupportedExtension(let name):
             return "“\(name)” is not an .iso or .img file."
+        case .macDiskImage(let name):
+            return "“\(name)” is a macOS disk image, made to be opened on a Mac rather than copied onto a drive. Choose an .iso or .img file."
         case .notFound(let name):
             return "“\(name)” could not be found."
         case .isDirectory(let name):

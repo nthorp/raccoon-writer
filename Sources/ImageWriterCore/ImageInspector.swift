@@ -10,6 +10,9 @@ public struct ImageInspector: Sendable {
         let fileName = url.lastPathComponent
         // Checked before touching the file, so an unsupported pick does no I/O.
         guard let kind = ImageKind(pathExtension: url.pathExtension) else {
+            if Self.macDiskImageExtensions.contains(url.pathExtension.lowercased()) {
+                throw ImageInspectorError.macDiskImage(fileName: fileName)
+            }
             throw ImageInspectorError.unsupportedExtension(fileName: fileName)
         }
 
@@ -49,6 +52,9 @@ public struct ImageInspector: Sendable {
             bootWarning: signatures.bootWarning
         )
     }
+
+    /// The extensions macOS gives the same type as `.img` (`com.apple.disk-image-udif`).
+    static let macDiskImageExtensions: Set<String> = ["dmg", "udif"]
 
     /// Reads up to `ImageSignatures.headerLength` bytes from the start, fewer at end of file.
     static func readHeader(fd: Int32, fileName: String) throws -> [UInt8] {

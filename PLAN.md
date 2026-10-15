@@ -134,8 +134,9 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T25 | 🧑 Tell a Removable Volumes privacy denial apart from a refused password | T21 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
 | T26 | 🧑 Refuse a drive that holds the image; open the image before the unmount | T25 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 | T27 | 🧑 Remount the drive when a run stops before writing | T26 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T28 | Explain a `.dmg` picked in the open panel | T04 | DONE | 2026-10-14 | Claude |
 
-Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T25 builds on T22's committed prep but not on Nick's T22 runs, so it may start while T22 is `NEEDS_HUMAN`. T27 builds on T26's committed prep but not on Nick's H17 runs, so it may start while T26 is `NEEDS_HUMAN`. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
+Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T25 builds on T22's committed prep but not on Nick's T22 runs, so it may start while T22 is `NEEDS_HUMAN`. T27 builds on T26's committed prep but not on Nick's H17 runs, so it may start while T26 is `NEEDS_HUMAN`. T28 only changes `ImageInspector`, so it may start while T26 and T27 are `NEEDS_HUMAN`. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
 ---
 
@@ -1560,6 +1561,34 @@ Significance is low (no data loss, a confusing state); likelihood is moderate fo
 
 ---
 
+### T28 — Explain a `.dmg` picked in the open panel
+
+**Goal:** close a review finding. `ImageFileTypes.allowed` asks for the `img` type, and `UTType(filenameExtension: "img")` resolves to `com.apple.disk-image-udif`, which also covers `.dmg` and `.udif`. So the open panel offers `.dmg` files, and `ImageInspector` then rejects them with "is not an .iso or .img file", which reads oddly for a file the panel just offered.
+
+Significance is low: nothing is read or written, and refusing a `.dmg` is right (UDIF has its own container format, so a byte-for-byte copy wouldn't boot). Likelihood is moderate: most Downloads folders hold `.dmg` files, and someone may try a macOS installer.
+
+**Out of scope:** hiding `.dmg` in the panel. `.fileImporter` filters by type only; doing it by extension needs an `NSOpenPanel` with a `panel(_:shouldEnable:)` delegate. Removing `img` from the list would hide real `.img` files, and declaring our own type for `.img` would compete with Apple's.
+
+**Agent steps**
+1. `ImageInspectorError.macDiskImage(fileName:)`, thrown by `ImageInspector` (still before any I/O) for `.dmg` and `.udif`, case-insensitively. Message: "“<file>” is a macOS disk image, made to be opened on a Mac rather than copied onto a drive. Choose an .iso or .img file."
+2. Tests: `.dmg`, `.DMG`, `.udif` and `image.iso.dmg` throw `macDiskImage` without touching the file; other extensions still throw `unsupportedExtension`; the message names the file and the fix. Check the new test fails without the fix.
+3. `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass.
+
+**Acceptance criteria**
+- A `.dmg` or `.udif` is rejected with the macOS disk image message, before any I/O (unit tests).
+- `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass.
+
+**Files:** `Sources/ImageWriterCore/` (`ImageInspector`, `ImageInspectorError`), `Tests/ImageWriterCoreTests/ImageInspectorTests`, `PLAN.md`
+
+**Handoff notes:**
+
+**Done, 2026-10-14 (Claude).** `scripts/test.sh` passes 424 tests (2 new). `scripts/build.sh` and `scripts/build.sh --release` succeed. Nothing touched a disk.
+- With the check turned off, `rejectsMacDiskImageWithoutTouchingTheFile` failed for all four arguments.
+- The message leaves out `hdiutil convert`. Converting a `.dmg` to a raw image rarely gives a bootable drive (a macOS installer needs `createinstallmedia`), so the tip would mostly lead to drives that don't boot.
+- The app shows `errorDescription` as it is, so no `App/` change was needed.
+
+---
+
 ## 4. Future work (not in scope)
 
 - Rename the GitHub repo and local folder from `iso-sword` to match the app (T14 left them as they are).
@@ -1637,3 +1666,4 @@ Significance is low (no data loss, a confusing state); likelihood is moderate fo
 | 2026-10-14 | T26 prep: `ImageInfo.volumeMountPoint` from `fstatfs`, `ImageOnDrive` on the drive step and in the safety check, image opened before the unmount; NEEDS_HUMAN for H17 | Claude |
 | 2026-10-14 | T27 added from a review finding: a run that stops after the unmount but before the first write (open failure, privacy denial, cancel, busy unmount) leaves the drive unmounted; remount it with `diskutil mountDisk` | Claude |
 | 2026-10-14 | T27 prep: `DiskManager.mountWholeDisk` (`diskutil mountDisk`), the coordinator remounts the drive before reporting a failure or cancel that stopped before writing, README, H18; NEEDS_HUMAN for Nick's run | Claude |
+| 2026-10-14 | T28 added from a review finding and DONE: the open panel offers `.dmg` (macOS gives `.img` the same type), so `ImageInspector` rejects `.dmg` and `.udif` with a `macDiskImage` message instead of "not an .iso or .img file" | Claude |

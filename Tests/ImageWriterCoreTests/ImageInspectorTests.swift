@@ -166,13 +166,29 @@ final class ImageInspectorTests {
 
     // MARK: - Rejections
 
-    @Test(arguments: ["image.dmg", "image.iso.xz", "image.zip", "image", "iso", ".iso"])
+    @Test(arguments: ["image.iso.xz", "image.zip", "image.dmg.iso.xz", "image", "iso", ".iso", "dmg"])
     func rejectsWrongExtensionWithoutTouchingTheFile(_ name: String) {
         // The file does not exist, so getting unsupportedExtension (not notFound) shows no I/O happened.
         let url = dir.appendingPathComponent(name)
         #expect(throws: ImageInspectorError.unsupportedExtension(fileName: name)) {
             try self.inspector.inspect(url: url)
         }
+    }
+
+    /// The open panel offers these (macOS gives `.img` the same type), so they get their own message.
+    @Test(arguments: ["Installer.dmg", "Installer.DMG", "image.udif", "image.iso.dmg"])
+    func rejectsMacDiskImageWithoutTouchingTheFile(_ name: String) {
+        let url = dir.appendingPathComponent(name)
+        #expect(throws: ImageInspectorError.macDiskImage(fileName: name)) {
+            try self.inspector.inspect(url: url)
+        }
+    }
+
+    @Test func macDiskImageMessageNamesTheFileAndTheFix() throws {
+        let message = try #require(ImageInspectorError.macDiskImage(fileName: "Installer.dmg").errorDescription)
+        #expect(message.contains("“Installer.dmg”"))
+        #expect(message.contains("macOS disk image"))
+        #expect(message.contains("Choose an .iso or .img file."))
     }
 
     @Test func rejectsEmptyFile() throws {
@@ -228,7 +244,8 @@ final class ImageInspectorTests {
 
     @Test func errorsHaveDescriptions() {
         let errors: [ImageInspectorError] = [
-            .notAFileURL("https://x"), .unsupportedExtension(fileName: "a.dmg"), .notFound(fileName: "a.iso"),
+            .notAFileURL("https://x"), .unsupportedExtension(fileName: "a.zip"), .macDiskImage(fileName: "a.dmg"),
+            .notFound(fileName: "a.iso"),
             .isDirectory(fileName: "a.iso"), .notRegularFile(fileName: "a.iso"),
             .permissionDenied(fileName: "a.iso"), .empty(fileName: "a.iso"),
             .posix(operation: "read", fileName: "a.iso", code: EIO),
