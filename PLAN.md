@@ -1516,6 +1516,7 @@ Significance is low to moderate (no data loss, a wrong message); likelihood is l
 - New previews: "Image on the drive" (`SetupView`, using `PreviewSamples.imageOnStick`).
 
 **Instructions for Nick:** run H17 in `docs/HARDWARE_TESTS.md` (steps 1 and 2, step 3 optional) and report: whether the stick showed "Holds this image" with Continue disabled, the stick's mount point as the message showed it, and what the failed screen said in step 2.
+- **H17 step 1, 2026-10-14 (Nick, Release, `3917068`): PASS.** "Holds this image" on the stick's row, the message with its `/Volumes/…` path, Continue disabled, both kept across the toggle, and all cleared by choosing an image on the Mac. A real stick's `diskutil` mount point matches `fstatfs`. Still to run before DONE: H17 step 2 (Simulate, Debug).
 
 ---
 
