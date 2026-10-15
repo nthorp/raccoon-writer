@@ -135,7 +135,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T26 | 🧑 Refuse a drive that holds the image; open the image before the unmount | T25 | DONE | 2026-10-14 | Claude (prep) / Nick (run) |
 | T27 | 🧑 Remount the drive when a run stops before writing | T26 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 | T28 | Explain a `.dmg` picked in the open panel | T04 | DONE | 2026-10-14 | Claude |
-| T29 | 🧑 List built-in SD card readers in the default drive list | T25 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T29 | 🧑 List built-in SD card readers in the default drive list | T25 | DONE | 2026-10-14 | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T25 builds on T22's committed prep but not on Nick's T22 runs, so it may start while T22 is `NEEDS_HUMAN`. T27 builds on T26's committed prep but not on Nick's H17 runs, so it may start while T26 is `NEEDS_HUMAN`. T28 only changes `ImageInspector`, so it may start while T26 and T27 are `NEEDS_HUMAN`. T29 builds on T26's and T27's committed prep but not on Nick's H17 and H18 runs, so it may start while they are `NEEDS_HUMAN`. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -1659,7 +1659,9 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 - **Docs.** README: safety bullet names the exception and its four conditions; the "not listed" limitation is replaced by "Some built-in card readers are not listed" (other buses stay hidden) and "Cards in the built-in slot all have the same name" (the card-swap note). Section 5 "Wrong disk written" row. `docs/HARDWARE_TESTS.md`: H3 expected results mention the card, recorded notes untouched; H19 written; H19 row in the summary table.
 - **Builds.** `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass; `build/RaccoonWriter.app` is the Release build.
 - **For Nick:** run H19 in `docs/HARDWARE_TESTS.md` on the Release build, with an SD card you don't need in the MacBook Pro's built-in slot. Steps 1–2 are required: the card listed with the toggle off (SD card symbol, "Secure Digital", size) and the internal disk absent in both toggle positions, then a Raspberry Pi OS `.img` or the H7 FreeBSD `.img` written and verified with one password dialog. Report any Removable Volumes prompt and the `fullSync used …` log line. Steps 3 (boot) and 4 (a USB card reader's `diskutil` keys) are optional.
-- **H19, 2026-10-14 (Nick, Release, `3917068`):** the card wrote successfully, and the log showed `fullSync used DKIOCSYNCHRONIZE`. Still to report before DONE: the step 1 list checks, one password dialog, any Removable Volumes prompt, and the eject on the done screen. Details in `docs/HARDWARE_TESTS.md` H19.
+- **H19, 2026-10-14 (Nick, Release, `3917068`):** the card wrote successfully, and the log showed `fullSync used DKIOCSYNCHRONIZE`. Details in `docs/HARDWARE_TESTS.md` H19.
+- **H19 follow-up, 2026-10-14 (Nick, Release): PASS.** Step 1: the card was listed with the toggle off, with the `sdcard` symbol, "Secure Digital" and its size; the internal disk and boot container were hidden in both toggle positions. The write had one password dialog, no Removable Volumes prompt (already allowed since H16), and ended with "Finished. You can remove the drive." and the card ejected. Optional steps 3 (boot) and 4 (USB reader capture) not run, so `info-disk9` stays a guess.
+- **DONE, 2026-10-14 (Claude).** Every agent step and both required human steps are complete, and every acceptance criterion is met. Tests (437) and both builds passed at `3917068`.
 
 ---
 
@@ -1744,3 +1746,4 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 | 2026-10-14 | T29 added from a review finding and Nick's decision: built-in SD card readers (`Secure Digital`, removable media, physical, whole disk) appear in the default drive list; `AGENTS.md` safety rule and section 1 "Drive filter" amended | Claude |
 | 2026-10-14 | T26 DONE after Nick's H17 runs: a stick holding the image is marked and refused, and an image deleted before the run fails with "Nothing was written to the drive." | Claude |
 | 2026-10-14 | T29 prep: `DiskInfo.isBuiltInCardReader` from the four diskutil keys, exempt from the internal and USB filter rules only; `info-disk7` matches H14, guessed USB reader `info-disk9`; `sdcard` row symbol, `SimulatedDrive.builtInSDCard` (disk98), README, H19; NEEDS_HUMAN for Nick's run | Claude |
+| 2026-10-14 | T29 DONE after Nick's H19 run: the built-in SD card is listed with the toggle off and writes with one password dialog, `DKIOCSYNCHRONIZE` and an eject; no separate privacy prompt | Claude |

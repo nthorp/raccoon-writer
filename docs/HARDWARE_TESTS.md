@@ -89,7 +89,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H16 | Removable Volumes privacy prompt denied | Debug + Release | PASS | Mapped to `blockedByPrivacySettings`; fix A needs Try Again, not a relaunch; fix B needs no relaunch |
 | H17 | Image stored on the drive; image deleted before the write | Release + Debug | PASS | Stick holding the image marked and refused; deleted image fails with "Nothing was written to the drive."; optional APFS step not run |
 | H18 | Drive remounted after a run that stops before writing | Release | | |
-| H19 | SD card in the built-in slot listed and written | Release | Partial | Write and verify passed; `DKIOCSYNCHRONIZE`; step 1 checks not yet reported |
+| H19 | SD card in the built-in slot listed and written | Release | PASS | Listed with the toggle off, `sdcard` symbol; internal disk hidden; one password dialog, no privacy prompt; `DKIOCSYNCHRONIZE`; ejected. Optional steps 3–4 not run |
 
 **Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09). That build never tried `DKIOCSYNCHRONIZE`. **From T19 on: `DKIOCSYNCHRONIZE`** (Cruzer Glide, Release build, 2026-10-13, commit `169b386`; details under T19 in `PLAN.md`).
 
@@ -482,6 +482,8 @@ for k in MediaName BusProtocol Internal Removable RemovableMedia Ejectable Virtu
 - Step 2: one password dialog; write and verify pass; "Finished. You can remove the drive." and the card ejected. The log shows `fullSync used DKIOCSYNCHRONIZE` or a fallback with `fullSync skipped …` lines; either is fine, but record it.
 - Step 4: BusProtocol `USB`, Internal `false`, RemovableMedia `true`, listed with the toggle off. Anything else, record it.
 
-**Result:**
+**Result:** PASS (steps 1 and 2; optional steps 3 and 4 not run)
 **Notes:**
 - 2026-10-14, Release build, commit `3917068`, MacBook Pro (M3 Max) built-in slot. Nick reports the card wrote successfully. The log showed `fullSync used DKIOCSYNCHRONIZE`, so the built-in slot accepts the cache flush. Afterwards the agent ran `diskutil list` (read-only): no card was attached, which fits the card having been ejected. Stored logs had no lines from the app process, as expected for a successful run (info-level lines aren't kept). Not yet reported: step 1 (the card listed with the toggle off, the SD card symbol, "Secure Digital", the internal disk absent in both toggle positions), the number of password dialogs, any Removable Volumes prompt, and the done screen's eject message.
+- Follow-up, 2026-10-14, Release build, card reinserted (Nick): step 1 passed. With the toggle off the card was listed with the SD card symbol, "Secure Digital" and its size, and the internal disk and boot container were absent with the toggle off and on. For the earlier write Nick confirms exactly one password dialog, no Removable Volumes prompt (the permission was already allowed since H16, so the built-in slot needs no separate grant), and "Finished. You can remove the drive." with the card ejected.
+- Step 4 was not run, so `info-disk9` (SD card in a USB reader) is still a hand-written guess.
