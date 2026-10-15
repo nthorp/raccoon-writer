@@ -120,3 +120,7 @@ If you build from source: macOS treats each ad-hoc-signed rebuild as a new app (
 - `Spikes/`: throwaway experiments (the `authopen` spike)
 - `scripts/`: build, test and release-check entry points
 - `PLAN.md`, `AGENTS.md`: the implementation plan and the rules for coding agents working on this repo
+
+## License
+
+Raccoon Writer is free software, licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
