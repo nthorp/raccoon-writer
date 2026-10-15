@@ -133,8 +133,9 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
 | T25 | 🧑 Tell a Removable Volumes privacy denial apart from a refused password | T21 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
 | T26 | 🧑 Refuse a drive that holds the image; open the image before the unmount | T25 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T27 | 🧑 Remount the drive when a run stops before writing | T26 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 
-Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T25 builds on T22's committed prep but not on Nick's T22 runs, so it may start while T22 is `NEEDS_HUMAN`. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
+Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T25 builds on T22's committed prep but not on Nick's T22 runs, so it may start while T22 is `NEEDS_HUMAN`. T27 builds on T26's committed prep but not on Nick's H17 runs, so it may start while T26 is `NEEDS_HUMAN`. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
 ---
 
@@ -1516,6 +1517,49 @@ Significance is low to moderate (no data loss, a wrong message); likelihood is l
 
 ---
 
+### T27 — 🧑 Remount the drive when a run stops before writing
+
+**Goal:** close a review finding. A run that stops after the unmount but before the first write leaves the drive unmounted: its volumes leave Finder, while the failed or cancelled screen says "Nothing was written to the drive." The data is intact, but the drive looks gone or broken until it is replugged. The most common case is T25's privacy denial (`Run failed in open` in H16), which repeats on every attempt until the setting is fixed.
+
+The window is wider than the open:
+- **Open failures:** authopen errors, including `.blockedByPrivacySettings`.
+- **The opened-device check** (`checkOpened`, another disk took the name).
+- **A cancel** that lands during the unmount or the open (the `checkCancellation()` after each).
+- **A busy unmount.** diskutil may unmount some volumes before one refuses.
+
+Significance is low (no data loss, a confusing state); likelihood is moderate for users who denied the Removable Volumes prompt, low otherwise.
+
+**Out of scope:** runs that stopped in `.write` or `.verify`. Mounting a partly written drive can bring up macOS's "disk not readable" dialog, so they stay unmounted as now. Also telling the user on screen when the remount fails; it is logged.
+
+**Agent steps**
+1. **`DiskManager.mountWholeDisk(bsdName:)`**, implemented in `DiskutilDiskManager` as `diskutil mountDisk /dev/diskN` through the same `run` (name validation, failure mapping) and in `FakeDiskManager` (new `.mount` call, `mountError`). Simulate mode picks it up through `FakeDiskManager`.
+2. **Coordinator.** Note the disk's name just before the unmount. In the failure and cancel path, if a disk was unmounted and `!stage.mayHaveModifiedDrive`: close the device first (an open descriptor could block the mount), then await a best-effort `mountWholeDisk`, then publish `.failed` or `.cancelled`. Publishing after the mount keeps a quick Try Again from racing it. A remount failure is logged and doesn't change the outcome. The prompt-cancel path never unmounted, so it is unchanged.
+3. **Tests:** open failure, privacy denial, busy unmount, wrong opened device and cancel during the open each end `[.unmount, .mount]`; a cancel held during the unmount ends `.cancelled(.unmount)` with a mount and no open; the device is closed before the mount; the mount has happened before the failed state is published; a failing mount keeps the original failure; failures and cancels in `.write` and `.verify` still end `[.unmount]`; `DiskutilDiskManager` runs `diskutil mountDisk /dev/disk4`, rejects bad names and maps a failure. Check the new coordinator tests fail without the fix.
+4. README "How it works". `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass. Write H18, set `NEEDS_HUMAN`, stop.
+
+**Human steps (Nick):** run H18 in `docs/HARDWARE_TESTS.md`: the H16 privacy denial on the Cruzer Glide, checking the volume comes back in Finder. The agent never runs `diskutil mountDisk`, so H18 is also the first real run of it.
+
+**Acceptance criteria**
+- A run that stops before the first write after unmounting the drive mounts it again before showing the failed or cancelled screen (unit tests, H18).
+- A run that stopped in `.write` or `.verify` is not remounted (unit tests).
+- A failing remount is logged and doesn't change the reported failure (unit test).
+- `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass.
+
+**Files:** `Sources/ImageWriterCore/` (`DiskManager`, `DiskutilDiskManager`, `Fakes/FakeDiskManager`, `WriteCoordinator`), `Tests/ImageWriterCoreTests/` (`WriteCoordinatorTests`, `CoordinatorFaultTests`, `DiskutilDiskManagerTests`), `README.md`, `docs/HARDWARE_TESTS.md`, `PLAN.md`
+
+**Handoff notes:**
+
+**Prep, 2026-10-14 (Claude).** All agent steps done. `scripts/test.sh` passes 422 tests (6 new). `scripts/build.sh` and `scripts/build.sh --release` succeed (Release 4.56 MB, flag check clean). Nothing touched a disk; `diskutil mountDisk` has only run against fakes.
+- **Coordinator.** `run` records `unmountedDisk` just before calling `unmountWholeDisk`, so a busy unmount (which may have released some volumes) is remounted too. The generic `catch` closes the device, awaits `remount`, then logs and publishes the result. `remount` logs `Remounted diskN after a run that stopped before writing` or `Remount of diskN failed: …` and never throws. The prompt-cancel `catch` is unchanged (nothing was unmounted).
+- **Tests that failed without the fix** (remount turned off): `aCancelDuringTheUnmountRemountsWithoutOpening`, `theDeviceIsClosedBeforeTheRemount`, `theRemountHappensBeforeTheFailureIsShown`, `aFailedRemountKeepsTheOriginalFailure`, and the four updated tests (`unmountFailureStopsBeforeOpen`, `openFailureRemountsWithoutEjecting` and `privacyBlockedOpenRemountsWithoutEjecting`, both renamed from `…DoesNotEject`, `anOpenedDeviceOfAnotherSizeIsNeverWritten`, `cancelWhileOpeningClosesTheOpenedDevice`). Remounting regardless of stage failed six write and verify tests that still expect `[.unmount]`; closing the device after the mount failed `theDeviceIsClosedBeforeTheRemount`.
+- **Test helpers.** `EjectProbe` became `DiskCallProbe` (also notes whether the device was closed at the mount); new `GatedUnmountManager` holds the unmount for the cancel test; `GatedEjectManager` gained an empty `mountWholeDisk`.
+- **Not verified:** `diskutil mountDisk`'s real output. The success test uses "Volume(s) mounted successfully" as a stand-in; only the exit status is used, and a failure maps to `commandFailed` with the output. H18 is the first real run.
+- **Known gaps, left as is:** a failed remount is only logged, so the screen still just says "Nothing was written to the drive." The remount runs while the screen still shows the last preparing step; it is normally under a second, but a hung `diskutil` holds the run (and a quit) for up to `ProcessCommandRunner`'s 30 s timeout plus the kill grace. When `checkOpened` finds another disk under the name, the remount targets that name, which now belongs to the other disk; mounting it is harmless, since macOS mounts a newly attached disk anyway.
+
+**Instructions for Nick:** run H18 in `docs/HARDWARE_TESTS.md` (steps 1–3) and report: whether `TESTSTICK` was back in Finder on the failed screen without replugging, and the `Remounted …` or `Remount of … failed` log line.
+
+---
+
 ## 4. Future work (not in scope)
 
 - Rename the GitHub repo and local folder from `iso-sword` to match the app (T14 left them as they are).
@@ -1591,3 +1635,5 @@ Significance is low to moderate (no data loss, a wrong message); likelihood is l
 | 2026-10-13 | T25 DONE after Nick's H16 runs: the denial maps to `blockedByPrivacySettings`, and both fixes work without relaunching (fix A once Try Again refreshes the drive list) | Claude |
 | 2026-10-14 | T26 added from a review finding: an image stored on the target drive fails after the unmount and is reported as a partly written drive. Also a moved, deleted or changed image, which fails the same way | Claude |
 | 2026-10-14 | T26 prep: `ImageInfo.volumeMountPoint` from `fstatfs`, `ImageOnDrive` on the drive step and in the safety check, image opened before the unmount; NEEDS_HUMAN for H17 | Claude |
+| 2026-10-14 | T27 added from a review finding: a run that stops after the unmount but before the first write (open failure, privacy denial, cancel, busy unmount) leaves the drive unmounted; remount it with `diskutil mountDisk` | Claude |
+| 2026-10-14 | T27 prep: `DiskManager.mountWholeDisk` (`diskutil mountDisk`), the coordinator remounts the drive before reporting a failure or cancel that stopped before writing, README, H18; NEEDS_HUMAN for Nick's run | Claude |

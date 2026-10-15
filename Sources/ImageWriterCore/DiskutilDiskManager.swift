@@ -1,7 +1,7 @@
 import Foundation
 import os
 
-/// Production `DiskManager`: `diskutil unmountDisk` and `diskutil eject` on `/dev/diskN`.
+/// Production `DiskManager`: `diskutil unmountDisk`, `mountDisk` and `eject` on `/dev/diskN`.
 /// These commands print text, not plists, so failures are recognized from their output.
 public struct DiskutilDiskManager: DiskManager {
     private static let log = Logger(subsystem: AppInfo.bundleIdentifier, category: "diskmanager")
@@ -15,6 +15,10 @@ public struct DiskutilDiskManager: DiskManager {
     public func unmountWholeDisk(bsdName: String) async throws {
         // An already-unmounted disk exits 0 with the usual success line, so this is idempotent.
         try await run("unmountDisk", bsdName: bsdName)
+    }
+
+    public func mountWholeDisk(bsdName: String) async throws {
+        try await run("mountDisk", bsdName: bsdName)
     }
 
     public func eject(bsdName: String) async throws {

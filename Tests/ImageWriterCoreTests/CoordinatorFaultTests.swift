@@ -459,6 +459,8 @@ private final class GatedEjectManager: DiskManager, @unchecked Sendable {
 
     func unmountWholeDisk(bsdName: String) async throws {}
 
+    func mountWholeDisk(bsdName: String) async throws {}
+
     func eject(bsdName: String) async throws {
         await withCheckedContinuation { continuation in
             DispatchQueue.global().async {

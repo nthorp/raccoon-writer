@@ -6,6 +6,7 @@ import Testing
 struct DiskutilDiskManagerTests {
     static let diskutil = "/usr/sbin/diskutil"
     static let unmount4 = [diskutil, "unmountDisk", "/dev/disk4"]
+    static let mount4 = [diskutil, "mountDisk", "/dev/disk4"]
     static let eject4 = [diskutil, "eject", "/dev/disk4"]
 
     static let unmounted = CommandResult(status: 0, stdout: Data("Unmount of all volumes on disk4 was successful\n".utf8))
@@ -79,6 +80,25 @@ struct DiskutilDiskManagerTests {
         }
     }
 
+    // MARK: mount
+
+    @Test func mountRunsDiskutilOnTheWholeDiskNode() async throws {
+        // Success text not captured from a real run; only the exit status matters.
+        let mounted = CommandResult(status: 0, stdout: Data("Volume(s) mounted successfully\n".utf8))
+        let (manager, runner) = manager([Self.mount4: mounted])
+        try await manager.mountWholeDisk(bsdName: "disk4")
+        #expect(runner.invocations == [Self.mount4])
+    }
+
+    @Test func mountFailureKeepsTheOutput() async {
+        let result = CommandResult(status: 1, stderr: Data("Volume(s) failed to mount\n".utf8))
+        let (manager, _) = manager([Self.mount4: result])
+        await #expect(throws: DiskManagerError.commandFailed(
+            command: "diskutil mountDisk /dev/disk4", status: 1, output: "Volume(s) failed to mount")) {
+            try await manager.mountWholeDisk(bsdName: "disk4")
+        }
+    }
+
     // MARK: eject
 
     @Test func ejectRunsDiskutilOnTheWholeDiskNode() async throws {
@@ -134,6 +154,9 @@ struct DiskutilDiskManagerTests {
         let (manager, runner) = manager([:])
         await #expect(throws: DiskManagerError.invalidDiskName(name)) {
             try await manager.unmountWholeDisk(bsdName: name)
+        }
+        await #expect(throws: DiskManagerError.invalidDiskName(name)) {
+            try await manager.mountWholeDisk(bsdName: name)
         }
         await #expect(throws: DiskManagerError.invalidDiskName(name)) {
             try await manager.eject(bsdName: name)
@@ -193,6 +216,13 @@ struct FakeDiskManagerTests {
         await #expect(throws: DiskManagerError.notFound(bsdName: "disk4")) {
             try await fake.unmountWholeDisk(bsdName: "disk4")
         }
+
+        try await fake.mountWholeDisk(bsdName: "disk4")
+        fake.mountError = DiskManagerError.notFound(bsdName: "disk4")
+        await #expect(throws: DiskManagerError.notFound(bsdName: "disk4")) {
+            try await fake.mountWholeDisk(bsdName: "disk4")
+        }
+        #expect(fake.calls.suffix(2) == [.mount("disk4"), .mount("disk4")])
     }
 
     @Test func validatesNamesLikeProduction() async {

@@ -104,7 +104,7 @@ final class WriteCoordinatorTests {
         let device = try device()
         let opener = FakeDeviceOpener(device: device)
         let diskManager = FakeDiskManager()
-        let probe = EjectProbe(inner: diskManager, device: device)
+        let probe = DiskCallProbe(inner: diskManager, device: device)
         let (coordinator, _) = coordinator(diskManager: probe, opener: opener)
 
         try await runToEnd(coordinator, image: try image(bytes))
@@ -295,12 +295,13 @@ final class WriteCoordinatorTests {
         try await runToEnd(coordinator, image: try image())
 
         #expect(coordinator.state == .failed(WriteFailure(stage: .unmount, error: DiskManagerError.busy(dissenter: "/bin/sleep"))))
-        #expect(diskManager.calls == [.unmount("disk4")])
+        // diskutil may have unmounted some volumes before one refused.
+        #expect(diskManager.calls == [.unmount("disk4"), .mount("disk4")])
         #expect(opener.openAttempts.isEmpty)
         #expect(opener.grants.map(\.releaseCount) == [1])
     }
 
-    @Test func openFailureDoesNotEject() async throws {
+    @Test func openFailureRemountsWithoutEjecting() async throws {
         let diskManager = FakeDiskManager()
         let opener = FakeDeviceOpener(openError: .permissionDenied)
         let (coordinator, _) = coordinator(diskManager: diskManager, opener: opener)
@@ -308,12 +309,12 @@ final class WriteCoordinatorTests {
         try await runToEnd(coordinator, image: try image())
 
         #expect(coordinator.state == .failed(WriteFailure(stage: .open, error: DeviceOpenError.permissionDenied)))
-        #expect(diskManager.calls == [.unmount("disk4")])
+        #expect(diskManager.calls == [.unmount("disk4"), .mount("disk4")])
         #expect(opener.grants.map(\.releaseCount) == [1])
     }
 
     /// T25: same path as `.permissionDenied`; only the wording differs.
-    @Test func privacyBlockedOpenDoesNotEject() async throws {
+    @Test func privacyBlockedOpenRemountsWithoutEjecting() async throws {
         let diskManager = FakeDiskManager()
         let opener = FakeDeviceOpener(openError: .blockedByPrivacySettings)
         let (coordinator, _) = coordinator(diskManager: diskManager, opener: opener)
@@ -321,7 +322,7 @@ final class WriteCoordinatorTests {
         try await runToEnd(coordinator, image: try image())
 
         #expect(coordinator.state == .failed(WriteFailure(stage: .open, error: DeviceOpenError.blockedByPrivacySettings)))
-        #expect(diskManager.calls == [.unmount("disk4")])
+        #expect(diskManager.calls == [.unmount("disk4"), .mount("disk4")])
         #expect(opener.openAttempts == ["disk4"])
         #expect(opener.grants.map(\.releaseCount) == [1])
     }
@@ -383,7 +384,7 @@ final class WriteCoordinatorTests {
         #expect(FailureExplanation(failure).drive == .untouched)
         #expect(other.writeCallCount == 0)
         #expect(other.isClosed)
-        #expect(diskManager.calls == [.unmount("disk4")])
+        #expect(diskManager.calls == [.unmount("disk4"), .mount("disk4")])
         #expect(opener.grants.map(\.releaseCount) == [1])
     }
 
@@ -562,7 +563,7 @@ final class WriteCoordinatorTests {
         #expect(coordinator.state == .cancelled(.open))
         #expect(device.isClosed)
         #expect(device.writeCallCount == 0)
-        #expect(diskManager.calls == [.unmount("disk4")])
+        #expect(diskManager.calls == [.unmount("disk4"), .mount("disk4")])
         #expect(inner.grants.map(\.releaseCount) == [1])
     }
 
@@ -606,6 +607,63 @@ final class WriteCoordinatorTests {
 
         #expect(coordinator.state == .driveSelected(image, disk))
         #expect(opener.authorizeAttempts.isEmpty)
+    }
+
+    // MARK: - Remount after a stop before writing (T27)
+
+    @Test func aCancelDuringTheUnmountRemountsWithoutOpening() async throws {
+        let diskManager = FakeDiskManager()
+        let gated = GatedUnmountManager(inner: diskManager)
+        let opener = FakeDeviceOpener(device: try device())
+        let (coordinator, _) = coordinator(diskManager: gated, opener: opener)
+
+        try prepare(coordinator, image: try image())
+        let task = try coordinator.confirmAndStart()
+        await gated.gate.waitForArrival()
+        #expect(coordinator.state == .preparing(.unmount))
+        try coordinator.cancel()
+        gated.gate.release()
+        await task.value
+
+        #expect(coordinator.state == .cancelled(.unmount))
+        #expect(diskManager.calls == [.unmount("disk4"), .mount("disk4")])
+        #expect(opener.openAttempts.isEmpty)
+    }
+
+    @Test func theDeviceIsClosedBeforeTheRemount() async throws {
+        // Opened, then refused by the size check: the descriptor is open when the run fails.
+        let other = try FileBackedDevice(blockSize: Self.blockSize, blockCount: Self.deviceBlocks * 2)
+        let diskManager = FakeDiskManager()
+        let probe = DiskCallProbe(inner: diskManager, device: other)
+        let (coordinator, _) = coordinator(diskManager: probe, opener: FakeDeviceOpener(device: other))
+
+        try await runToEnd(coordinator, image: try image())
+
+        #expect(diskManager.calls == [.unmount("disk4"), .mount("disk4")])
+        #expect(probe.deviceWasClosedAtMount == true)
+    }
+
+    @Test func theRemountHappensBeforeTheFailureIsShown() async throws {
+        let diskManager = FakeDiskManager()
+        let (coordinator, _) = coordinator(diskManager: diskManager, opener: FakeDeviceOpener(openError: .blockedByPrivacySettings))
+        var callsWhenShown: [FakeDiskManager.Call]?
+        coordinator.onTransition = { state in
+            if case .failed = state { callsWhenShown = diskManager.calls }
+        }
+
+        try await runToEnd(coordinator, image: try image())
+
+        #expect(callsWhenShown == [.unmount("disk4"), .mount("disk4")])
+    }
+
+    @Test func aFailedRemountKeepsTheOriginalFailure() async throws {
+        let diskManager = FakeDiskManager(mountError: DiskManagerError.notFound(bsdName: "disk4"))
+        let (coordinator, _) = coordinator(diskManager: diskManager, opener: FakeDeviceOpener(openError: .permissionDenied))
+
+        try await runToEnd(coordinator, image: try image())
+
+        #expect(coordinator.state == .failed(WriteFailure(stage: .open, error: DeviceOpenError.permissionDenied)))
+        #expect(diskManager.calls == [.unmount("disk4"), .mount("disk4")])
     }
 
     // MARK: - Legal transitions
@@ -898,11 +956,12 @@ private struct StubResolver: BootDiskResolving {
 }
 
 /// Forwards to a `FakeDiskManager` and notes whether the device was already closed when
-/// the eject ran.
-private final class EjectProbe: DiskManager, @unchecked Sendable {
+/// the mount or the eject ran.
+private final class DiskCallProbe: DiskManager, @unchecked Sendable {
     let inner: FakeDiskManager
     let device: FileBackedDevice
     private let lock = NSLock()
+    private var closedAtMount: Bool?
     private var closedAtEject: Bool?
 
     init(inner: FakeDiskManager, device: FileBackedDevice) {
@@ -910,10 +969,17 @@ private final class EjectProbe: DiskManager, @unchecked Sendable {
         self.device = device
     }
 
+    var deviceWasClosedAtMount: Bool? { lock.withLock { closedAtMount } }
     var deviceWasClosedAtEject: Bool? { lock.withLock { closedAtEject } }
 
     func unmountWholeDisk(bsdName: String) async throws {
         try await inner.unmountWholeDisk(bsdName: bsdName)
+    }
+
+    func mountWholeDisk(bsdName: String) async throws {
+        let closed = device.isClosed
+        lock.withLock { closedAtMount = closed }
+        try await inner.mountWholeDisk(bsdName: bsdName)
     }
 
     func eject(bsdName: String) async throws {
@@ -943,6 +1009,29 @@ private final class SwappableDiscovery: DiskDiscovery, @unchecked Sendable {
 
 /// Forwards to a `FakeDeviceOpener` but holds at `gate` first: in `authorize`, like the
 /// password dialog being up, or in the grant's `open`, like authopen running.
+/// Holds the unmount at `gate` before forwarding it, so a test can cancel mid-unmount.
+private final class GatedUnmountManager: DiskManager, @unchecked Sendable {
+    let gate = Gate()
+    let inner: FakeDiskManager
+
+    init(inner: FakeDiskManager) {
+        self.inner = inner
+    }
+
+    func unmountWholeDisk(bsdName: String) async throws {
+        await gate.passOffThePool()
+        try await inner.unmountWholeDisk(bsdName: bsdName)
+    }
+
+    func mountWholeDisk(bsdName: String) async throws {
+        try await inner.mountWholeDisk(bsdName: bsdName)
+    }
+
+    func eject(bsdName: String) async throws {
+        try await inner.eject(bsdName: bsdName)
+    }
+}
+
 private final class GatedOpener: DeviceOpener, @unchecked Sendable {
     enum Point { case authorize, open }
 

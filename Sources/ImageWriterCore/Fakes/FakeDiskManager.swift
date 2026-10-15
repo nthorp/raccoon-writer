@@ -6,16 +6,19 @@ import Foundation
 public final class FakeDiskManager: DiskManager, @unchecked Sendable {
     public enum Call: Equatable, Sendable {
         case unmount(String)
+        case mount(String)
         case eject(String)
     }
 
     private let lock = NSLock()
     private var recorded: [Call] = []
     private var unmountFailure: (any Error)?
+    private var mountFailure: (any Error)?
     private var ejectFailure: (any Error)?
 
-    public init(unmountError: (any Error)? = nil, ejectError: (any Error)? = nil) {
+    public init(unmountError: (any Error)? = nil, mountError: (any Error)? = nil, ejectError: (any Error)? = nil) {
         self.unmountFailure = unmountError
+        self.mountFailure = mountError
         self.ejectFailure = ejectError
     }
 
@@ -27,6 +30,11 @@ public final class FakeDiskManager: DiskManager, @unchecked Sendable {
         set { lock.withLock { unmountFailure = newValue } }
     }
 
+    public var mountError: (any Error)? {
+        get { lock.withLock { mountFailure } }
+        set { lock.withLock { mountFailure = newValue } }
+    }
+
     public var ejectError: (any Error)? {
         get { lock.withLock { ejectFailure } }
         set { lock.withLock { ejectFailure = newValue } }
@@ -34,6 +42,10 @@ public final class FakeDiskManager: DiskManager, @unchecked Sendable {
 
     public func unmountWholeDisk(bsdName: String) async throws {
         try record(.unmount(bsdName), bsdName: bsdName, failure: \.unmountFailure)
+    }
+
+    public func mountWholeDisk(bsdName: String) async throws {
+        try record(.mount(bsdName), bsdName: bsdName, failure: \.mountFailure)
     }
 
     public func eject(bsdName: String) async throws {

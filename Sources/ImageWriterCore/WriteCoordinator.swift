@@ -235,6 +235,8 @@ public final class WriteCoordinator {
         var stage = PipelineStage.authorize
         var grant: (any DeviceGrant)?
         var device: (any OpenedDevice)?
+        // Set once the unmount has been tried; a busy unmount can release some volumes.
+        var unmountedDisk: String?
         // Every exit path, cancel and error included, releases the descriptor and the
         // admin permission.
         defer {
@@ -267,6 +269,7 @@ public final class WriteCoordinator {
 
             stage = .unmount
             transition(to: .preparing(.unmount))
+            unmountedDisk = target.bsdName
             try await diskManager.unmountWholeDisk(bsdName: target.bsdName)
             try Task.checkCancellation()
 
@@ -320,6 +323,15 @@ public final class WriteCoordinator {
             transition(to: .awaitingConfirmation(image, disk))
             notice = .passwordPromptCancelled
         } catch {
+            // Nothing was written, so put the drive back as the user had it. A partly
+            // written drive stays unmounted: mounting it can bring up macOS's "disk not
+            // readable" dialog. The remount comes before the result, so Try Again can't
+            // race it, and the descriptor is closed first, since an open one could block it.
+            if let bsdName = unmountedDisk, !stage.mayHaveModifiedDrive {
+                device?.close()
+                device = nil
+                await remount(bsdName)
+            }
             // Once the user has asked to stop, whatever unwinds the run (usually a
             // CancellationError, sometimes authopen's "canceled by the user") is a cancel.
             // The stage still tells the UI whether the drive was touched.
@@ -332,6 +344,16 @@ public final class WriteCoordinator {
                 Self.log.error("Run failed in \(stage.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 finish(with: .failed(WriteFailure(stage: stage, error: error)))
             }
+        }
+    }
+
+    /// Best effort: a drive that won't mount is logged and the run's outcome stands.
+    private func remount(_ bsdName: String) async {
+        do {
+            try await diskManager.mountWholeDisk(bsdName: bsdName)
+            Self.log.notice("Remounted \(bsdName, privacy: .public) after a run that stopped before writing")
+        } catch {
+            Self.log.error("Remount of \(bsdName, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 

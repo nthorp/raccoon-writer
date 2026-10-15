@@ -7,6 +7,10 @@ public protocol DiskManager: Sendable {
     /// `bsdName` must match `^disk[0-9]+$`.
     func unmountWholeDisk(bsdName: String) async throws
 
+    /// Mounts the volumes on the whole disk, undoing `unmountWholeDisk` for a run that
+    /// stopped before writing. `bsdName` must match `^disk[0-9]+$`.
+    func mountWholeDisk(bsdName: String) async throws
+
     /// Unmounts and ejects the whole disk. `bsdName` must match `^disk[0-9]+$`.
     func eject(bsdName: String) async throws
 }

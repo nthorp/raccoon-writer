@@ -88,6 +88,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H15 | Drive swapped during the password dialog | Debug | PASS | Both RAM disks were `disk8`; refused with "A different drive is attached" |
 | H16 | Removable Volumes privacy prompt denied | Debug + Release | PASS | Mapped to `blockedByPrivacySettings`; fix A needs Try Again, not a relaunch; fix B needs no relaunch |
 | H17 | Image stored on the drive; image deleted before the write | Release + Debug | | |
+| H18 | Drive remounted after a run that stops before writing | Release | | |
 
 **Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09). That build never tried `DKIOCSYNCHRONIZE`. **From T19 on: `DKIOCSYNCHRONIZE`** (Cruzer Glide, Release build, 2026-10-13, commit `169b386`; details under T19 in `PLAN.md`).
 
@@ -426,6 +427,28 @@ Before T26, choosing an image stored on the stick and writing it to that stick f
 - Step 1: the label, the message with the stick's mount point, Continue disabled, and all three cleared by choosing an image on the Mac. No password dialog appears.
 - Step 2: the failed screen as above, with "Nothing was written to the drive." rather than "may be partially written".
 - Step 3: same as step 1.
+
+**Result:**
+**Notes:**
+
+### H18 — Drive remounted after a run that stops before writing (T27)
+
+From T27 on, a run that stops after the unmount but before the first write mounts the drive again before showing the failed or cancelled screen. The easiest way to get there on real hardware is H16's privacy denial, which fails right after the unmount. Nothing is written to the drive. This is also the first real run of `diskutil mountDisk` from the app.
+
+Keep this running in a second Terminal window for the whole test:
+
+```sh
+log stream --predicate 'subsystem == "com.example.raccoonwriter"' --info
+```
+
+**Steps**
+1. **Privacy denial, Release, Cruzer Glide.** Give the stick a volume with a file on it (for example ExFAT, named `TESTSTICK`). `scripts/build.sh --release`, then `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter`. Plug in the stick, check `TESTSTICK` is in Finder, and launch `build/RaccoonWriter.app`. Press **Don't Allow** at the prompt. Choose an image and the stick, Continue, Erase and Write, and enter your password. Wait for the failed screen ("macOS blocked access to removable drives").
+2. **Check the volume.** Without replugging, look for `TESTSTICK` in Finder and open the file on it. Press Try Again and look at the stick's row in the drive list: its volume name should be there. Optionally run `diskutil list external` (read-only) and note whether the volume shows a mount point.
+3. **Restore.** Run `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter`, quit the app, and click Allow at the next launch.
+
+**Expected**
+- Step 1: the failed screen as in H16. The log shows `Remounted diskN after a run that stopped before writing`, then `Run failed in open: macOS privacy settings did not allow Raccoon Writer to open the drive.`
+- Step 2: `TESTSTICK` is back in Finder (it may disappear for a moment during the run) and the file opens. If the log instead shows `Remount of diskN failed: …`, record that line.
 
 **Result:**
 **Notes:**
