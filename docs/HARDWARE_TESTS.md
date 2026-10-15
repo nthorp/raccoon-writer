@@ -88,7 +88,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H15 | Drive swapped during the password dialog | Debug | PASS | Both RAM disks were `disk8`; refused with "A different drive is attached" |
 | H16 | Removable Volumes privacy prompt denied | Debug + Release | PASS | Mapped to `blockedByPrivacySettings`; fix A needs Try Again, not a relaunch; fix B needs no relaunch |
 | H17 | Image stored on the drive; image deleted before the write | Release + Debug | PASS | Stick holding the image marked and refused; deleted image fails with "Nothing was written to the drive."; optional APFS step not run |
-| H18 | Drive remounted after a run that stops before writing | Release | | |
+| H18 | Drive remounted after a run that stops before writing | Release | PASS | Volume back in Finder after the privacy denial without replugging; `Remounted disk7 …` logged |
 | H19 | SD card in the built-in slot listed and written | Release | PASS | Listed with the toggle off, `sdcard` symbol; internal disk hidden; one password dialog, no privacy prompt; `DKIOCSYNCHRONIZE`; ejected. Optional steps 3–4 not run |
 
 **Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09). That build never tried `DKIOCSYNCHRONIZE`. **From T19 on: `DKIOCSYNCHRONIZE`** (Cruzer Glide, Release build, 2026-10-13, commit `169b386`; details under T19 in `PLAN.md`).
@@ -453,8 +453,16 @@ log stream --predicate 'subsystem == "com.example.raccoonwriter"' --info
 - Step 1: the failed screen as in H16. The log shows `Remounted diskN after a run that stopped before writing`, then `Run failed in open: macOS privacy settings did not allow Raccoon Writer to open the drive.`
 - Step 2: `TESTSTICK` is back in Finder (it may disappear for a moment during the run) and the file opens. If the log instead shows `Remount of diskN failed: …`, record that line.
 
-**Result:**
+**Result:** PASS
 **Notes:**
+- 2026-10-14, Release build, USB stick as `disk7` (Nick, with the log read by the agent afterwards). After **Don't Allow**, the run failed on the H16 screen ("macOS blocked access to removable drives"). Without replugging, the volume was back in Finder and its file opened, and after Try Again the stick's row showed its volume name. This was the first real `diskutil mountDisk` from the app, and it worked. Stored log, in order:
+  ```
+  21:44:29.029 [authopen] authopen exited(1): authopen: couldn't open /dev/rdisk7: Operation not permitted
+  21:44:29.030 [authopen] authopen failure mapped to blockedByPrivacySettings
+  21:44:29.453 [coordinator] Remounted disk7 after a run that stopped before writing
+  21:44:29.453 [coordinator] Run failed in open: macOS privacy settings did not allow Raccoon Writer to open the drive.
+  ```
+- Step 3 (restoring the permission) wasn't reported back; it doesn't affect the result.
 
 ### H19 — SD card in the built-in slot listed and written (T29)
 

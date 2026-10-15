@@ -133,7 +133,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
 | T25 | 🧑 Tell a Removable Volumes privacy denial apart from a refused password | T21 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
 | T26 | 🧑 Refuse a drive that holds the image; open the image before the unmount | T25 | DONE | 2026-10-14 | Claude (prep) / Nick (run) |
-| T27 | 🧑 Remount the drive when a run stops before writing | T26 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T27 | 🧑 Remount the drive when a run stops before writing | T26 | DONE | 2026-10-14 | Claude (prep) / Nick (run) |
 | T28 | Explain a `.dmg` picked in the open panel | T04 | DONE | 2026-10-14 | Claude |
 | T29 | 🧑 List built-in SD card readers in the default drive list | T25 | DONE | 2026-10-14 | Claude (prep) / Nick (run) |
 
@@ -1562,6 +1562,8 @@ Significance is low (no data loss, a confusing state); likelihood is moderate fo
 - **Known gaps, left as is:** a failed remount is only logged, so the screen still just says "Nothing was written to the drive." The remount runs while the screen still shows the last preparing step; it is normally under a second, but a hung `diskutil` holds the run (and a quit) for up to `ProcessCommandRunner`'s 30 s timeout plus the kill grace. When `checkOpened` finds another disk under the name, the remount targets that name, which now belongs to the other disk; mounting it is harmless, since macOS mounts a newly attached disk anyway.
 
 **Instructions for Nick:** run H18 in `docs/HARDWARE_TESTS.md` (steps 1–3) and report: whether `TESTSTICK` was back in Finder on the failed screen without replugging, and the `Remounted …` or `Remount of … failed` log line.
+- **H18, 2026-10-14 (Nick, Release): PASS.** After the privacy denial, the volume was back in Finder without replugging, its file opened, and the drive list showed its volume name after Try Again. The stored log (read by the agent) shows `Remounted disk7 after a run that stopped before writing` about 0.4 s after authopen's "Operation not permitted", then `Run failed in open: …`. First real `diskutil mountDisk` from the app. Restoring the permission (H18 step 3) wasn't reported back; it doesn't affect the result.
+- **DONE, 2026-10-14 (Claude).** Every agent step and the test steps of H18 are complete, and every acceptance criterion is met. Tests (437) and both builds passed at `3917068`, which contains this task's code.
 
 ---
 
@@ -1746,4 +1748,5 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 | 2026-10-14 | T29 added from a review finding and Nick's decision: built-in SD card readers (`Secure Digital`, removable media, physical, whole disk) appear in the default drive list; `AGENTS.md` safety rule and section 1 "Drive filter" amended | Claude |
 | 2026-10-14 | T26 DONE after Nick's H17 runs: a stick holding the image is marked and refused, and an image deleted before the run fails with "Nothing was written to the drive." | Claude |
 | 2026-10-14 | T29 prep: `DiskInfo.isBuiltInCardReader` from the four diskutil keys, exempt from the internal and USB filter rules only; `info-disk7` matches H14, guessed USB reader `info-disk9`; `sdcard` row symbol, `SimulatedDrive.builtInSDCard` (disk98), README, H19; NEEDS_HUMAN for Nick's run | Claude |
+| 2026-10-14 | T27 DONE after Nick's H18 run: after a privacy denial the stick was remounted (`diskutil mountDisk`) before the failed screen, and its volume was back in Finder | Claude |
 | 2026-10-14 | T29 DONE after Nick's H19 run: the built-in SD card is listed with the toggle off and writes with one password dialog, `DKIOCSYNCHRONIZE` and an eject; no separate privacy prompt | Claude |
