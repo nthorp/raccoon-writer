@@ -87,7 +87,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H14 | What real disks report (read-only) | none | | |
 | H15 | Drive swapped during the password dialog | Debug | PASS | Both RAM disks were `disk8`; refused with "A different drive is attached" |
 | H16 | Removable Volumes privacy prompt denied | Debug + Release | PASS | Mapped to `blockedByPrivacySettings`; fix A needs Try Again, not a relaunch; fix B needs no relaunch |
-| H17 | Image stored on the drive; image deleted before the write | Release + Debug | Partial | Step 1 PASS; step 2 (Simulate) not yet run |
+| H17 | Image stored on the drive; image deleted before the write | Release + Debug | PASS | Stick holding the image marked and refused; deleted image fails with "Nothing was written to the drive."; optional APFS step not run |
 | H18 | Drive remounted after a run that stops before writing | Release | | |
 | H19 | SD card in the built-in slot listed and written | Release | Partial | Write and verify passed; `DKIOCSYNCHRONIZE`; step 1 checks not yet reported |
 
@@ -429,9 +429,10 @@ Before T26, choosing an image stored on the stick and writing it to that stick f
 - Step 2: the failed screen as above, with "Nothing was written to the drive." rather than "may be partially written".
 - Step 3: same as step 1.
 
-**Result:** Step 1 PASS; step 2 not yet run
+**Result:** PASS (steps 1 and 2; optional step 3 not run)
 **Notes:**
 - Step 1, 2026-10-14, Release build (`build/` as built for T29, commit `3917068`), USB stick: passed. With the image copied onto the stick, the row said "Holds this image" in orange. Selecting the stick showed the orange message with its `/Volumes/…` path and disabled Continue, and both stayed when the toggle was flipped. Choosing an image on the Mac cleared the label and the message and enabled Continue. So the mount point `diskutil` reports for a real stick matches the one `fstatfs` gives for a file on it.
+- Step 2, 2026-10-14, Debug build, Simulate mode, `disk90`: passed. With the image deleted on the confirm screen, Erase and Write led to the failed screen with "The image file couldn’t be read" and "Nothing was written to the drive.", not "may be partially written".
 
 ### H18 — Drive remounted after a run that stops before writing (T27)
 

@@ -132,7 +132,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T24 | Smaller app: optimized raccoon layer, stripped Release binary | T23 | DONE | 2026-10-13 | Claude |
 | T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
 | T25 | 🧑 Tell a Removable Volumes privacy denial apart from a refused password | T21 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
-| T26 | 🧑 Refuse a drive that holds the image; open the image before the unmount | T25 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T26 | 🧑 Refuse a drive that holds the image; open the image before the unmount | T25 | DONE | 2026-10-14 | Claude (prep) / Nick (run) |
 | T27 | 🧑 Remount the drive when a run stops before writing | T26 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 | T28 | Explain a `.dmg` picked in the open panel | T04 | DONE | 2026-10-14 | Claude |
 | T29 | 🧑 List built-in SD card readers in the default drive list | T25 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
@@ -1516,7 +1516,9 @@ Significance is low to moderate (no data loss, a wrong message); likelihood is l
 - New previews: "Image on the drive" (`SetupView`, using `PreviewSamples.imageOnStick`).
 
 **Instructions for Nick:** run H17 in `docs/HARDWARE_TESTS.md` (steps 1 and 2, step 3 optional) and report: whether the stick showed "Holds this image" with Continue disabled, the stick's mount point as the message showed it, and what the failed screen said in step 2.
-- **H17 step 1, 2026-10-14 (Nick, Release, `3917068`): PASS.** "Holds this image" on the stick's row, the message with its `/Volumes/…` path, Continue disabled, both kept across the toggle, and all cleared by choosing an image on the Mac. A real stick's `diskutil` mount point matches `fstatfs`. Still to run before DONE: H17 step 2 (Simulate, Debug).
+- **H17 step 1, 2026-10-14 (Nick, Release, `3917068`): PASS.** "Holds this image" on the stick's row, the message with its `/Volumes/…` path, Continue disabled, both kept across the toggle, and all cleared by choosing an image on the Mac. A real stick's `diskutil` mount point matches `fstatfs`.
+- **H17 step 2, 2026-10-14 (Nick, Debug, Simulate): PASS.** The image deleted on the confirm screen gave "The image file couldn’t be read" and "Nothing was written to the drive.", not "may be partially written". Optional step 3 (APFS) not run.
+- **DONE, 2026-10-14 (Claude).** Every agent step and both required human steps are complete, and every acceptance criterion is met. `scripts/test.sh` (437 tests) passes, and `scripts/build.sh` and `scripts/build.sh --release` passed at `3917068`, which contains this task's code.
 
 ---
 
@@ -1740,4 +1742,5 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 | 2026-10-14 | T27 prep: `DiskManager.mountWholeDisk` (`diskutil mountDisk`), the coordinator remounts the drive before reporting a failure or cancel that stopped before writing, README, H18; NEEDS_HUMAN for Nick's run | Claude |
 | 2026-10-14 | T28 added from a review finding and DONE: the open panel offers `.dmg` (macOS gives `.img` the same type), so `ImageInspector` rejects `.dmg` and `.udif` with a `macDiskImage` message instead of "not an .iso or .img file" | Claude |
 | 2026-10-14 | T29 added from a review finding and Nick's decision: built-in SD card readers (`Secure Digital`, removable media, physical, whole disk) appear in the default drive list; `AGENTS.md` safety rule and section 1 "Drive filter" amended | Claude |
+| 2026-10-14 | T26 DONE after Nick's H17 runs: a stick holding the image is marked and refused, and an image deleted before the run fails with "Nothing was written to the drive." | Claude |
 | 2026-10-14 | T29 prep: `DiskInfo.isBuiltInCardReader` from the four diskutil keys, exempt from the internal and USB filter rules only; `info-disk7` matches H14, guessed USB reader `info-disk9`; `sdcard` row symbol, `SimulatedDrive.builtInSDCard` (disk98), README, H19; NEEDS_HUMAN for Nick's run | Claude |
