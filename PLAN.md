@@ -40,7 +40,7 @@
 | Privilege model | **`authopen`** now, behind a `DeviceOpener` protocol so an SMAppService helper can replace it later |
 | Image formats | `.iso` and `.img` only, raw block copy |
 | Verification | Always on (no toggle) |
-| Drive filter | Default: external, USB-attached physical disks that report removable or ejectable (sticks and card readers, but also most USB hard drives and SSDs). Drives over 500 GB get a "Large drive" warning in the list and on the confirm screen (T20), which never blocks the write. Toggle "Show all external disks". The boot disk and internal disks are **never** shown. |
+| Drive filter | Default: external, USB-attached physical disks that report removable or ejectable (sticks and card readers, but also most USB hard drives and SSDs). Drives over 500 GB get a "Large drive" warning in the list and on the confirm screen (T20), which never blocks the write. Toggle "Show all external disks". The boot disk and internal disks are **never** shown, except a built-in SD card reader (`Secure Digital`, removable media, physical, whole disk), which appears in the default list (Nick's decision 2026-10-14, implemented in T29; rule in `AGENTS.md`). |
 | Confirmation | Show drive name, size, mount points; explicit "Erase and Write" click |
 | Distribution | Personal / open source now. App Sandbox **off**. No Mac App Store. Signing and notarization deferred. |
 | Features | Minimal v1: no drag-and-drop, no SHA-256 display, no localization |
@@ -135,8 +135,9 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T26 | 🧑 Refuse a drive that holds the image; open the image before the unmount | T25 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 | T27 | 🧑 Remount the drive when a run stops before writing | T26 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 | T28 | Explain a `.dmg` picked in the open panel | T04 | DONE | 2026-10-14 | Claude |
+| T29 | 🧑 List built-in SD card readers in the default drive list | T25 | TODO | | Claude (prep) / Nick (run) |
 
-Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T25 builds on T22's committed prep but not on Nick's T22 runs, so it may start while T22 is `NEEDS_HUMAN`. T27 builds on T26's committed prep but not on Nick's H17 runs, so it may start while T26 is `NEEDS_HUMAN`. T28 only changes `ImageInspector`, so it may start while T26 and T27 are `NEEDS_HUMAN`. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
+Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T25 builds on T22's committed prep but not on Nick's T22 runs, so it may start while T22 is `NEEDS_HUMAN`. T27 builds on T26's committed prep but not on Nick's H17 runs, so it may start while T26 is `NEEDS_HUMAN`. T28 only changes `ImageInspector`, so it may start while T26 and T27 are `NEEDS_HUMAN`. T29 builds on T26's and T27's committed prep but not on Nick's H17 and H18 runs, so it may start while they are `NEEDS_HUMAN`. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
 ---
 
@@ -1589,6 +1590,65 @@ Significance is low: nothing is read or written, and refusing a `.dmg` is right 
 
 ---
 
+### T29 — 🧑 List built-in SD card readers in the default drive list
+
+**Goal:** close a review finding. An SD card in a Mac's built-in slot is never listed, so Raspberry Pi and other single-board-computer users, a large share of this app's audience, need a USB card reader. The slot is hidden only because it reports `Internal = true`. H14 (2026-10-09) recorded the MacBook Pro's slot as `disk4`: MediaName `Built In SDXC Reader`, BusProtocol `Secure Digital`, Internal `true`, Removable `true`, RemovableMedia `true`, Ejectable `true`, VirtualOrPhysical `Physical`, DeviceBlockSize `512`, TotalSize `64021856256`.
+
+**Decision (Nick, 2026-10-14):** a built-in SD card reader is an allowed exception to the internal-disk rule, and it appears in the **default** list, not only under "Show all external disks". `AGENTS.md` now says so: it is recognised only when `BusProtocol` is exactly `Secure Digital`, `RemovableMedia` is true, `VirtualOrPhysical` is `Physical`, and it is a whole disk. A missing key means it is not one. Every other rule still applies, the boot disk rule included, so a card macOS booted from stays hidden.
+
+Also fixes a wrong fixture: `info-disk7` was hand-written in T03 as an SD card with `Internal = false` and MediaName `SD Card Reader`. No real disk looks like that (H14), so the test that "the toggle adds the SD card" tests nothing real.
+
+Significance is moderate (a common use case needs extra hardware today); likelihood is high for anyone writing Raspberry Pi images on a MacBook Pro or Mac Studio with a slot.
+
+**Out of scope:**
+- Built-in readers that report a different protocol, for example one on an internal USB bus (`BusProtocol = USB`, `Internal = true`). They stay hidden, which fails closed. Record any seen in H19.
+- Telling cards in the slot apart. Every card in it has the MediaName `Built In SDXC Reader`, so if cards are swapped while the password dialog is open, the safety check (`identityDifference`) and the opened-device check can tell them apart only by size and block size. This is the "two identical drives" limitation, more likely here; the README says so instead of changing identity.
+
+**Agent steps**
+1. **Fixtures.** Replace `info-disk7.plist` with the H14 values above (keep other keys realistic, e.g. `OSInternalMedia` false) and keep `list.plist` and `DiskutilFixtures` consistent. Add a hand-written USB card reader fixture (for example `info-disk9`: BusProtocol `USB`, Internal `false`, RemovableMedia `true`), marked as a guess in its comment until H19 step 4 captures a real one.
+2. **`DiskInfo.isBuiltInCardReader: Bool`**, defaulting to `false` in the memberwise init so existing call sites and fakes don't change. The `DiskInfo(DiskutilInfo, volumes:)` init sets it only when `busProtocol == "Secure Digital"` (exact, case-sensitive), `removableMedia == true`, `virtualOrPhysical == "Physical"` and `wholeDisk == true`. `RemovableMedia` must be read on its own: today it is merged into `isRemovable` with `Removable`. Note that internal disks report `VirtualOrPhysical = Unknown` (T01), which correctly fails the test.
+3. **`DiskFilter.rejection`.** The internal rule becomes `guard !disk.isInternal || disk.isBuiltInCardReader`. In default mode, accept `busProtocol == "USB"` or `isBuiltInCardReader`; the removable-or-ejectable rule still applies. Keep the rule order, so the boot disk, system volume, APFS container, virtual and no-media rules still run after the internal rule. Update the doc comments on `DiskFilter`, `DiskInfo` and `DiskRejection`. `SafetyGuard` uses the same filter, so it needs no change; a test proves it.
+4. **App.** `DriveRow` shows the `sdcard` symbol for a built-in card reader and `externaldrive` otherwise. `PreviewSamples.builtInSDCard` and a `DriveSection` preview that includes it.
+5. **Simulate mode.** `SimulatedDrive.builtInSDCard` (`disk98`, works, `Internal = true`, `Secure Digital`, 64 GB), listed in the default list. Update `SimulationModeTests`.
+6. **Tests.** Check each new test fails without its fix.
+   - Discovery decodes the real capture with `isBuiltInCardReader == true`; `disk0` (internal NVMe) has it `false`.
+   - **Shown:** the built-in SD card under both settings; `SafetyGuard.validate` accepts it under the default filter.
+   - **Still hidden**, each as its own case:
+     - the internal NVMe disk
+     - an internal `Secure Digital` disk with `RemovableMedia` false or missing
+     - `VirtualOrPhysical` `Virtual`, `Unknown` or missing
+     - `BusProtocol` missing, or not exactly `Secure Digital` (e.g. `secure digital`)
+     - not a whole disk (`WholeDisk` false or missing)
+     - an SD card that is in the boot disk set
+     - an SD card with a system volume mounted (`/` or under `/System/Volumes`)
+     - an SD card reader with no card (size 0, `noMedia`)
+   - The USB card reader fixture is shown in the default list.
+   - The old "toggle adds the SD card" expectation is replaced: the built-in card appears with the toggle off.
+7. **Docs.**
+   - `README.md`: the safety bullet (line 13) names the built-in SD card exception. Replace the limitation "SD cards in a Mac's built-in slot are not listed" with the card-swap note from Out of scope. "Known limitations" says which readers stay hidden.
+   - `PLAN.md` section 5, "Wrong disk written" row: mention the exception and its four-key test.
+   - `docs/HARDWARE_TESTS.md`: H3's expected results now include the built-in SD card in the list, and its recorded note ("built-in SD slot reports internal, so hidden") stays as history. Write H19.
+8. `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass. Write instructions for Nick, set `NEEDS_HUMAN`, stop.
+
+**Human steps (Nick):** run H19 in `docs/HARDWARE_TESTS.md`, with an SD card whose contents you don't need, in the MacBook Pro's built-in slot, on the Release build:
+1. The card is listed with the toggle off, with the `sdcard` symbol, `Secure Digital` and its size. The internal disk is still absent from the list (compare with `diskutil list`) in both toggle positions.
+2. Write an uncompressed Raspberry Pi OS `.img` (`xz -dk`) or the FreeBSD `.img` from H7. One password dialog; write and verify pass; note any Removable Volumes prompt and the `fullSync used …` log line; the done screen reports the card ejected.
+3. Optional: the card boots a Raspberry Pi (or the FreeBSD image boots the test machine from a USB reader).
+4. Optional: an SD card in a USB card reader. Paste a read-only `diskutil info -plist diskN` summary (BusProtocol, Internal, Removable, RemovableMedia, Ejectable, VirtualOrPhysical) so the agent can replace the guessed fixture.
+
+**Acceptance criteria**
+- A built-in SD card reader that passes all four keys is listed in the default list and can be written (unit tests, H19 steps 1–2).
+- Every other internal disk stays hidden under both settings, including near misses on each of the four keys (unit tests, H19 step 1).
+- The boot disk, system volume, APFS container, virtual and no-media rules still apply to an SD card (unit tests).
+- `info-disk7` matches the H14 capture.
+- `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass.
+
+**Files:** `AGENTS.md` (already changed, 2026-10-14), `Sources/ImageWriterCore/` (`DiskInfo`, `DiskutilDiscovery`, `DiskFilter`, `DiskRejection`, `Simulation/SimulatedDrive`), `App/` (`DriveSection`, `PreviewSamples`), `Tests/ImageWriterCoreTests/` (`DiskFilterTests`, `DiskutilDiscoveryTests`, `DiskutilFixtures`, `SafetyGuardTests`, `SimulationModeTests`, `Fixtures/diskutil/`), `README.md`, `docs/HARDWARE_TESTS.md`, `PLAN.md`
+
+**Handoff notes:**
+
+---
+
 ## 4. Future work (not in scope)
 
 - Rename the GitHub repo and local folder from `iso-sword` to match the app (T14 left them as they are).
@@ -1667,3 +1727,4 @@ Significance is low: nothing is read or written, and refusing a `.dmg` is right 
 | 2026-10-14 | T27 added from a review finding: a run that stops after the unmount but before the first write (open failure, privacy denial, cancel, busy unmount) leaves the drive unmounted; remount it with `diskutil mountDisk` | Claude |
 | 2026-10-14 | T27 prep: `DiskManager.mountWholeDisk` (`diskutil mountDisk`), the coordinator remounts the drive before reporting a failure or cancel that stopped before writing, README, H18; NEEDS_HUMAN for Nick's run | Claude |
 | 2026-10-14 | T28 added from a review finding and DONE: the open panel offers `.dmg` (macOS gives `.img` the same type), so `ImageInspector` rejects `.dmg` and `.udif` with a `macDiskImage` message instead of "not an .iso or .img file" | Claude |
+| 2026-10-14 | T29 added from a review finding and Nick's decision: built-in SD card readers (`Secure Digital`, removable media, physical, whole disk) appear in the default drive list; `AGENTS.md` safety rule and section 1 "Drive filter" amended | Claude |

@@ -11,7 +11,7 @@ Native macOS app (Swift/SwiftUI) that writes `.iso` / `.img` images to USB drive
 ## Safety (non-negotiable)
 
 - **Never write to a real block device.** Do not run `dd`, `authopen`, `diskutil erase*`, `diskutil partitionDisk`, or anything similar against real disks. Tests use temp files, fixtures and fakes only.
-- The boot disk and internal disks must never appear as targets, under any setting. Disk discovery and filtering must **fail closed**.
+- The boot disk and internal disks must never appear as targets, under any setting, with one exception: a built-in SD card reader, recognised only when **all** of these hold: `BusProtocol` is exactly `Secure Digital`, `RemovableMedia` is true, `VirtualOrPhysical` is `Physical`, and it is a whole disk. A missing key means it is not one. Every other rule still applies to it, the boot disk rule included. Disk discovery and filtering must **fail closed**.
 - The debug-only "allow virtual disks" mode must stay inside `#if DEBUG` and be absent from Release builds.
 
 ## Stack and conventions
