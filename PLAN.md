@@ -1675,7 +1675,6 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 
 - Rename the GitHub repo and local folder from `iso-sword` to match the app (T14 left them as they are).
 - ~~`authopen -extauth` for a dialog naming ISO Sword~~: implemented in T13.
-- `HelperOpener` using an SMAppService-registered privileged XPC helper (removes per-write password prompt). Requires Developer ID signing; design must re-validate targets inside the helper.
 - Developer ID signing, notarization, DMG packaging.
 - Compressed image support, SHA-256 display, drag-and-drop, localization.
 
@@ -1755,3 +1754,4 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 | 2026-10-14 | T27 DONE after Nick's H18 run: after a privacy denial the stick was remounted (`diskutil mountDisk`) before the failed screen, and its volume was back in Finder | Claude |
 | 2026-10-14 | T29 DONE after Nick's H19 run: the built-in SD card is listed with the toggle off and writes with one password dialog, `DKIOCSYNCHRONIZE` and an eject; no separate privacy prompt | Claude |
 | 2026-10-14 | T12 DONE after Nick's H10, H11, H12 and H14 runs; a real USB card reader capture replaced the guessed `info-disk9` fixture. Every task in the plan is DONE | Claude |
+| 2026-10-14 | Privileged helper (`HelperOpener`, SMAppService) removed from future work at Nick's request | Claude |
