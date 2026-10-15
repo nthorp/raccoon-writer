@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Hand-written guess at an SD card in a USB card reader (T29). Replace with H19 step 4's capture. -->
+<!-- Real capture (H14, 2026-10-14): a 64 GB SD card in a USB card reader on the MacBook Pro, read with diskutil info -plist. Only the disk number was changed, from disk8 to disk9. -->
 <plist version="1.0">
 <dict>
 	<key>Bootable</key>
@@ -8,6 +8,8 @@
 	<key>BusProtocol</key>
 	<string>USB</string>
 	<key>CanBeMadeBootable</key>
+	<false/>
+	<key>CanBeMadeBootableRequiresDestroy</key>
 	<false/>
 	<key>Content</key>
 	<string>FDisk_partition_scheme</string>
@@ -17,22 +19,34 @@
 	<string>disk9</string>
 	<key>DeviceNode</key>
 	<string>/dev/disk9</string>
+	<key>DeviceTreePath</key>
+	<string>IODeviceTree:/arm-io@10F00000/usb-drd0@2280000/usb-drd0-port-ss@00200000</string>
 	<key>Ejectable</key>
+	<true/>
+	<key>EjectableMediaAutomaticUnderSoftwareControl</key>
 	<true/>
 	<key>EjectableOnly</key>
 	<true/>
 	<key>FreeSpace</key>
 	<integer>0</integer>
+	<key>GlobalPermissionsEnabled</key>
+	<false/>
 	<key>IOKitSize</key>
-	<integer>31914983424</integer>
+	<integer>64021856256</integer>
+	<key>IORegistryEntryName</key>
+	<string>Generic MassStorageClass Media</string>
 	<key>Internal</key>
 	<false/>
+	<key>LowLevelFormatSupported</key>
+	<false/>
 	<key>MediaName</key>
-	<string>USB3.0 CRW-SD</string>
+	<string>MassStorageClass</string>
 	<key>MediaType</key>
 	<string>Generic</string>
 	<key>MountPoint</key>
 	<string></string>
+	<key>OS9DriversInstalled</key>
+	<false/>
 	<key>OSInternalMedia</key>
 	<false/>
 	<key>ParentWholeDisk</key>
@@ -49,16 +63,18 @@
 	<true/>
 	<key>RemovableMediaOrExternalDevice</key>
 	<true/>
+	<key>SMARTDeviceSpecificKeysMayVaryNotGuaranteed</key>
+	<dict/>
 	<key>SMARTStatus</key>
 	<string>Not Supported</string>
 	<key>Size</key>
-	<integer>31914983424</integer>
-	<key>SolidState</key>
-	<true/>
+	<integer>64021856256</integer>
+	<key>SupportsGlobalPermissionsDisable</key>
+	<false/>
 	<key>SystemImage</key>
 	<false/>
 	<key>TotalSize</key>
-	<integer>31914983424</integer>
+	<integer>64021856256</integer>
 	<key>VirtualOrPhysical</key>
 	<string>Physical</string>
 	<key>VolumeName</key>

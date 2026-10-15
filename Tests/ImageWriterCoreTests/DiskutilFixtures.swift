@@ -8,9 +8,9 @@ import Foundation
 /// - `disk7` SD card in a built-in SDXC slot (`Internal = true`, Secure Digital bus)
 /// - `disk8` mounted disk image
 /// - `disk9` SD card in a USB card reader
-/// The disk4–disk6, disk8 and disk9 plists are hand-written from the keys seen on real
-/// captures; disk9 is a guess until H19 step 4 captures a real USB reader. disk7 is
-/// hand-written around the H14 capture's values (T29).
+/// The disk4–disk6 and disk8 plists are hand-written from the keys seen on real captures.
+/// disk7 is hand-written around the H14 capture's values (T29). `info-disk9` is a real
+/// capture (H14, 2026-10-14) with only the disk number changed.
 enum DiskutilFixtures {
     static let diskutil = "/usr/sbin/diskutil"
     static let wholeDisks = ["disk0", "disk3", "disk4", "disk5", "disk6", "disk7", "disk8", "disk9"]

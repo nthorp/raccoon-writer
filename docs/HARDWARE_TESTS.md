@@ -54,11 +54,11 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 
 | | Run A | Run B (optional) |
 | --- | --- | --- |
-| Date | 2026-10-09 | |
-| Mac model and chip | MacBook Pro (Mac15,10), Apple M3 Max, 36 GB | |
-| macOS version | 26.3.1 (25D2128) | |
-| Xcode version | 26.6 (17F113) | |
-| Commit tested | 2df5b29 (app code unchanged since T11, 57fc215) | |
+| Date | 2026-10-09 | 2026-10-14 (H10–H12, H14, H17–H19) |
+| Mac model and chip | MacBook Pro (Mac15,10), Apple M3 Max, 36 GB | Same |
+| macOS version | 26.3.1 (25D2128) | 26.3.1 (25D2128) |
+| Xcode version | 26.6 (17F113) | 26.6 (17F113) |
+| Commit tested | 2df5b29 (app code unchanged since T11, 57fc215) | Release build, app code as of `3917068` (T29); H17 step 2 on the Debug build of the same code |
 | USB stick 1 (make, model, size, USB 2/3) | SanDisk Cruzer Glide, 31.4 GB, USB 2.0 link (480 Mb/s) through a GenesysLogic USB 2.1 hub | |
 | USB stick 2 / spare (make, model, size) | | |
 | Boot test machine | 2017 Intel Mac | |
@@ -81,15 +81,15 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H8 | Cancel during write | Release | PASS | |
 | H9 | Cancel during verify | Release | PASS | |
 | H10 | Quit and close during a write | Release | PASS | Keep Writing continued; Stop and Quit quit cleanly; quit during the password dialog (answered Cancel) quit |
-| H11 | Pull the stick out mid-write | Release | PASS | "The drive was disconnected"; `ENXIO` (errno 6); rewrite after replugging succeeded |
+| H11 | Pull the stick out mid-write | Release | PASS | "The drive was disconnected"; `ENXIO` (errno 6); Try Again back to setup; rewrite after replugging succeeded |
 | H12 | Drive in use (unmount refused) | Release | PASS | "The drive is in use by tail"; stick remounted (T27); second attempt wrote |
 | H13 | Intel Mac run | Release | Not possible | Intel Mac runs macOS 13.7.8; app needs 14+ |
-| H14 | What real disks report (read-only) | none | | |
+| H14 | What real disks report (read-only) | none | PASS | USB stick, built-in SD slot and SD card in a USB reader recorded; no Thunderbolt/USB-C SSD available |
 | H15 | Drive swapped during the password dialog | Debug | PASS | Both RAM disks were `disk8`; refused with "A different drive is attached" |
 | H16 | Removable Volumes privacy prompt denied | Debug + Release | PASS | Mapped to `blockedByPrivacySettings`; fix A needs Try Again, not a relaunch; fix B needs no relaunch |
 | H17 | Image stored on the drive; image deleted before the write | Release + Debug | PASS | Stick holding the image marked and refused; deleted image fails with "Nothing was written to the drive."; optional APFS step not run |
 | H18 | Drive remounted after a run that stops before writing | Release | PASS | Volume back in Finder after the privacy denial without replugging; `Remounted disk7 …` logged |
-| H19 | SD card in the built-in slot listed and written | Release | PASS | Listed with the toggle off, `sdcard` symbol; internal disk hidden; one password dialog, no privacy prompt; `DKIOCSYNCHRONIZE`; ejected. Optional steps 3–4 not run |
+| H19 | SD card in the built-in slot listed and written | Release | PASS | Listed with the toggle off, `sdcard` symbol; internal disk hidden; one password dialog, no privacy prompt; `DKIOCSYNCHRONIZE`; ejected. Optional step 3 not run; step 4 USB reader listed |
 
 **Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09). That build never tried `DKIOCSYNCHRONIZE`. **From T19 on: `DKIOCSYNCHRONIZE`** (Cruzer Glide, Release build, 2026-10-13, commit `169b386`; details under T19 in `PLAN.md`).
 
@@ -298,7 +298,7 @@ The main end-to-end test. Also records the flush method on a real stick.
 - After reinserting it, the stick can be written again successfully.
 
 **Result:** PASS
-**Notes:** 2026-10-14, Release build, app code as of `3917068`, USB stick (Nick, with the log read by the agent afterwards). The app showed "The drive was disconnected" and didn't hang. After replugging, the stick was written successfully. The stored log has two pulls, both `ENXIO`: `Run failed in write: Writing to the drive failed. write at offset 130023424 failed: Device not configured (errno 6).` (21:56:29) and the same at offset 92274688 (21:57:35). So the stick came out at about 90–130 MB, earlier than the 30 % the step asks for, which doesn't change what's tested.
+**Notes:** 2026-10-14, Release build, app code as of `3917068`, USB stick (Nick, with the log read by the agent afterwards). The app showed "The drive was disconnected" and didn't hang. Try Again went back to the setup screen with no drive selected, and nothing was retried. After replugging, the stick was written successfully. The stored log has two pulls, both `ENXIO`: `Run failed in write: Writing to the drive failed. write at offset 130023424 failed: Device not configured (errno 6).` (21:56:29) and the same at offset 92274688 (21:57:35). So the stick came out at about 90–130 MB, earlier than the 30 % the step asks for, which doesn't change what's tested.
 
 ### H12 — Drive in use (unmount refused)
 
@@ -346,10 +346,12 @@ for k in MediaName BusProtocol Internal Removable RemovableMedia Ejectable Virtu
 
 Change `disk4` to the disk's number first. Paste each output below, and note whether the disk appeared in Raccoon Writer with the toggle off and on.
 
-**Result:**
+**Result:** PASS (no Thunderbolt or USB-C SSD available)
 **Notes:**
 - **USB stick 1, `disk7` on 2026-10-09** (read by the agent): MediaName `Cruzer Glide`, BusProtocol `USB`, Internal `false`, Removable `true`, RemovableMedia `true`, Ejectable `true`, VirtualOrPhysical `Physical`, DeviceBlockSize `512`, TotalSize `31406948352`. This matches the hand-written USB fixture's rules (T03): shown in the default list.
 - **SD card in the built-in SDXC slot, `disk4` on 2026-10-09** (read by the agent): MediaName `Built In SDXC Reader`, BusProtocol `Secure Digital`, Internal **`true`**, Removable `true`, RemovableMedia `true`, Ejectable `true`, VirtualOrPhysical `Physical`, DeviceBlockSize `512`, TotalSize `64021856256`. Hidden under both settings because it reports internal. The T03 fixture `info-disk7` guessed `Internal = false` for an SD card; a real built-in slot says `true`. Not seen in ISO Sword with the toggle off or on.
+- **SD card in a USB card reader, `disk8` on 2026-10-14** (read by the agent): MediaName `MassStorageClass`, BusProtocol `USB`, Internal `false`, Removable `true`, RemovableMedia `true`, Ejectable `true`, VirtualOrPhysical `Physical`, WholeDisk `true`, DeviceBlockSize `512`, TotalSize `64021856256` (the 64 GB card from H19, still holding the Raspberry Pi OS `bootfs` and Linux partitions written there). Nick saw it listed with the toggle off, with the drive symbol. It passes the default filter as a USB drive and is not a built-in card reader. The full plist is now `Tests/ImageWriterCoreTests/Fixtures/diskutil/info-disk9.plist`, replacing T29's guess (renamed to `disk9`).
+- No Thunderbolt or USB-C SSD was available.
 
 ### H15 — Drive swapped during the password dialog (RAM disks, debug flag)
 
@@ -497,8 +499,8 @@ for k in MediaName BusProtocol Internal Removable RemovableMedia Ejectable Virtu
 - Step 2: one password dialog; write and verify pass; "Finished. You can remove the drive." and the card ejected. The log shows `fullSync used DKIOCSYNCHRONIZE` or a fallback with `fullSync skipped …` lines; either is fine, but record it.
 - Step 4: BusProtocol `USB`, Internal `false`, RemovableMedia `true`, listed with the toggle off. Anything else, record it.
 
-**Result:** PASS (steps 1 and 2; optional steps 3 and 4 not run)
+**Result:** PASS (steps 1 and 2; optional step 3 not run)
 **Notes:**
 - 2026-10-14, Release build, commit `3917068`, MacBook Pro (M3 Max) built-in slot. Nick reports the card wrote successfully. The log showed `fullSync used DKIOCSYNCHRONIZE`, so the built-in slot accepts the cache flush. Afterwards the agent ran `diskutil list` (read-only): no card was attached, which fits the card having been ejected. Stored logs had no lines from the app process, as expected for a successful run (info-level lines aren't kept). Not yet reported: step 1 (the card listed with the toggle off, the SD card symbol, "Secure Digital", the internal disk absent in both toggle positions), the number of password dialogs, any Removable Volumes prompt, and the done screen's eject message.
 - Follow-up, 2026-10-14, Release build, card reinserted (Nick): step 1 passed. With the toggle off the card was listed with the SD card symbol, "Secure Digital" and its size, and the internal disk and boot container were absent with the toggle off and on. For the earlier write Nick confirms exactly one password dialog, no Removable Volumes prompt (the permission was already allowed since H16, so the built-in slot needs no separate grant), and "Finished. You can remove the drive." with the card ejected.
-- Step 4 was not run, so `info-disk9` (SD card in a USB reader) is still a hand-written guess.
+- Step 4, 2026-10-14: the same card in a USB card reader was listed with the toggle off, with the drive symbol. Its keys are recorded under H14 and replace the guessed `info-disk9` fixture.

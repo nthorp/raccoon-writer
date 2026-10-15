@@ -27,6 +27,7 @@
 		<string>disk8s1</string>
 		<string>disk9</string>
 		<string>disk9s1</string>
+		<string>disk9s2</string>
 	</array>
 	<key>AllDisksAndPartitions</key>
 	<array>
@@ -343,9 +344,17 @@
 					<key>VolumeName</key>
 					<string>bootfs</string>
 				</dict>
+				<dict>
+					<key>Content</key>
+					<string>Linux</string>
+					<key>DeviceIdentifier</key>
+					<string>disk9s2</string>
+					<key>Size</key>
+					<integer>2533359616</integer>
+				</dict>
 			</array>
 			<key>Size</key>
-			<integer>31914983424</integer>
+			<integer>64021856256</integer>
 		</dict>
 	</array>
 	<key>VolumesFromDisks</key>

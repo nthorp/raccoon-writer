@@ -118,7 +118,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T09 | WriteCoordinator (orchestration, state machine) | T04, T06, T07, T08 | DONE | 2026-10-09 | Claude |
 | T10 | SwiftUI shell and screens | T09 | DONE | 2026-10-09 | Claude |
 | T11 | Error states, cancel, disconnect handling, polish | T10 | DONE | 2026-10-09 | Claude |
-| T12 | 🧑 Hardware test checklist and README | T11 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T12 | 🧑 Hardware test checklist and README | T11 | DONE | 2026-10-14 | Claude (prep) / Nick (run) |
 | T13 | 🧑 Branded password prompt (`authopen -extauth`) | T11 | DONE | 2026-10-12 | Claude (prep) / Nick (run) |
 | T14 | Rename to Red Delicious Media Writer | T13 | DONE | 2026-10-12 | Claude |
 | T15 | App icon | T14 | DONE | 2026-10-12 | Claude |
@@ -691,7 +691,9 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - **2026-10-12: T13 runs before the remaining tests.** H1–H9 ran on the authopen-named-dialog build. Run H10, H11, H12 and H14 only after T13 is `DONE`, on the T13 build, and put the build's commit in each test's notes. See T13 "Order with T12".
 - **2026-10-12: run them on the T14 build instead.** T14 renames the app to Red Delicious (`build/RedDelicious.app`, `REDDELICIOUS_*` env vars, subsystem `com.example.reddelicious`), and the checklist's unrun steps use the new names.
 - **2026-10-13: and on the T23 build or later.** T23 renames the app to Raccoon Writer (`build/RaccoonWriter.app`, `RACCOONWRITER_*` env vars, subsystem `com.example.raccoonwriter`), and the checklist's steps use the new names.
-- **2026-10-14: H10, H11 and H12 PASS** (Nick, Release, app code as of `3917068`; details and log lines in `docs/HARDWARE_TESTS.md`). H11's pull gave "The drive was disconnected" (`ENXIO`); H12 named `tail` and remounted the stick. Left before DONE: H14, where Nick has an SD card in a USB reader to capture (read-only), which also replaces the guessed `info-disk9` fixture from T29.
+- **2026-10-14: H10, H11 and H12 PASS** (Nick, Release, app code as of `3917068`; details and log lines in `docs/HARDWARE_TESTS.md`). H11's pull gave "The drive was disconnected" (`ENXIO`); H12 named `tail` and remounted the stick.
+- **2026-10-14: H11 Try Again confirmed; H14 PASS.** The agent read an SD card in a USB card reader with `diskutil info -plist` (read-only): BusProtocol `USB`, Internal `false`, RemovableMedia `true`, Physical, MediaName `MassStorageClass`. Nick saw it listed with the toggle off. The capture replaced T29's guessed `info-disk9` (only the disk number changed), and `usbCardReaderFields` checks its name, size and that it isn't a built-in card reader; 437 tests pass. No Thunderbolt or USB-C SSD was available. Run B column of the environment table filled in.
+- **DONE, 2026-10-14 (Claude).** Every test in the checklist has a result: H1–H12 and H14–H19 PASS, H13 not possible (the only Intel Mac runs macOS 13). No failures, so no issues to file. The README was kept accurate by each task since.
 
 ---
 
@@ -1665,6 +1667,7 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 - **H19, 2026-10-14 (Nick, Release, `3917068`):** the card wrote successfully, and the log showed `fullSync used DKIOCSYNCHRONIZE`. Details in `docs/HARDWARE_TESTS.md` H19.
 - **H19 follow-up, 2026-10-14 (Nick, Release): PASS.** Step 1: the card was listed with the toggle off, with the `sdcard` symbol, "Secure Digital" and its size; the internal disk and boot container were hidden in both toggle positions. The write had one password dialog, no Removable Volumes prompt (already allowed since H16), and ended with "Finished. You can remove the drive." and the card ejected. Optional steps 3 (boot) and 4 (USB reader capture) not run, so `info-disk9` stays a guess.
 - **DONE, 2026-10-14 (Claude).** Every agent step and both required human steps are complete, and every acceptance criterion is met. Tests (437) and both builds passed at `3917068`.
+- **Later, 2026-10-14 (T12's H14):** the guessed `info-disk9` was replaced by a real capture of an SD card in a USB reader (BusProtocol `USB`, Internal `false`, MediaName `MassStorageClass`). The guess's filter-relevant keys were right, so no test expectation changed.
 
 ---
 
@@ -1751,3 +1754,4 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 | 2026-10-14 | T29 prep: `DiskInfo.isBuiltInCardReader` from the four diskutil keys, exempt from the internal and USB filter rules only; `info-disk7` matches H14, guessed USB reader `info-disk9`; `sdcard` row symbol, `SimulatedDrive.builtInSDCard` (disk98), README, H19; NEEDS_HUMAN for Nick's run | Claude |
 | 2026-10-14 | T27 DONE after Nick's H18 run: after a privacy denial the stick was remounted (`diskutil mountDisk`) before the failed screen, and its volume was back in Finder | Claude |
 | 2026-10-14 | T29 DONE after Nick's H19 run: the built-in SD card is listed with the toggle off and writes with one password dialog, `DKIOCSYNCHRONIZE` and an eject; no separate privacy prompt | Claude |
+| 2026-10-14 | T12 DONE after Nick's H10, H11, H12 and H14 runs; a real USB card reader capture replaced the guessed `info-disk9` fixture. Every task in the plan is DONE | Claude |

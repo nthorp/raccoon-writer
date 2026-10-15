@@ -82,11 +82,15 @@ struct DiskutilDiscoveryTests {
         #expect(card.isInternal)
     }
 
+    /// A real capture (H14): the reader names the card "MassStorageClass".
     @Test func usbCardReaderFields() async throws {
         let reader = try #require(try await disks()["disk9"])
+        #expect(reader.mediaName == "MassStorageClass")
+        #expect(reader.sizeBytes == 64_021_856_256 && reader.blockSize == 512)
         #expect(reader.busProtocol == "USB")
         #expect(!reader.isInternal && reader.isRemovable && reader.isEjectable && !reader.isVirtual)
         #expect(reader.mountPoints == ["/Volumes/bootfs"])
+        #expect(!reader.isBuiltInCardReader)
     }
 
     @Test func diskImageIsVirtual() async throws {
