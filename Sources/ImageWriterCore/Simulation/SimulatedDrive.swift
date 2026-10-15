@@ -20,6 +20,9 @@ public enum SimulatedDrive: String, CaseIterable, Sendable {
     /// The password dialog succeeds, then the open is refused as when the Removable
     /// Volumes privacy prompt was denied.
     case privacyBlocked
+    /// A card in a built-in SD slot: internal, yet listed by default (T29). Otherwise
+    /// behaves like `working`.
+    case builtInSDCard
 
     static let writeBytesPerSecond = 40_000_000.0
     static let readBytesPerSecond = 80_000_000.0
@@ -38,6 +41,7 @@ public enum SimulatedDrive: String, CaseIterable, Sendable {
         case .thunderbolt: return "disk95"
         case .usbHardDrive: return "disk96"
         case .privacyBlocked: return "disk97"
+        case .builtInSDCard: return "disk98"
         }
     }
 
@@ -61,6 +65,12 @@ public enum SimulatedDrive: String, CaseIterable, Sendable {
                 busProtocol: "USB", isInternal: false, isRemovable: false, isEjectable: true,
                 isVirtual: false, isWholeDisk: true, mountPoints: ["/Volumes/SIM96"], volumeNames: ["SIM96"]
             )
+        case .builtInSDCard:
+            return DiskInfo(
+                bsdName: bsdName, mediaName: mediaName, sizeBytes: 64_021_856_256, blockSize: 512,
+                busProtocol: "Secure Digital", isInternal: true, isBuiltInCardReader: true, isRemovable: true,
+                isEjectable: true, isVirtual: false, isWholeDisk: true, mountPoints: ["/Volumes/SIM98"], volumeNames: ["SIM98"]
+            )
         default:
             return DiskInfo(
                 bsdName: bsdName, mediaName: mediaName, sizeBytes: sizeBytes, blockSize: 512,
@@ -82,6 +92,7 @@ public enum SimulatedDrive: String, CaseIterable, Sendable {
         case .thunderbolt: return "Simulated Thunderbolt SSD"
         case .usbHardDrive: return "Simulated USB Hard Drive (1 TB)"
         case .privacyBlocked: return "Simulated USB Stick (privacy settings blocked)"
+        case .builtInSDCard: return "Simulated Built In SDXC Reader"
         }
     }
 

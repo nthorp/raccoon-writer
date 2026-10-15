@@ -63,6 +63,32 @@ struct DiskutilDiscoveryTests {
         #expect(container.mountPoints.contains("/System/Volumes/Data"))
     }
 
+    @Test func builtInSDCardIsACardReader() async throws {
+        let disks = try await disks()
+        let card = try #require(disks["disk7"])
+        #expect(card == .builtInSDCard())
+        #expect(card.isInternal && card.isBuiltInCardReader)
+
+        // Only the built-in slot qualifies: a USB reader is external and needs no exception.
+        for name in ["disk0", "disk3", "disk4", "disk5", "disk6", "disk8", "disk9"] {
+            #expect(disks[name]?.isBuiltInCardReader == false, "\(name)")
+        }
+    }
+
+    @Test(arguments: CardReaderNearMiss.allCases)
+    func nearMissIsNotACardReader(_ miss: CardReaderNearMiss) async throws {
+        let card = try #require(try await disks(overriding: try miss.override())["disk7"])
+        #expect(!card.isBuiltInCardReader)
+        #expect(card.isInternal)
+    }
+
+    @Test func usbCardReaderFields() async throws {
+        let reader = try #require(try await disks()["disk9"])
+        #expect(reader.busProtocol == "USB")
+        #expect(!reader.isInternal && reader.isRemovable && reader.isEjectable && !reader.isVirtual)
+        #expect(reader.mountPoints == ["/Volumes/bootfs"])
+    }
+
     @Test func diskImageIsVirtual() async throws {
         let image = try #require(try await disks()["disk8"])
         #expect(image.isVirtual && !image.isInternal && image.isRemovable)

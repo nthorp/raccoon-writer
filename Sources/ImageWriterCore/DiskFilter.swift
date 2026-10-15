@@ -2,10 +2,12 @@ import Foundation
 
 /// Decides which disks may be shown as write targets.
 ///
-/// Default: external, removable or ejectable, physical USB whole disks.
-/// `showAllExternal`: any external physical whole disk.
+/// Default: external, removable or ejectable, physical USB whole disks, plus a card in
+/// a built-in SD card slot.
+/// `showAllExternal`: any external physical whole disk, plus that card.
 /// Under both settings, the boot disks, internal disks, APFS containers and disks
-/// with system volumes mounted are never shown.
+/// with system volumes mounted are never shown. The built-in SD card reader is the one
+/// internal disk allowed (`AGENTS.md`); every other rule still applies to it.
 public struct DiskFilter: Sendable {
     public var showAllExternal: Bool
 
@@ -43,7 +45,7 @@ public struct DiskFilter: Sendable {
     public func rejection(for disk: DiskInfo, bootDisks: BootDiskSet) -> DiskRejection? {
         guard BSDName.isWholeDisk(disk.bsdName) else { return .invalidName }
         guard disk.isWholeDisk else { return .notWholeDisk }
-        guard !disk.isInternal else { return .internalDisk }
+        guard !disk.isInternal || disk.isBuiltInCardReader else { return .internalDisk }
         guard !bootDisks.contains(disk.bsdName) else { return .bootDisk }
         guard !disk.mountPoints.contains(where: Self.isSystemMountPoint) else { return .systemVolume }
         guard !disk.isAPFSContainer else { return .apfsContainer }
@@ -51,7 +53,7 @@ public struct DiskFilter: Sendable {
         guard disk.sizeBytes > 0 else { return .noMedia }
         // A disk image is never on the USB bus, so the default-mode rules would hide it.
         if !showAllExternal && !disk.isVirtual {
-            guard disk.busProtocol == "USB" else { return .notUSB }
+            guard disk.busProtocol == "USB" || disk.isBuiltInCardReader else { return .notUSB }
             guard disk.isRemovable || disk.isEjectable else { return .notRemovable }
         }
         return nil

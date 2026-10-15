@@ -38,9 +38,16 @@ struct SafetyGuardTests {
     }
 
     @Test func diskShownOnlyUnderShowAllExternalPassesUnderThatSetting() async throws {
-        for name in ["disk5", "disk7"] {
-            let disk = try await confirmed(name)
-            #expect(try await validate(disk, filter: allExternal) == disk)
+        let disk = try await confirmed("disk5")
+        #expect(try await validate(disk, filter: allExternal) == disk)
+    }
+
+    /// T29: the guard uses the same filter, so the internal built-in SD card passes.
+    @Test func builtInSDCardPassesUnderBothSettings() async throws {
+        let card = try await confirmed("disk7")
+        #expect(card.isInternal)
+        for filter in [defaultFilter, allExternal] {
+            #expect(try await validate(card, filter: filter) == card)
         }
     }
 
@@ -158,6 +165,17 @@ struct SafetyGuardTests {
         for filter in [defaultFilter, allExternal] {
             await #expect(throws: SafetyGuardError.forbiddenTarget(bsdName: "disk4", reason: .internalDisk)) {
                 try await validate(disk, filter: filter, overriding: try disk4Info(["Internal": true]))
+            }
+        }
+    }
+
+    /// The fresh query decides: a card that no longer passes the four-key test is internal.
+    @Test func builtInSDCardThatNoLongerQualifiesIsRejected() async throws {
+        let card = try await confirmed("disk7")
+        let changed = try F.infoVariant("disk7", setting: ["RemovableMedia": false])
+        for filter in [defaultFilter, allExternal] {
+            await #expect(throws: SafetyGuardError.forbiddenTarget(bsdName: "disk7", reason: .internalDisk)) {
+                try await validate(card, filter: filter, overriding: changed)
             }
         }
     }

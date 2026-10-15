@@ -25,6 +25,8 @@
 		<string>disk7s1</string>
 		<string>disk8</string>
 		<string>disk8s1</string>
+		<string>disk9</string>
+		<string>disk9s1</string>
 	</array>
 	<key>AllDisksAndPartitions</key>
 	<array>
@@ -285,13 +287,13 @@
 					<key>MountPoint</key>
 					<string>/Volumes/CAMERA</string>
 					<key>Size</key>
-					<integer>63847792640</integer>
+					<integer>64017661952</integer>
 					<key>VolumeName</key>
 					<string>CAMERA</string>
 				</dict>
 			</array>
 			<key>Size</key>
-			<integer>63864569856</integer>
+			<integer>64021856256</integer>
 		</dict>
 		<dict>
 			<key>Content</key>
@@ -320,6 +322,31 @@
 			<key>Size</key>
 			<integer>15728640000</integer>
 		</dict>
+		<dict>
+			<key>Content</key>
+			<string>FDisk_partition_scheme</string>
+			<key>DeviceIdentifier</key>
+			<string>disk9</string>
+			<key>OSInternal</key>
+			<false/>
+			<key>Partitions</key>
+			<array>
+				<dict>
+					<key>Content</key>
+					<string>Windows_FAT_32</string>
+					<key>DeviceIdentifier</key>
+					<string>disk9s1</string>
+					<key>MountPoint</key>
+					<string>/Volumes/bootfs</string>
+					<key>Size</key>
+					<integer>536870912</integer>
+					<key>VolumeName</key>
+					<string>bootfs</string>
+				</dict>
+			</array>
+			<key>Size</key>
+			<integer>31914983424</integer>
+		</dict>
 	</array>
 	<key>VolumesFromDisks</key>
 	<array>
@@ -332,6 +359,7 @@
 		<string>Backup</string>
 		<string>CAMERA</string>
 		<string>Installer</string>
+		<string>bootfs</string>
 	</array>
 	<key>WholeDisks</key>
 	<array>
@@ -342,6 +370,7 @@
 		<string>disk6</string>
 		<string>disk7</string>
 		<string>disk8</string>
+		<string>disk9</string>
 	</array>
 </dict>
 </plist>

@@ -57,7 +57,8 @@ public struct DiskutilDiscovery: DiskDiscovery {
 
 extension DiskInfo {
     /// Missing safety flags take the restrictive value: no `Internal` key means internal,
-    /// no `WholeDisk` key means not a whole disk.
+    /// no `WholeDisk` key means not a whole disk, and a missing card-reader key means not
+    /// a built-in card reader.
     init(_ info: DiskutilInfo, volumes: DiskutilList.Volumes) {
         let stores = info.apfsPhysicalStores ?? []
         var mountPoints = volumes.mountPoints
@@ -71,6 +72,7 @@ extension DiskInfo {
             blockSize: info.deviceBlockSize,
             busProtocol: info.busProtocol,
             isInternal: info.isInternal ?? true,
+            isBuiltInCardReader: Self.isBuiltInCardReader(info),
             isRemovable: (info.removable ?? false) || (info.removableMedia ?? false),
             isEjectable: info.ejectable ?? false,
             // T01: internal disks report "Unknown", so only "Virtual" counts as virtual.
@@ -81,5 +83,15 @@ extension DiskInfo {
             mountPoints: mountPoints,
             volumeNames: volumes.names
         )
+    }
+
+    /// H14: the MacBook Pro's SDXC slot reports these four with `Internal = true`.
+    /// `RemovableMedia` is read on its own, not merged with `Removable`. Internal disks
+    /// report `VirtualOrPhysical = Unknown` (T01), so they fail here.
+    static func isBuiltInCardReader(_ info: DiskutilInfo) -> Bool {
+        info.busProtocol == "Secure Digital"
+            && info.removableMedia == true
+            && info.virtualOrPhysical == "Physical"
+            && info.wholeDisk == true
     }
 }

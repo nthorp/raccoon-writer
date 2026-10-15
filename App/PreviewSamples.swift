@@ -66,6 +66,13 @@ enum PreviewSamples {
         isVirtual: false, isWholeDisk: true, mountPoints: ["/Volumes/Time Machine"], volumeNames: ["Time Machine"]
     )
 
+    /// A card in a Mac's built-in slot, as H14 recorded it: internal, but listed (T29).
+    static let builtInSDCard = DiskInfo(
+        bsdName: "disk10", mediaName: "Built In SDXC Reader", sizeBytes: 64_021_856_256, blockSize: 512,
+        busProtocol: "Secure Digital", isInternal: true, isBuiltInCardReader: true, isRemovable: true,
+        isEjectable: true, isVirtual: false, isWholeDisk: true, mountPoints: ["/Volumes/bootfs"], volumeNames: ["bootfs"]
+    )
+
     static let tinyStick = DiskInfo(
         bsdName: "disk6", mediaName: "Kingston DataTraveler", sizeBytes: 2_000_683_008, blockSize: 512,
         busProtocol: "USB", isInternal: false, isRemovable: true, isEjectable: true,

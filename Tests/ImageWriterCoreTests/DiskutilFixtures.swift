@@ -5,12 +5,15 @@ import Foundation
 /// - `disk0` internal SSD; `disk3` its APFS container holding `/` (real captures, macOS 26.3.1)
 /// - `disk4` USB stick with two mounted partitions
 /// - `disk5` Thunderbolt (PCI-Express) SSD; `disk6` its APFS container, mounted at /Volumes/Backup
-/// - `disk7` SD card (Secure Digital bus)
+/// - `disk7` SD card in a built-in SDXC slot (`Internal = true`, Secure Digital bus)
 /// - `disk8` mounted disk image
-/// The disk4–disk8 plists are hand-written from the keys seen on real captures.
+/// - `disk9` SD card in a USB card reader
+/// The disk4–disk6, disk8 and disk9 plists are hand-written from the keys seen on real
+/// captures; disk9 is a guess until H19 step 4 captures a real USB reader. disk7 is
+/// hand-written around the H14 capture's values (T29).
 enum DiskutilFixtures {
     static let diskutil = "/usr/sbin/diskutil"
-    static let wholeDisks = ["disk0", "disk3", "disk4", "disk5", "disk6", "disk7", "disk8"]
+    static let wholeDisks = ["disk0", "disk3", "disk4", "disk5", "disk6", "disk7", "disk8", "disk9"]
 
     struct Missing: Error {
         let name: String
@@ -64,6 +67,13 @@ enum DiskutilFixtures {
         guard let dictionary = object as? [String: Any] else { throw Missing(name: fixture) }
         return dictionary
     }
+
+    /// An override replying to `diskutil info -plist <disk>` with its fixture changed.
+    static func infoVariant(_ disk: String, setting changes: [String: Any] = [:], removing removals: [String] = []) throws -> [[String]: CommandResult] {
+        var info = try dictionary("info-\(disk)").merging(changes) { _, new in new }
+        for key in removals { info.removeValue(forKey: key) }
+        return [self.info(disk): try plist(info)]
+    }
 }
 
 extension DiskInfo {
@@ -83,6 +93,28 @@ extension DiskInfo {
             isWholeDisk: true,
             mountPoints: ["/Volumes/STICK"],
             volumeNames: ["STICK"]
+        )
+    }
+}
+
+extension DiskInfo {
+    /// A card in a built-in SDXC slot, as discovery describes the H14 capture: internal,
+    /// and allowed only because it is a built-in card reader.
+    static func builtInSDCard(_ bsdName: String = "disk7") -> DiskInfo {
+        DiskInfo(
+            bsdName: bsdName,
+            mediaName: "Built In SDXC Reader",
+            sizeBytes: 64_021_856_256,
+            blockSize: 512,
+            busProtocol: "Secure Digital",
+            isInternal: true,
+            isBuiltInCardReader: true,
+            isRemovable: true,
+            isEjectable: true,
+            isVirtual: false,
+            isWholeDisk: true,
+            mountPoints: ["/Volumes/CAMERA"],
+            volumeNames: ["CAMERA"]
         )
     }
 }

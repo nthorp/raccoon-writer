@@ -89,6 +89,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H16 | Removable Volumes privacy prompt denied | Debug + Release | PASS | Mapped to `blockedByPrivacySettings`; fix A needs Try Again, not a relaunch; fix B needs no relaunch |
 | H17 | Image stored on the drive; image deleted before the write | Release + Debug | | |
 | H18 | Drive remounted after a run that stops before writing | Release | | |
+| H19 | SD card in the built-in slot listed and written | Release | | |
 
 **Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09). That build never tried `DKIOCSYNCHRONIZE`. **From T19 on: `DKIOCSYNCHRONIZE`** (Cruzer Glide, Release build, 2026-10-13, commit `169b386`; details under T19 in `PLAN.md`).
 
@@ -158,10 +159,10 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 
 **Expected**
 - Internal disks, the boot disk and its container never appear, in either mode or either build.
-- With the toggle off, only the USB stick is listed. With it on, other external, non-internal disks (Thunderbolt SSD, external SD reader) may also appear.
+- With the toggle off, only the USB stick is listed, plus, from T29 on, an SD card in a built-in slot (H19). With it on, other external, non-internal disks (Thunderbolt SSD, external SD reader) may also appear.
 - A mounted `.dmg` never appears, not even with the debug flag (the flag accepts only unmounted disk images).
 - The stick appears or disappears within about 2 seconds. When the selected stick is removed, it is deselected.
-- Note what an SD card in a built-in slot does. It may report itself as internal, in which case it is hidden by design.
+- Note what an SD card in a built-in slot does. Before T29 it was hidden because it reports internal; from T29 on it is listed (H19).
 
 **Result:** PASS
 **Notes:**
@@ -449,6 +450,35 @@ log stream --predicate 'subsystem == "com.example.raccoonwriter"' --info
 **Expected**
 - Step 1: the failed screen as in H16. The log shows `Remounted diskN after a run that stopped before writing`, then `Run failed in open: macOS privacy settings did not allow Raccoon Writer to open the drive.`
 - Step 2: `TESTSTICK` is back in Finder (it may disappear for a moment during the run) and the file opens. If the log instead shows `Remount of diskN failed: …`, record that line.
+
+**Result:**
+**Notes:**
+
+### H19 — SD card in the built-in slot listed and written (T29)
+
+From T29 on, a card in a Mac's built-in SD card slot is listed with "Show all external disks" off, although macOS reports it as internal. It is the one internal disk allowed, and only when `diskutil` reports all four of: BusProtocol `Secure Digital`, RemovableMedia `true`, VirtualOrPhysical `Physical`, and a whole disk. **Step 2 erases the SD card:** use one whose contents you don't need.
+
+Keep this running in a second Terminal window for the whole test:
+
+```sh
+log stream --predicate 'subsystem == "com.example.raccoonwriter"' --info
+```
+
+**Steps**
+1. **Listed, Release, MacBook Pro's built-in slot.** `scripts/build.sh --release`. Insert the SD card in the built-in slot and run `diskutil list` (read-only); note the card's `diskN` and the internal disk and boot container (for example `disk0` and `disk3`). Launch `build/RaccoonWriter.app` and choose an image. With "Show all external disks" off, the card should be listed with an SD card symbol instead of the drive symbol, with "Secure Digital" and its size in the details line. Turn the toggle on, then off again. The internal disk and the boot container must not appear in either position.
+2. **Write.** Decompress a Raspberry Pi OS image first (`xz -dk <image>.img.xz`) and choose the `.img`, or use the FreeBSD `.img` from H7. Select the card, Continue, Erase and Write. Expect exactly one password dialog. Note whether a Removable Volumes prompt appears. Write and verify should pass, and the done screen should report the card ejected. Copy the `fullSync used …` line from the log.
+3. **Optional: boot.** Put the card in a Raspberry Pi and check it boots. With the FreeBSD image, use a USB card reader to boot the test machine instead.
+4. **Optional: a USB card reader.** Put an SD card in a USB card reader, find its `diskN` with `diskutil list`, and run the read-only command below with that number. Paste the output in the notes, and note whether the reader is listed with the toggle off. The agent replaces the guessed `info-disk9` fixture with it.
+
+```sh
+D=disk4
+for k in MediaName BusProtocol Internal Removable RemovableMedia Ejectable VirtualOrPhysical WholeDisk DeviceBlockSize TotalSize; do printf '%s: ' "$k"; diskutil info -plist "$D" | plutil -extract "$k" raw -o - - 2>/dev/null || echo absent; done
+```
+
+**Expected**
+- Step 1: the card is listed with the toggle off, with the SD card symbol, "Secure Digital" and its size. No internal disk or boot container in either toggle position.
+- Step 2: one password dialog; write and verify pass; "Finished. You can remove the drive." and the card ejected. The log shows `fullSync used DKIOCSYNCHRONIZE` or a fallback with `fullSync skipped …` lines; either is fine, but record it.
+- Step 4: BusProtocol `USB`, Internal `false`, RemovableMedia `true`, listed with the toggle off. Anything else, record it.
 
 **Result:**
 **Notes:**

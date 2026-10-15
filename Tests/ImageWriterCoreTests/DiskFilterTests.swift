@@ -93,4 +93,56 @@ struct DiskFilterTests {
         disk.isEjectable = true
         #expect(DiskFilter(showAllExternal: false).rejection(for: disk, bootDisks: boot) == nil)
     }
+
+    // MARK: Built-in SD card reader (T29)
+
+    @Test func builtInSDCardPassesBothSettings() {
+        #expect(rejections(.builtInSDCard()) == [nil, nil])
+    }
+
+    @Test func internalSecureDigitalDiskThatIsNotACardReaderIsHidden() {
+        var disk = DiskInfo.builtInSDCard()
+        disk.isBuiltInCardReader = false
+        #expect(rejections(disk) == [.internalDisk, .internalDisk])
+    }
+
+    /// The exception lifts the internal and USB rules only.
+    @Test func builtInSDCardStillFollowsEveryOtherRule() {
+        var disk = DiskInfo.builtInSDCard()
+        disk.isWholeDisk = false
+        #expect(rejections(disk) == [.notWholeDisk, .notWholeDisk])
+
+        disk = .builtInSDCard()
+        disk.isAPFSContainer = true
+        #expect(rejections(disk) == [.apfsContainer, .apfsContainer])
+
+        disk = .builtInSDCard()
+        disk.isVirtual = true
+        #expect(rejections(disk) == [.virtualDisk, .virtualDisk])
+
+        disk = .builtInSDCard()
+        disk.isRemovable = false
+        disk.isEjectable = false
+        #expect(rejections(disk) == [.notRemovable, nil])
+    }
+
+    @Test func builtInSDCardInTheBootSetIsHidden() {
+        let cardBoot = BootDiskSet(["disk7"])!
+        for filter in both {
+            #expect(filter.rejection(for: .builtInSDCard(), bootDisks: cardBoot) == .bootDisk)
+        }
+    }
+
+    @Test(arguments: ["/", "/System/Volumes/Data"])
+    func builtInSDCardWithASystemVolumeIsHidden(_ mountPoint: String) {
+        var disk = DiskInfo.builtInSDCard()
+        disk.mountPoints.append(mountPoint)
+        #expect(rejections(disk) == [.systemVolume, .systemVolume])
+    }
+
+    @Test func emptyBuiltInSlotIsHidden() {
+        var disk = DiskInfo.builtInSDCard()
+        disk.sizeBytes = 0
+        #expect(rejections(disk) == [.noMedia, .noMedia])
+    }
 }

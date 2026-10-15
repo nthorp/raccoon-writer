@@ -53,7 +53,7 @@ struct DriveSection: View {
                 systemImage: "externaldrive.badge.plus",
                 detail: showAllExternal
                     ? "No external disks found."
-                    : "Only USB drives are listed. Turn on “Show all external disks” for other external disks."
+                    : "Only USB drives and SD cards are listed. Turn on “Show all external disks” for other external disks."
             )
         } else {
             List(drives, selection: selection) { disk in
@@ -97,7 +97,7 @@ private struct DriveRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "externaldrive")
+            Image(systemName: disk.isBuiltInCardReader ? "sdcard" : "externaldrive")
                 .font(.title3)
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 2) {
@@ -156,6 +156,16 @@ private struct DriveRow: View {
     )
     .padding()
     .frame(width: 540, height: 340)
+}
+
+#Preview("Built-in SD card") {
+    DriveSection(
+        drives: [PreviewSamples.stick, PreviewSamples.builtInSDCard], image: PreviewSamples.image,
+        selected: PreviewSamples.builtInSDCard, isEnabled: true, hasLoaded: true, errorMessage: nil,
+        showAllExternal: .constant(false), onSelect: { _ in }, onRefresh: {}
+    )
+    .padding()
+    .frame(width: 540, height: 240)
 }
 
 #Preview("Error") {

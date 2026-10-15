@@ -5,6 +5,7 @@ import Foundation
 public enum DiskRejection: Equatable, Sendable {
     case invalidName
     case notWholeDisk
+    /// Any internal disk except a built-in SD card reader.
     case internalDisk
     case bootDisk
     /// A volume on it is mounted at `/` or under `/System/Volumes`.
@@ -13,7 +14,7 @@ public enum DiskRejection: Equatable, Sendable {
     case virtualDisk
     /// Size 0, e.g. a card reader with no card inserted.
     case noMedia
-    /// Default mode only.
+    /// Default mode only. A built-in SD card reader is exempt.
     case notUSB
     /// Default mode only.
     case notRemovable

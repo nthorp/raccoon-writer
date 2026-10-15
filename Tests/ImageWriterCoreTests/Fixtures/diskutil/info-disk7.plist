@@ -23,11 +23,11 @@
 	<key>FreeSpace</key>
 	<integer>0</integer>
 	<key>IOKitSize</key>
-	<integer>63864569856</integer>
+	<integer>64021856256</integer>
 	<key>Internal</key>
-	<false/>
+	<true/>
 	<key>MediaName</key>
-	<string>SD Card Reader</string>
+	<string>Built In SDXC Reader</string>
 	<key>MediaType</key>
 	<string>Generic</string>
 	<key>MountPoint</key>
@@ -51,13 +51,13 @@
 	<key>SMARTStatus</key>
 	<string>Not Supported</string>
 	<key>Size</key>
-	<integer>63864569856</integer>
+	<integer>64021856256</integer>
 	<key>SolidState</key>
 	<true/>
 	<key>SystemImage</key>
 	<false/>
 	<key>TotalSize</key>
-	<integer>63864569856</integer>
+	<integer>64021856256</integer>
 	<key>VirtualOrPhysical</key>
 	<string>Physical</string>
 	<key>VolumeName</key>

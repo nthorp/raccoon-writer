@@ -12,12 +12,20 @@ struct TargetDiskListerTests {
             .map(\.bsdName)
     }
 
-    @Test func defaultListShowsOnlyTheUSBStick() async throws {
-        #expect(try await targets(showAllExternal: false) == ["disk4"])
+    /// T29: the built-in SD card is listed with the toggle off, although it reports internal.
+    @Test func defaultListShowsUSBDrivesAndTheBuiltInSDCard() async throws {
+        #expect(try await targets(showAllExternal: false) == ["disk4", "disk7", "disk9"])
     }
 
-    @Test func toggleAddsThunderboltSSDAndSDCard() async throws {
-        #expect(try await targets(showAllExternal: true) == ["disk4", "disk5", "disk7"])
+    @Test func toggleAddsTheThunderboltSSD() async throws {
+        #expect(try await targets(showAllExternal: true) == ["disk4", "disk5", "disk7", "disk9"])
+    }
+
+    @Test(arguments: CardReaderNearMiss.allCases, [false, true])
+    func builtInSDNearMissIsNeverShown(_ miss: CardReaderNearMiss, showAllExternal: Bool) async throws {
+        let shown = try await targets(showAllExternal: showAllExternal, overriding: try miss.override())
+        #expect(!shown.contains("disk7"))
+        #expect(shown.contains("disk4"))
     }
 
     @Test(arguments: [false, true])
@@ -66,6 +74,40 @@ struct TargetDiskListerTests {
             _ = try await targets(showAllExternal: false, overriding: [F.list: CommandResult(status: 1)])
         }
     }
+}
+
+/// The fixture's built-in SD card (`disk7`) with one of the four card-reader keys wrong
+/// or missing. `Removable` stays true throughout, so `RemovableMedia` must be read on its own.
+enum CardReaderNearMiss: CaseIterable, Sendable, CustomTestStringConvertible {
+    case removableMediaFalse
+    case removableMediaMissing
+    case virtual
+    case unknownVirtualOrPhysical
+    case virtualOrPhysicalMissing
+    case busProtocolMissing
+    case busProtocolLowercase
+    case busProtocolUSB
+    case notWholeDisk
+    case wholeDiskMissing
+
+    func override() throws -> [[String]: CommandResult] {
+        typealias F = DiskutilFixtures
+        switch self {
+        case .removableMediaFalse: return try F.infoVariant("disk7", setting: ["RemovableMedia": false])
+        case .removableMediaMissing: return try F.infoVariant("disk7", removing: ["RemovableMedia"])
+        case .virtual: return try F.infoVariant("disk7", setting: ["VirtualOrPhysical": "Virtual"])
+        case .unknownVirtualOrPhysical: return try F.infoVariant("disk7", setting: ["VirtualOrPhysical": "Unknown"])
+        case .virtualOrPhysicalMissing: return try F.infoVariant("disk7", removing: ["VirtualOrPhysical"])
+        case .busProtocolMissing: return try F.infoVariant("disk7", removing: ["BusProtocol"])
+        case .busProtocolLowercase: return try F.infoVariant("disk7", setting: ["BusProtocol": "secure digital"])
+        // An internal reader on an internal USB bus stays hidden (out of scope in T29).
+        case .busProtocolUSB: return try F.infoVariant("disk7", setting: ["BusProtocol": "USB"])
+        case .notWholeDisk: return try F.infoVariant("disk7", setting: ["WholeDisk": false])
+        case .wholeDiskMissing: return try F.infoVariant("disk7", removing: ["WholeDisk"])
+        }
+    }
+
+    var testDescription: String { "\(self)" }
 }
 
 private struct StubDiscovery: DiskDiscovery {

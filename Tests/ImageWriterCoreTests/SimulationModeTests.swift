@@ -34,8 +34,8 @@ final class SimulationModeTests {
         let usb = try await lister.targets(filter: DiskFilter(showAllExternal: false)).map(\.bsdName)
         let all = try await lister.targets(filter: DiskFilter(showAllExternal: true)).map(\.bsdName)
 
-        #expect(usb == ["disk90", "disk91", "disk92", "disk93", "disk94", "disk96", "disk97"])
-        #expect(all == ["disk90", "disk91", "disk92", "disk93", "disk94", "disk95", "disk96", "disk97"])
+        #expect(usb == ["disk90", "disk91", "disk92", "disk93", "disk94", "disk96", "disk97", "disk98"])
+        #expect(all == ["disk90", "disk91", "disk92", "disk93", "disk94", "disk95", "disk96", "disk97", "disk98"])
         #expect(!all.contains(SimulatedDrive.internalDisk.bsdName))
     }
 
@@ -106,6 +106,16 @@ final class SimulationModeTests {
             return
         }
         #expect(summary.bsdName == "disk96")
+    }
+
+    @Test func builtInSDCardFinishes() async throws {
+        #expect(SimulatedDrive.builtInSDCard.disk.isInternal)
+        let state = try await run(on: .builtInSDCard)
+        guard case .finished(let summary) = state else {
+            Issue.record("Expected finished, got \(state)")
+            return
+        }
+        #expect(summary.bsdName == "disk98")
     }
 
     @Test func privacyBlockedDriveFailsAtTheOpenAfterThePassword() async throws {

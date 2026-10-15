@@ -11,6 +11,10 @@ public struct DiskInfo: Hashable, Sendable, Identifiable {
     /// diskutil's `BusProtocol`, e.g. `USB`, `PCI-Express`, `Secure Digital`, `Disk Image`.
     public var busProtocol: String?
     public var isInternal: Bool
+    /// A built-in SD card slot with a card in it: the one internal disk `DiskFilter` may
+    /// offer (`AGENTS.md`). Set by discovery only when all four diskutil keys say so; see
+    /// `DiskInfo(DiskutilInfo, volumes:)`.
+    public var isBuiltInCardReader: Bool
     public var isRemovable: Bool
     public var isEjectable: Bool
     /// Disk images, RAM disks and APFS synthesized containers.
@@ -34,6 +38,7 @@ public struct DiskInfo: Hashable, Sendable, Identifiable {
         blockSize: Int? = nil,
         busProtocol: String?,
         isInternal: Bool,
+        isBuiltInCardReader: Bool = false,
         isRemovable: Bool,
         isEjectable: Bool,
         isVirtual: Bool,
@@ -49,6 +54,7 @@ public struct DiskInfo: Hashable, Sendable, Identifiable {
         self.blockSize = blockSize
         self.busProtocol = busProtocol
         self.isInternal = isInternal
+        self.isBuiltInCardReader = isBuiltInCardReader
         self.isRemovable = isRemovable
         self.isEjectable = isEjectable
         self.isVirtual = isVirtual
