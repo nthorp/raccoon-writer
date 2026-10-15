@@ -89,7 +89,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H16 | Removable Volumes privacy prompt denied | Debug + Release | PASS | Mapped to `blockedByPrivacySettings`; fix A needs Try Again, not a relaunch; fix B needs no relaunch |
 | H17 | Image stored on the drive; image deleted before the write | Release + Debug | | |
 | H18 | Drive remounted after a run that stops before writing | Release | | |
-| H19 | SD card in the built-in slot listed and written | Release | | |
+| H19 | SD card in the built-in slot listed and written | Release | Partial | Write and verify passed; `DKIOCSYNCHRONIZE`; step 1 checks not yet reported |
 
 **Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09). That build never tried `DKIOCSYNCHRONIZE`. **From T19 on: `DKIOCSYNCHRONIZE`** (Cruzer Glide, Release build, 2026-10-13, commit `169b386`; details under T19 in `PLAN.md`).
 
@@ -482,3 +482,4 @@ for k in MediaName BusProtocol Internal Removable RemovableMedia Ejectable Virtu
 
 **Result:**
 **Notes:**
+- 2026-10-14, Release build, commit `3917068`, MacBook Pro (M3 Max) built-in slot. Nick reports the card wrote successfully. The log showed `fullSync used DKIOCSYNCHRONIZE`, so the built-in slot accepts the cache flush. Afterwards the agent ran `diskutil list` (read-only): no card was attached, which fits the card having been ejected. Stored logs had no lines from the app process, as expected for a successful run (info-level lines aren't kept). Not yet reported: step 1 (the card listed with the toggle off, the SD card symbol, "Secure Digital", the internal disk absent in both toggle positions), the number of password dialogs, any Removable Volumes prompt, and the done screen's eject message.

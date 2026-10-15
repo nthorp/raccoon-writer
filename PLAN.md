@@ -1656,6 +1656,7 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 - **Docs.** README: safety bullet names the exception and its four conditions; the "not listed" limitation is replaced by "Some built-in card readers are not listed" (other buses stay hidden) and "Cards in the built-in slot all have the same name" (the card-swap note). Section 5 "Wrong disk written" row. `docs/HARDWARE_TESTS.md`: H3 expected results mention the card, recorded notes untouched; H19 written; H19 row in the summary table.
 - **Builds.** `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass; `build/RaccoonWriter.app` is the Release build.
 - **For Nick:** run H19 in `docs/HARDWARE_TESTS.md` on the Release build, with an SD card you don't need in the MacBook Pro's built-in slot. Steps 1–2 are required: the card listed with the toggle off (SD card symbol, "Secure Digital", size) and the internal disk absent in both toggle positions, then a Raspberry Pi OS `.img` or the H7 FreeBSD `.img` written and verified with one password dialog. Report any Removable Volumes prompt and the `fullSync used …` log line. Steps 3 (boot) and 4 (a USB card reader's `diskutil` keys) are optional.
+- **H19, 2026-10-14 (Nick, Release, `3917068`):** the card wrote successfully, and the log showed `fullSync used DKIOCSYNCHRONIZE`. Still to report before DONE: the step 1 list checks, one password dialog, any Removable Volumes prompt, and the eject on the done screen. Details in `docs/HARDWARE_TESTS.md` H19.
 
 ---
 
