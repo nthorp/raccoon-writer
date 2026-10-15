@@ -80,9 +80,9 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H7 | `.img` write | Release | PASS | FreeBSD `.img` booted on a 2017 Intel Mac |
 | H8 | Cancel during write | Release | PASS | |
 | H9 | Cancel during verify | Release | PASS | |
-| H10 | Quit and close during a write | Release | | |
-| H11 | Pull the stick out mid-write | Release | | |
-| H12 | Drive in use (unmount refused) | Release | | |
+| H10 | Quit and close during a write | Release | PASS | Keep Writing continued; Stop and Quit quit cleanly; quit during the password dialog (answered Cancel) quit |
+| H11 | Pull the stick out mid-write | Release | PASS | "The drive was disconnected"; `ENXIO` (errno 6); rewrite after replugging succeeded |
+| H12 | Drive in use (unmount refused) | Release | PASS | "The drive is in use by tail"; stick remounted (T27); second attempt wrote |
 | H13 | Intel Mac run | Release | Not possible | Intel Mac runs macOS 13.7.8; app needs 14+ |
 | H14 | What real disks report (read-only) | none | | |
 | H15 | Drive swapped during the password dialog | Debug | PASS | Both RAM disks were `disk8`; refused with "A different drive is attached" |
@@ -283,8 +283,8 @@ The main end-to-end test. Also records the flush method on a real stick.
 - Stop and Quit: the app quits within a few seconds. `ps aux | grep -i RaccoonWriter` shows nothing left running.
 - During the password dialog the alert says "Cancel and quit?" and that the app quits once you answer the dialog, which it does.
 
-**Result:**
-**Notes:**
+**Result:** PASS
+**Notes:** 2026-10-14, Release build, app code as of `3917068` (unchanged through `e45256f`), USB stick (Nick). Every expected result: Keep Writing let the write continue; Stop and Quit quit the app and nothing was left running; ⌘Q during the password dialog gave "Cancel and quit?", and after Stop and Quit, answering the dialog with **Cancel** quit the app. Stored log: `Run cancelled in authorize; it ended with: The administrator password prompt was cancelled.` The quit during the write logs nothing, as expected: a stop the user asked for unwinds with `CancellationError`, which isn't logged.
 
 ### H11 — Pull the stick out mid-write (spare stick)
 
@@ -297,8 +297,8 @@ The main end-to-end test. Also records the flush method on a real stick.
 - The log shows the I/O error (note the errno if you can see it).
 - After reinserting it, the stick can be written again successfully.
 
-**Result:**
-**Notes:**
+**Result:** PASS
+**Notes:** 2026-10-14, Release build, app code as of `3917068`, USB stick (Nick, with the log read by the agent afterwards). The app showed "The drive was disconnected" and didn't hang. After replugging, the stick was written successfully. The stored log has two pulls, both `ENXIO`: `Run failed in write: Writing to the drive failed. write at offset 130023424 failed: Device not configured (errno 6).` (21:56:29) and the same at offset 92274688 (21:57:35). So the stick came out at about 90–130 MB, earlier than the 30 % the step asks for, which doesn't change what's tested.
 
 ### H12 — Drive in use (unmount refused)
 
@@ -311,8 +311,15 @@ The main end-to-end test. Also records the flush method on a real stick.
 - First attempt: the password dialog appears (from T16 on it comes before the unmount). After you enter the password: "The drive is in use", naming the process that is holding it, with "Nothing was written to the drive."
 - Second attempt: works normally.
 
-**Result:**
-**Notes:**
+**Result:** PASS
+**Notes:** 2026-10-14, Release build, app code as of `3917068`, USB stick held by `tail -f` on a file in its volume (Nick, with the log read by the agent afterwards). The password dialog came first, then "The drive is in use" naming `tail`, with "Nothing was written to the drive." After stopping `tail`, the second attempt wrote normally. Stored log:
+```
+diskutil unmountDisk /dev/disk7 exited 1: Unmount of disk7 failed: at least one volume could not be unmounted
+Unmount was dissented by PID 41965 (/usr/bin/tail)
+Remounted disk7 after a run that stopped before writing
+Run failed in unmount: The drive is in use by tail. Quit it or close any files on the drive, then try again.
+```
+The remount line shows T27 also remounts after a refused unmount (a partial unmount may have unmounted some volumes).
 
 ### H13 — Intel Mac run (if available)
 

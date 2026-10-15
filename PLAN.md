@@ -691,6 +691,7 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - **2026-10-12: T13 runs before the remaining tests.** H1–H9 ran on the authopen-named-dialog build. Run H10, H11, H12 and H14 only after T13 is `DONE`, on the T13 build, and put the build's commit in each test's notes. See T13 "Order with T12".
 - **2026-10-12: run them on the T14 build instead.** T14 renames the app to Red Delicious (`build/RedDelicious.app`, `REDDELICIOUS_*` env vars, subsystem `com.example.reddelicious`), and the checklist's unrun steps use the new names.
 - **2026-10-13: and on the T23 build or later.** T23 renames the app to Raccoon Writer (`build/RaccoonWriter.app`, `RACCOONWRITER_*` env vars, subsystem `com.example.raccoonwriter`), and the checklist's steps use the new names.
+- **2026-10-14: H10, H11 and H12 PASS** (Nick, Release, app code as of `3917068`; details and log lines in `docs/HARDWARE_TESTS.md`). H11's pull gave "The drive was disconnected" (`ENXIO`); H12 named `tail` and remounted the stick. Left before DONE: H14, where Nick has an SD card in a USB reader to capture (read-only), which also replaces the guessed `info-disk9` fixture from T29.
 
 ---
 
