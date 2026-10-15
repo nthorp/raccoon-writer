@@ -232,6 +232,61 @@ final class WriteCoordinatorTests {
         #expect(diskManager.calls.isEmpty)
     }
 
+    @Test func anImageOnTheDrivesFreshVolumesIsRefusedBeforeUnmount() async throws {
+        // Confirmed while the drive's volume wasn't mounted; mounted again by the safety check.
+        var confirmed = disk
+        confirmed.mountPoints = []
+        var image = try image()
+        image.volumeMountPoint = "/Volumes/STICK"
+        let diskManager = FakeDiskManager()
+        let opener = FakeDeviceOpener(device: try device())
+        let (coordinator, _) = coordinator(listed: [disk], diskManager: diskManager, opener: opener)
+
+        try prepare(coordinator, image: image, drive: confirmed)
+        try await coordinator.confirmAndStart().value
+
+        let problem = ImageOnDrive(fileName: image.fileName, mountPoint: "/Volumes/STICK")
+        #expect(coordinator.state == .failed(WriteFailure(
+            stage: .safetyCheck,
+            error: SafetyGuardError.imageOnDrive(bsdName: "disk4", problem)
+        )))
+        #expect(diskManager.calls.isEmpty)
+        #expect(opener.openAttempts.isEmpty)
+    }
+
+    @Test func anImageDeletedAfterConfirmationFailsBeforeUnmount() async throws {
+        let image = try image()
+        let diskManager = FakeDiskManager()
+        let opener = FakeDeviceOpener(device: try device())
+        let (coordinator, _) = coordinator(diskManager: diskManager, opener: opener)
+
+        try prepare(coordinator, image: image)
+        try FileManager.default.removeItem(at: image.url)
+        try await coordinator.confirmAndStart().value
+
+        let failure = WriteFailure(
+            stage: .safetyCheck,
+            error: ImageSourceError.posix(operation: "open", fileName: image.fileName, code: ENOENT)
+        )
+        #expect(coordinator.state == .failed(failure))
+        #expect(FailureExplanation(failure).drive == .untouched)
+        #expect(diskManager.calls.isEmpty)
+        #expect(opener.openAttempts.isEmpty)
+    }
+
+    @Test func anImageChangedAfterConfirmationFailsBeforeUnmount() async throws {
+        let image = try image()
+        let diskManager = FakeDiskManager()
+        let (coordinator, _) = coordinator(diskManager: diskManager, opener: FakeDeviceOpener(device: try device()))
+
+        try prepare(coordinator, image: image)
+        try Data(pattern(count: Self.imageBytes, seed: 0x5A)).write(to: image.url)
+        try await coordinator.confirmAndStart().value
+
+        #expect(coordinator.state == .failed(WriteFailure(stage: .safetyCheck, error: ImageSourceError.changed(fileName: image.fileName))))
+        #expect(diskManager.calls.isEmpty)
+    }
+
     @Test func unmountFailureStopsBeforeOpen() async throws {
         let diskManager = FakeDiskManager(unmountError: DiskManagerError.busy(dissenter: "/bin/sleep"))
         let opener = FakeDeviceOpener(device: try device())

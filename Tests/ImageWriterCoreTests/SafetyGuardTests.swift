@@ -80,6 +80,23 @@ struct SafetyGuardTests {
         }
     }
 
+    // MARK: The image's own drive is rejected
+
+    @Test func aDiskHoldingTheImageIsRejected() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("raccoonwriter-guard-\(UUID().uuidString).img")
+        try Data(pattern(count: 512)).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        var image = try imageInfo(at: url)
+        let guardian = SafetyGuard(discovery: StubDiscovery(disks: []), bootResolver: StubResolver())
+        let disk = DiskInfo.usbStick()
+
+        try guardian.checkImage(image, isNotOn: disk)
+        image.volumeMountPoint = "/Volumes/STICK"
+        #expect(throws: SafetyGuardError.imageOnDrive(bsdName: "disk4", ImageOnDrive(fileName: image.fileName, mountPoint: "/Volumes/STICK"))) {
+            try guardian.checkImage(image, isNotOn: disk)
+        }
+    }
+
     @Test(arguments: DiskIdentityField.allCases)
     func everyIdentityFieldIsCompared(_ field: DiskIdentityField) async throws {
         let disk = DiskInfo.usbStick()

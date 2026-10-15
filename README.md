@@ -94,6 +94,7 @@ If you build from source: macOS treats each ad-hoc-signed rebuild as a new app (
 - **Windows installer ISOs are not supported.** They need their files extracted onto a formatted drive, not a raw copy.
 - **No compressed images.** Decompress `.xz`, `.gz` or `.zip` images first (for example `xz -dk image.img.xz`).
 - **One drive at a time.** No persistence partitions.
+- **The image can't be on the drive you write it to.** Writing erases the drive, so the app refuses a drive that holds the image. Copy the image to your Mac first. An image inside a `.dmg` that is stored on the drive isn't recognized as being on it. macOS should then refuse to unmount the drive while the disk image is attached, so the write stops with "The drive is in use" before anything is written.
 - **SD cards in a Mac's built-in slot are not listed.** macOS reports the built-in reader as an internal disk, and Raccoon Writer never shows internal disks. Use a USB card reader instead.
 - **USB hard drives and SSDs are listed by default.** macOS reports most of them as ejectable, like sticks, so the app can't tell them apart reliably. Drives over 500 GB get a "Large drive" warning; a smaller backup drive doesn't, so check the name, volume names and size on the confirm screen.
 - **A password prompt on every write.** The app discards the authorization as soon as the disk is open, so the next write asks again.

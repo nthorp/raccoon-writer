@@ -9,6 +9,8 @@ public enum SafetyGuardError: Error, Equatable, Sendable {
     case diskChanged(bsdName: String, field: DiskIdentityField)
     /// The disk is no longer an allowed target under the setting the user chose.
     case forbiddenTarget(bsdName: String, reason: DiskRejection)
+    /// The image file is on one of the disk's volumes.
+    case imageOnDrive(bsdName: String, ImageOnDrive)
     /// The disks or the boot disk could not be queried, so nothing can be shown safe.
     case queryFailed(reason: String)
 }
@@ -22,6 +24,8 @@ extension SafetyGuardError: LocalizedError {
             return "The drive at \(bsdName) is not the one you confirmed (its \(field.label) changed). Nothing was written. Select the drive again."
         case .forbiddenTarget(let bsdName, let reason):
             return "The drive (\(bsdName)) can't be written: \(reason.explanation) Nothing was written."
+        case .imageOnDrive(let bsdName, let problem):
+            return "“\(problem.fileName)” is stored on the drive (\(bsdName)), which writing would erase. Nothing was written."
         case .queryFailed(let reason):
             return "The drive could not be checked again before writing, so nothing was written. (\(reason))"
         }

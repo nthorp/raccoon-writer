@@ -4,7 +4,7 @@ import Testing
 
 struct ProgressDisplayTests {
     let image = ImageInfo(
-        url: URL(fileURLWithPath: "/tmp/a.iso"), fileName: "a.iso", sizeBytes: 1000, identity: .madeUp, kind: .iso,
+        url: URL(fileURLWithPath: "/tmp/a.iso"), fileName: "a.iso", sizeBytes: 1000, identity: .madeUp, volumeMountPoint: "/", kind: .iso,
         hasMBR: true, hasGPT: false, isISO9660: true, bootWarning: nil
     )
 

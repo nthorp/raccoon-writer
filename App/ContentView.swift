@@ -55,6 +55,7 @@ struct ContentView: View {
                 imageError: imageError,
                 selectedDrive: coordinator.state.phase == .driveSelected ? coordinator.selectedDrive : nil,
                 driveTooSmall: coordinator.driveTooSmall,
+                imageOnDrive: coordinator.imageOnDrive,
                 drives: driveList.drives,
                 hasLoadedDrives: driveList.hasLoaded,
                 driveListError: driveList.errorMessage,

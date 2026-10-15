@@ -9,6 +9,8 @@ struct SetupView: View {
     let selectedDrive: DiskInfo?
     /// Set when the selected image can't fit on the selected drive.
     let driveTooSmall: DriveTooSmall?
+    /// Set when the selected image is stored on the selected drive.
+    let imageOnDrive: ImageOnDrive?
     let drives: [DiskInfo]
     let hasLoadedDrives: Bool
     let driveListError: String?
@@ -37,15 +39,16 @@ struct SetupView: View {
             )
 
             HStack {
-                if let driveTooSmall {
-                    Label(driveTooSmall.message, systemImage: "exclamationmark.triangle.fill")
+                // One message at a time; the image being on the drive is the more basic problem.
+                if let message = imageOnDrive?.message ?? driveTooSmall?.message {
+                    Label(message, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
                 Button("Continue…", action: onContinue)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(image == nil || selectedDrive == nil || driveTooSmall != nil)
+                    .disabled(image == nil || selectedDrive == nil || driveTooSmall != nil || imageOnDrive != nil)
             }
         }
     }
@@ -68,7 +71,7 @@ private struct StepHeader: View {
 #if DEBUG
 #Preview("Idle") {
     SetupView(
-        image: nil, imageError: nil, selectedDrive: nil, driveTooSmall: nil,
+        image: nil, imageError: nil, selectedDrive: nil, driveTooSmall: nil, imageOnDrive: nil,
         drives: PreviewSamples.drives, hasLoadedDrives: true, driveListError: nil,
         showAllExternal: .constant(false),
         onChooseImage: {}, onSelectDrive: { _ in }, onRefreshDrives: {}, onContinue: {}
@@ -79,7 +82,7 @@ private struct StepHeader: View {
 
 #Preview("Image selected, with warning") {
     SetupView(
-        image: PreviewSamples.isoOnlyImage, imageError: nil, selectedDrive: nil, driveTooSmall: nil,
+        image: PreviewSamples.isoOnlyImage, imageError: nil, selectedDrive: nil, driveTooSmall: nil, imageOnDrive: nil,
         drives: PreviewSamples.drives, hasLoadedDrives: true, driveListError: nil,
         showAllExternal: .constant(false),
         onChooseImage: {}, onSelectDrive: { _ in }, onRefreshDrives: {}, onContinue: {}
@@ -90,7 +93,7 @@ private struct StepHeader: View {
 
 #Preview("Drive selected") {
     SetupView(
-        image: PreviewSamples.image, imageError: nil, selectedDrive: PreviewSamples.stick, driveTooSmall: nil,
+        image: PreviewSamples.image, imageError: nil, selectedDrive: PreviewSamples.stick, driveTooSmall: nil, imageOnDrive: nil,
         drives: PreviewSamples.drives, hasLoadedDrives: true, driveListError: nil,
         showAllExternal: .constant(true),
         onChooseImage: {}, onSelectDrive: { _ in }, onRefreshDrives: {}, onContinue: {}
@@ -102,7 +105,7 @@ private struct StepHeader: View {
 #Preview("Drive too small") {
     SetupView(
         image: PreviewSamples.image, imageError: nil, selectedDrive: PreviewSamples.tinyStick,
-        driveTooSmall: DriveTooSmall(image: PreviewSamples.image, drive: PreviewSamples.tinyStick),
+        driveTooSmall: DriveTooSmall(image: PreviewSamples.image, drive: PreviewSamples.tinyStick), imageOnDrive: nil,
         drives: PreviewSamples.drives + [PreviewSamples.tinyStick], hasLoadedDrives: true, driveListError: nil,
         showAllExternal: .constant(true),
         onChooseImage: {}, onSelectDrive: { _ in }, onRefreshDrives: {}, onContinue: {}
@@ -111,9 +114,21 @@ private struct StepHeader: View {
     .frame(width: 580, height: 500)
 }
 
+#Preview("Image on the drive") {
+    SetupView(
+        image: PreviewSamples.imageOnStick, imageError: nil, selectedDrive: PreviewSamples.stick,
+        driveTooSmall: nil, imageOnDrive: ImageOnDrive(image: PreviewSamples.imageOnStick, drive: PreviewSamples.stick),
+        drives: PreviewSamples.drives, hasLoadedDrives: true, driveListError: nil,
+        showAllExternal: .constant(false),
+        onChooseImage: {}, onSelectDrive: { _ in }, onRefreshDrives: {}, onContinue: {}
+    )
+    .padding(24)
+    .frame(width: 580, height: 500)
+}
+
 #Preview("Rejected file, no drives") {
     SetupView(
-        image: nil, imageError: "“notes.txt” is not an .iso or .img file.", selectedDrive: nil, driveTooSmall: nil,
+        image: nil, imageError: "“notes.txt” is not an .iso or .img file.", selectedDrive: nil, driveTooSmall: nil, imageOnDrive: nil,
         drives: [], hasLoadedDrives: true, driveListError: nil,
         showAllExternal: .constant(false),
         onChooseImage: {}, onSelectDrive: { _ in }, onRefreshDrives: {}, onContinue: {}

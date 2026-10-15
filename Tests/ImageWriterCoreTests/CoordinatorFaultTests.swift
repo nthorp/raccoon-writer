@@ -257,6 +257,74 @@ final class CoordinatorFaultTests {
             == "The image (4.7 GB) is larger than the drive (4 GB). Choose a drive of at least 4.7 GB.")
     }
 
+    // MARK: - Image stored on the drive
+
+    /// An image as if it were stored on `disk`'s volume. The file itself stays in the
+    /// temp directory, so only the recorded mount point says where it is.
+    func imageOnDisk() throws -> ImageInfo {
+        var image = try image()
+        image.volumeMountPoint = "/Volumes/STICK"
+        return image
+    }
+
+    @Test func anImageOnTheDriveIsReportedBeforeConfirmation() throws {
+        let opener = FakeDeviceOpener(device: try device())
+        let coordinator = coordinator(opener: opener)
+        let image = try imageOnDisk()
+
+        try coordinator.selectImage(image)
+        #expect(coordinator.imageOnDrive == nil)
+        try coordinator.selectDrive(disk, filter: filter)
+
+        let expected = ImageOnDrive(fileName: image.fileName, mountPoint: "/Volumes/STICK")
+        #expect(coordinator.imageOnDrive == expected)
+        #expect(throws: WriteCoordinatorError.imageOnDrive(expected)) { try coordinator.requestConfirmation() }
+        #expect(coordinator.state == .driveSelected(image, disk))
+        #expect(opener.authorizeAttempts.isEmpty)
+    }
+
+    @Test func choosingAnImageElsewhereClearsTheProblem() throws {
+        let coordinator = coordinator(opener: FakeDeviceOpener(device: try device()))
+
+        try coordinator.selectImage(try imageOnDisk())
+        try coordinator.selectDrive(disk, filter: filter)
+        #expect(coordinator.imageOnDrive != nil)
+        try coordinator.selectImage(try image())
+
+        #expect(coordinator.imageOnDrive == nil)
+        try coordinator.requestConfirmation()
+        #expect(coordinator.state.phase == .awaitingConfirmation)
+    }
+
+    @Test func aDriveThatMountsTheImagesVolumeLaterIsReported() throws {
+        let coordinator = coordinator(opener: FakeDeviceOpener(device: try device()))
+        var unmounted = disk
+        unmounted.mountPoints = []
+
+        try coordinator.selectImage(try imageOnDisk())
+        try coordinator.selectDrive(unmounted, filter: filter)
+        #expect(coordinator.imageOnDrive == nil)
+        coordinator.refreshSelectedDrive(from: [disk], filter: filter)
+
+        #expect(coordinator.imageOnDrive?.mountPoint == "/Volumes/STICK")
+    }
+
+    @Test func imageOnDriveCheck() throws {
+        var image = try image()
+        image.volumeMountPoint = "/Volumes/PHOTOS"
+        var drive = disk
+        drive.mountPoints = ["/Volumes/STICK"]
+        #expect(ImageOnDrive(image: image, drive: drive) == nil)
+        // An APFS volume of a container stored on the drive is listed with the drive's own.
+        drive.mountPoints = ["/Volumes/STICK", "/Volumes/PHOTOS"]
+        #expect(ImageOnDrive(image: image, drive: drive) == ImageOnDrive(fileName: image.fileName, mountPoint: "/Volumes/PHOTOS"))
+        // Only the whole mount point counts, not a path that starts the same.
+        drive.mountPoints = ["/Volumes/PHOTO"]
+        #expect(ImageOnDrive(image: image, drive: drive) == nil)
+        #expect(ImageOnDrive(fileName: "a.iso", mountPoint: "/Volumes/STICK").message
+            == "“a.iso” is stored on this drive (/Volumes/STICK), and writing erases the whole drive. Copy the image to your Mac, choose the copy, then try again.")
+    }
+
     // MARK: - Sleep prevention
 
     @Test func sleepIsPreventedForTheWholeRunOnly() async throws {

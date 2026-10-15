@@ -10,6 +10,8 @@ public enum WriteCoordinatorError: Error, Equatable, Sendable {
     case notAllowed(Action, in: WriteState.Phase)
     /// The selected image does not fit on the selected drive, so it can't be confirmed.
     case driveTooSmall(DriveTooSmall)
+    /// The selected image is stored on the selected drive, so it can't be confirmed.
+    case imageOnDrive(ImageOnDrive)
 }
 
 extension WriteCoordinatorError: LocalizedError {
@@ -18,6 +20,8 @@ extension WriteCoordinatorError: LocalizedError {
         case .notAllowed(let action, let phase):
             return "Can't \(action.rawValue) while \(phase.rawValue)."
         case .driveTooSmall(let problem):
+            return problem.message
+        case .imageOnDrive(let problem):
             return problem.message
         }
     }

@@ -5,7 +5,7 @@ import os
 /// the unmount: it re-resolves the boot disks, re-lists the disks, and requires the
 /// confirmed disk to still be present, to still be the same medium, and to still pass
 /// the filter the user chose it under. Fails closed: any query error refuses the write.
-/// `checkOpened` then compares the opened device with what `validate` returned.
+/// `checkImage` then refuses a disk the image is stored on, and `checkOpened` compares the opened device with what `validate` returned.
 public struct SafetyGuard: Sendable {
     private static let log = Logger(subsystem: AppInfo.bundleIdentifier, category: "safety")
 
@@ -32,6 +32,15 @@ public struct SafetyGuard: Sendable {
             Self.log.error("Refused \(confirmed.bsdName, privacy: .public): \(error.localizedDescription, privacy: .public)")
             throw error
         }
+    }
+
+    /// After `validate`, before the unmount: the image must not be on a volume of the
+    /// disk `validate` just returned, whose mount points are fresh. Throws
+    /// `SafetyGuardError.imageOnDrive`.
+    public func checkImage(_ image: ImageInfo, isNotOn disk: DiskInfo) throws {
+        guard let problem = ImageOnDrive(image: image, drive: disk) else { return }
+        Self.log.error("Refused \(disk.bsdName, privacy: .public): the image is on its volume \(problem.mountPoint, privacy: .public)")
+        throw SafetyGuardError.imageOnDrive(bsdName: disk.bsdName, problem)
     }
 
     /// After the open, before the first write: the device authopen handed back must have

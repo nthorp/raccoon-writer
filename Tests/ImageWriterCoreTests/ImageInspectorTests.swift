@@ -40,9 +40,25 @@ final class ImageInspectorTests {
         let url = try file("distro.iso", image(size: 1 << 20, mbr: true, gpt: true, iso: true))
         let info = try inspector.inspect(url: url)
         #expect(info == ImageInfo(
-            url: url, fileName: "distro.iso", sizeBytes: 1 << 20, identity: try fileIdentity(at: url), kind: .iso,
+            url: url, fileName: "distro.iso", sizeBytes: 1 << 20, identity: try fileIdentity(at: url),
+            volumeMountPoint: try volumeMountPoint(at: url), kind: .iso,
             hasMBR: true, hasGPT: true, isISO9660: true, bootWarning: nil
         ))
+    }
+
+    @Test func recordsTheMountPointOfTheFilesVolume() throws {
+        let url = try file("disk.img", image(size: 4096, mbr: true))
+        let info = try inspector.inspect(url: url)
+        var volume = statfs()
+        #expect(statfs(url.deletingLastPathComponent().path, &volume) == 0)
+        #expect(!info.volumeMountPoint.isEmpty)
+        #expect(info.volumeMountPoint == ImageInspector.mountPoint(of: volume))
+    }
+
+    @Test func mountPointIsReadUpToItsTerminator() {
+        var root = statfs()
+        #expect(statfs("/", &root) == 0)
+        #expect(ImageInspector.mountPoint(of: root) == "/")
     }
 
     @Test func isoOnlyGetsWarning() throws {

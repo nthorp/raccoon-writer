@@ -82,6 +82,12 @@ public struct FailureExplanation: Equatable, Sendable {
                 message: "/dev/\(bsdName) was refused because \(reason.explanation)",
                 drive: .untouched
             )
+        case .imageOnDrive(_, let problem):
+            return FailureExplanation(
+                title: "The image is on this drive",
+                message: problem.message,
+                drive: .untouched
+            )
         case .queryFailed(let reason):
             return FailureExplanation(
                 title: "The drive couldn’t be checked",

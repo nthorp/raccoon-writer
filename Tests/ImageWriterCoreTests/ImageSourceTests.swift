@@ -99,7 +99,7 @@ final class ImageSourceTests {
     @Test func missingFile() {
         let url = dir.appendingPathComponent("gone.img")
         let info = ImageInfo(
-            url: url, fileName: "gone.img", sizeBytes: 1, identity: .madeUp, kind: .img,
+            url: url, fileName: "gone.img", sizeBytes: 1, identity: .madeUp, volumeMountPoint: "/", kind: .img,
             hasMBR: false, hasGPT: false, isISO9660: false, bootWarning: nil
         )
         #expect(throws: ImageSourceError.posix(operation: "open", fileName: "gone.img", code: ENOENT)) {

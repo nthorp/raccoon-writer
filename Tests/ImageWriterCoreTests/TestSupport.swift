@@ -34,12 +34,21 @@ func fileIdentity(at url: URL) throws -> FileIdentity {
     return FileIdentity(info)
 }
 
-/// An `ImageInfo` for a raw image already written at `url`, with the file's real size
-/// and identity, as `ImageInspector` would record them. Boot signatures are left off.
+/// The mount point `ImageInspector` would record for the file at `url`.
+func volumeMountPoint(at url: URL) throws -> String {
+    var volume = statfs()
+    guard statfs(url.path, &volume) == 0 else { throw DeviceIOError.posix(operation: "statfs", code: errno) }
+    return ImageInspector.mountPoint(of: volume)
+}
+
+/// An `ImageInfo` for a raw image already written at `url`, with the file's real size,
+/// identity and mount point, as `ImageInspector` would record them. Boot signatures are
+/// left off.
 func imageInfo(at url: URL) throws -> ImageInfo {
     let identity = try fileIdentity(at: url)
     return ImageInfo(
         url: url, fileName: url.lastPathComponent, sizeBytes: UInt64(identity.sizeBytes), identity: identity,
+        volumeMountPoint: try volumeMountPoint(at: url),
         kind: .img, hasMBR: false, hasGPT: false, isISO9660: false, bootWarning: nil
     )
 }

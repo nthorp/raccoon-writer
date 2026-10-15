@@ -14,7 +14,9 @@ struct FailureExplanationTests {
         WriteFailure(stage: .safetyCheck, error: SafetyGuardError.diskMissing(bsdName: "disk4")),
         WriteFailure(stage: .safetyCheck, error: SafetyGuardError.diskChanged(bsdName: "disk4", field: .size)),
         WriteFailure(stage: .safetyCheck, error: SafetyGuardError.forbiddenTarget(bsdName: "disk4", reason: .internalDisk)),
+        WriteFailure(stage: .safetyCheck, error: SafetyGuardError.imageOnDrive(bsdName: "disk4", ImageOnDrive(fileName: "a.iso", mountPoint: "/Volumes/STICK"))),
         WriteFailure(stage: .safetyCheck, error: SafetyGuardError.queryFailed(reason: "diskutil timed out")),
+        WriteFailure(stage: .safetyCheck, error: ImageSourceError.posix(operation: "open", fileName: "a.iso", code: ENOENT)),
         WriteFailure(stage: .unmount, error: DiskManagerError.invalidDiskName("disk4s1")),
         WriteFailure(stage: .unmount, error: DiskManagerError.busy(dissenter: "/Applications/Preview.app/Contents/MacOS/Preview")),
         WriteFailure(stage: .unmount, error: DiskManagerError.busy(dissenter: nil)),
@@ -186,6 +188,22 @@ struct FailureExplanationTests {
     @Test func forbiddenTargetGivesTheReason() {
         let explanation = explain(.safetyCheck, SafetyGuardError.forbiddenTarget(bsdName: "disk4", reason: .notUSB))
         #expect(explanation.message == "/dev/disk4 was refused because it is not a USB drive. Turn on \"Show all external disks\" to use it.")
+    }
+
+    @Test func imageOnTheDriveSaysToCopyItFirst() {
+        let problem = ImageOnDrive(fileName: "a.iso", mountPoint: "/Volumes/STICK")
+        let explanation = explain(.safetyCheck, SafetyGuardError.imageOnDrive(bsdName: "disk4", problem))
+        #expect(explanation.title == "The image is on this drive")
+        #expect(explanation.message == problem.message)
+        #expect(explanation.drive == .untouched)
+    }
+
+    /// The image is opened in the safety check, before the unmount, so one that went
+    /// missing doesn't report a drive that was never written as partly written.
+    @Test func imageMissingAtTheSafetyCheckLeavesTheDriveUntouched() {
+        let explanation = explain(.safetyCheck, ImageSourceError.posix(operation: "open", fileName: "a.iso", code: ENOENT))
+        #expect(explanation.title == "The image file couldn’t be read")
+        #expect(explanation.drive == .untouched)
     }
 
     @Test func diskutilFailureKeepsItsOutputInTheDetails() {

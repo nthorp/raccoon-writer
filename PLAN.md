@@ -132,6 +132,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T24 | Smaller app: optimized raccoon layer, stripped Release binary | T23 | DONE | 2026-10-13 | Claude |
 | T22 | 🧑 Volume names on screen, debug-only fakes, Info.plist keys, Hardened Runtime | T20, T21 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
 | T25 | 🧑 Tell a Removable Volumes privacy denial apart from a refused password | T21 | DONE | 2026-10-13 | Claude (prep) / Nick (run) |
+| T26 | 🧑 Refuse a drive that holds the image; open the image before the unmount | T25 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T25 builds on T22's committed prep but not on Nick's T22 runs, so it may start while T22 is `NEEDS_HUMAN`. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -1473,6 +1474,46 @@ Also, `NSRemovableVolumesUsageDescription` (T22) says the access is for reading 
 
 **DONE, 2026-10-13, after Nick's H16 runs (commit `1845799`).** All five steps passed; details in `docs/HARDWARE_TESTS.md` H16. Simulate screen, callout, A/B fixes, minimum size and the Full Disk Access button checked; Release on the Cruzer Glide logged `authopen failure mapped to blockedByPrivacySettings` after Don't Allow. Fix A: the prompt returns after Try Again (not on the failed screen, since only the drive list refreshes discovery), then the write and verify pass, no relaunch. Fix B: Full Disk Access works without relaunching. The cancelled-dialog notice is unchanged. Every acceptance criterion is met, with Full Disk Access in place of Files & Folders as Nick decided (see above). Possible follow-up: the fix A text says to quit and reopen if macOS doesn't ask; "click Try Again" would be enough.
 
+### T26 — 🧑 Refuse a drive that holds the image; open the image before the unmount
+
+**Goal:** close a review finding, and a second bug with the same cause. Both left the drive untouched but said it was partly written, which could lead a user to reformat it.
+
+- **A. Image stored on the target drive.** Nothing checked whether the image file is on the drive being written. The run unmounts the drive (`WriteCoordinator.run`, unmount stage), and only then does `WriteEngine` open the image by its path. By then the path is gone, so the open fails with `ENOENT` in the `.write` stage. The failed screen said "The image file couldn’t be read" and that the drive "may be partially written", although not a byte was written and the image was still on the drive, intact. A non-forced `diskutil unmountDisk` succeeds because nothing holds the file open at that point.
+- **B. Image moved, deleted or changed before the run.** Same path: the open fails after the unmount, in `.write`, so `explain(ImageSourceError)` reports `.partiallyWritten`.
+
+Significance is low to moderate (no data loss, a wrong message); likelihood is low (writing an image onto its own drive can only be a mistake, most likely an ISO downloaded to an external USB SSD or a large stick).
+
+**Out of scope:** an image inside a `.dmg` that is stored on the drive. `statfs` reports the disk image's volume, not the drive's. It should already fail safely, though this hasn't been tried: the mounted `.dmg` holds its backing file open, so the unmount should be refused as busy ("The drive is in use"). Also holding the image open from the safety check through the write; the gap between the check and the write's own open is moments.
+
+**Agent steps**
+1. **Record where the image is.** `ImageInfo.volumeMountPoint: String`, non-optional like `identity`. `ImageInspector` fills it with `fstatfs` on the descriptor it already has open (`f_mntonname`, via `ImageInspector.mountPoint(of:)`). If `fstatfs` fails, the inspection fails (`posix`, operation "inspect").
+2. **`ImageOnDrive`** (new, like `DriveTooSmall`): `init?(image:drive:)` is non-nil when `drive.mountPoints` contains `image.volumeMountPoint`. `DiskInfo.mountPoints` already includes the volumes of an APFS container stored on the drive (`DiskutilList.volumesByWholeDisk`). Message: "“<file>” is stored on this drive (<mount point>), and writing erases the whole drive. Copy the image to your Mac, choose the copy, then try again."
+3. **Drive step.** `WriteCoordinator.imageOnDrive`, computed from the `.driveSelected` state like `driveTooSmall`, so it follows the drive's fresh entry as the list refreshes and clears when another image is chosen. `requestConfirmation` throws `WriteCoordinatorError.imageOnDrive` (checked before `driveTooSmall`). In the app: the drive row shows "Holds this image" in orange, the drive step shows the message where the too-small message goes, and Continue is disabled.
+4. **Safety check backstop.** `SafetyGuard.checkImage(_:isNotOn:)` throws `SafetyGuardError.imageOnDrive(bsdName:_:)` for the fresh disk `validate` returned. The coordinator calls it straight after `validate`, before the unmount. `FailureExplanation`: "The image is on this drive", the `ImageOnDrive` message, `.untouched`.
+5. **B.** Still in the safety check stage, after `checkImage`, the coordinator opens the image with `ImageSource` and lets it close. A missing or changed image now fails in `.safetyCheck`, which `FailureExplanation` already reports as `.untouched`, with the drive still mounted.
+6. **Tests:** `ImageInspector` records the mount point; `mountPoint(of:)` reads `/` correctly; `ImageOnDrive` matches whole mount points only, including an APFS container volume; coordinator pre-check, clearing, and a refresh that mounts the image's volume; the safety check backstop with stale confirmed mount points; image deleted and image changed after confirmation fail in `.safetyCheck` with no unmount; the new explanation and the jargon test. Check each new test fails without its fix.
+7. README known limitation. `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass. Write H17, set `NEEDS_HUMAN`, stop.
+
+**Human steps (Nick):** run H17 in `docs/HARDWARE_TESTS.md`. Nothing is written to a drive. The main question is whether a real stick's mount point from `diskutil` matches what `statfs` reports for a file on it.
+
+**Acceptance criteria**
+- A drive holding the image is marked in the list, and the pair can't be confirmed (unit tests, H17 step 1).
+- If the drive's volumes change after confirmation, the safety check refuses it before the unmount (unit test).
+- An image moved, deleted or changed before the run fails before the unmount, with "Nothing was written to the drive." (unit tests, H17 step 2).
+- `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass.
+
+**Files:** `Sources/ImageWriterCore/` (`ImageInfo`, `ImageInspector`, new `ImageOnDrive`, `SafetyGuard`, `SafetyGuardError`, `FailureExplanation`, `WriteCoordinator`, `WriteCoordinatorError`), `App/` (`ContentView`, `SetupView`, `DriveSection`, `PreviewSamples`), `Tests/ImageWriterCoreTests/` (`ImageInspectorTests`, `CoordinatorFaultTests`, `WriteCoordinatorTests`, `SafetyGuardTests`, `FailureExplanationTests`, `TestSupport`, and the tests that construct `ImageInfo`), `README.md`, `docs/HARDWARE_TESTS.md`, `PLAN.md`
+
+**Handoff notes:**
+
+**Prep, 2026-10-14 (Claude).** All agent steps done. `scripts/test.sh` passes 416 tests. `scripts/build.sh` and `scripts/build.sh --release` succeed (Release 4.54 MB, flag check clean). The Release build shows one Swift warning, in `PosixIO.swift:36`, a file this task doesn't touch. Nothing touched a disk.
+- **Tests that failed without their fix** (`checkImage`, the image open and the `requestConfirmation` check turned off, then restored): `anImageOnTheDriveIsReportedBeforeConfirmation` (confirmed anyway), `anImageOnTheDrivesFreshVolumesIsRefusedBeforeUnmount` (the run finished), `anImageDeletedAfterConfirmationFailsBeforeUnmount` and `anImageChangedAfterConfirmationFailsBeforeUnmount` (both unmounted and opened the drive, then failed in `.write`, which is the original bug). `choosingAnImageElsewhereClearsTheProblem` and `aDriveThatMountsTheImagesVolumeLaterIsReported` test `imageOnDrive`, which stayed on, so they passed either way.
+- **Deviation from the review's fix:** it proposed a check on the drive step only. That misses an image chosen after the drive (`selectImage` keeps the drive) and volumes that change before the run, so the safety check checks again (step 4). The mount point is recorded at inspection, so the drive-step check is plain logic with no I/O.
+- **Test images** live in the temp directory, on the boot volume, so tests set `volumeMountPoint` to `/Volumes/STICK` (the `usbStick()` fixture's volume) to put an image "on" the drive.
+- New previews: "Image on the drive" (`SetupView`, using `PreviewSamples.imageOnStick`).
+
+**Instructions for Nick:** run H17 in `docs/HARDWARE_TESTS.md` (steps 1 and 2, step 3 optional) and report: whether the stick showed "Holds this image" with Continue disabled, the stick's mount point as the message showed it, and what the failed screen said in step 2.
+
 ---
 
 ## 4. Future work (not in scope)
@@ -1548,3 +1589,5 @@ Also, `NSRemovableVolumesUsageDescription` (T22) says the access is for reading 
 | 2026-10-13 | T25 unblocked by Nick's decision: the failed screen lists a `tccutil` reset and Full Disk Access (with a note that the app doesn't need it), and the button opens Full Disk Access; NEEDS_HUMAN for H16 | Claude |
 | 2026-10-13 | T25 layout: message in the blue notice callout, fixes labelled A and B, outcome details scroll in a short window | Claude |
 | 2026-10-13 | T25 DONE after Nick's H16 runs: the denial maps to `blockedByPrivacySettings`, and both fixes work without relaunching (fix A once Try Again refreshes the drive list) | Claude |
+| 2026-10-14 | T26 added from a review finding: an image stored on the target drive fails after the unmount and is reported as a partly written drive. Also a moved, deleted or changed image, which fails the same way | Claude |
+| 2026-10-14 | T26 prep: `ImageInfo.volumeMountPoint` from `fstatfs`, `ImageOnDrive` on the drive step and in the safety check, image opened before the unmount; NEEDS_HUMAN for H17 | Claude |

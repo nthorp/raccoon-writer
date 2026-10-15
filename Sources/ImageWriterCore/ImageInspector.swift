@@ -29,6 +29,10 @@ public struct ImageInspector: Sendable {
         default: throw ImageInspectorError.notRegularFile(fileName: fileName)
         }
         guard info.st_size > 0 else { throw ImageInspectorError.empty(fileName: fileName) }
+        var volume = statfs()
+        guard fstatfs(fd, &volume) == 0 else {
+            throw ImageInspectorError.posix(operation: "inspect", fileName: fileName, code: errno)
+        }
 
         let header = try Self.readHeader(fd: fd, fileName: fileName)
         let signatures = ImageSignatures(header: header)
@@ -37,6 +41,7 @@ public struct ImageInspector: Sendable {
             fileName: fileName,
             sizeBytes: UInt64(info.st_size),
             identity: FileIdentity(info),
+            volumeMountPoint: Self.mountPoint(of: volume),
             kind: kind,
             hasMBR: signatures.hasMBR,
             hasGPT: signatures.hasGPT,
@@ -62,6 +67,13 @@ public struct ImageInspector: Sendable {
             }
         }
         return Array(header.prefix(filled))
+    }
+
+    /// `f_mntonname` as a string. It is NUL-terminated within its fixed-size field.
+    static func mountPoint(of volume: statfs) -> String {
+        withUnsafeBytes(of: volume.f_mntonname) { bytes in
+            String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
+        }
     }
 
     private static func openError(_ code: Int32, fileName: String) -> ImageInspectorError {

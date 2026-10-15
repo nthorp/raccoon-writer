@@ -136,11 +136,22 @@ public final class WriteCoordinator {
         return DriveTooSmall(image: image, drive: disk)
     }
 
+    /// Set on the drive step when the selected image is stored on the selected drive,
+    /// which then can't be confirmed. Follows the drive's fresh mount points as the
+    /// drive list refreshes.
+    public var imageOnDrive: ImageOnDrive? {
+        guard case .driveSelected(let image, let disk) = state else { return nil }
+        return ImageOnDrive(image: image, drive: disk)
+    }
+
     /// Moves to the confirm screen. Only `confirmAndStart` can leave it towards a write.
-    /// Throws `driveTooSmall` for an image that can't fit, so the user hears about it
-    /// before being asked to erase anything.
+    /// Throws `imageOnDrive` or `driveTooSmall` for a pair that can't be written, so the
+    /// user hears about it before being asked to erase anything.
     public func requestConfirmation() throws {
         guard case .driveSelected(let image, let disk) = state else { throw notAllowed(.requestConfirmation) }
+        if let problem = ImageOnDrive(image: image, drive: disk) {
+            throw WriteCoordinatorError.imageOnDrive(problem)
+        }
         if let problem = DriveTooSmall(image: image, drive: disk) {
             throw WriteCoordinatorError.driveTooSmall(problem)
         }
@@ -246,6 +257,12 @@ public final class WriteCoordinator {
             transition(to: .preparing(.safetyCheck))
             // The fresh disk, not the confirmed snapshot, is what gets unmounted and opened.
             let target = try await safetyGuard.validate(confirmed: disk, filter: filter)
+            try safetyGuard.checkImage(image, isNotOn: target)
+            // Opened and checked now, while the drive is still mounted, so an image moved,
+            // deleted or changed since it was chosen fails here with the drive as it was.
+            // Left to the write, it would fail after the unmount, reported as a partly
+            // written drive. The write opens it again; the gap between is moments.
+            _ = try ImageSource(image: image)
             try Task.checkCancellation()
 
             stage = .unmount

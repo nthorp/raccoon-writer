@@ -5,7 +5,7 @@ import ImageWriterCore
 /// error states. Disabled until an image is chosen.
 struct DriveSection: View {
     let drives: [DiskInfo]
-    /// The chosen image, so drives too small for it can be marked.
+    /// The chosen image, so drives too small for it, or holding it, can be marked.
     let image: ImageInfo?
     let selected: DiskInfo?
     let isEnabled: Bool
@@ -59,6 +59,7 @@ struct DriveSection: View {
             List(drives, selection: selection) { disk in
                 DriveRow(
                     disk: disk,
+                    holdsImage: image.flatMap { ImageOnDrive(image: $0, drive: disk) } != nil,
                     isTooSmall: image.flatMap { DriveTooSmall(image: $0, drive: disk) } != nil,
                     isLarge: LargeDriveWarning(drive: disk) != nil
                 )
@@ -90,6 +91,7 @@ struct DriveSection: View {
 
 private struct DriveRow: View {
     let disk: DiskInfo
+    let holdsImage: Bool
     let isTooSmall: Bool
     let isLarge: Bool
 
@@ -107,6 +109,11 @@ private struct DriveRow: View {
                     .lineLimit(1)
                     // Middle, so a long list of volume names can't push the device path out.
                     .truncationMode(.middle)
+                if holdsImage {
+                    Text("Holds this image")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
                 if isTooSmall {
                     Text("Too small for this image")
                         .font(.caption)

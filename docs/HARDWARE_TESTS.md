@@ -87,6 +87,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H14 | What real disks report (read-only) | none | | |
 | H15 | Drive swapped during the password dialog | Debug | PASS | Both RAM disks were `disk8`; refused with "A different drive is attached" |
 | H16 | Removable Volumes privacy prompt denied | Debug + Release | PASS | Mapped to `blockedByPrivacySettings`; fix A needs Try Again, not a relaunch; fix B needs no relaunch |
+| H17 | Image stored on the drive; image deleted before the write | Release + Debug | | |
 
 **Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09). That build never tried `DKIOCSYNCHRONIZE`. **From T19 on: `DKIOCSYNCHRONIZE`** (Cruzer Glide, Release build, 2026-10-13, commit `169b386`; details under T19 in `PLAN.md`).
 
@@ -411,3 +412,20 @@ log stream --predicate 'subsystem == "com.example.raccoonwriter" OR (subsystem =
 - Step 3 (fix A): passed. After the `tccutil` reset the prompt did **not** appear on the failed screen; it appeared after Try Again (back on the drive list, whose refresh runs `diskutil`). After Allow, the write and verify passed. No relaunch needed.
 - Step 4 (fix B): passed. With Full Disk Access turned on, the write and verify passed without relaunching.
 - Step 5 (cancelled dialog): passed. The T18 notice appeared, not the new screen.
+
+### H17 — Image stored on the drive; image deleted before the write (T26)
+
+Before T26, choosing an image stored on the stick and writing it to that stick failed after the unmount with "The image file couldn’t be read" and "may be partially written", although nothing was written. Now the drive step refuses the pair. An image deleted after confirming now fails before the unmount. **Nothing in this test writes to a drive:** step 1 never gets past the drive step, and step 2 uses Simulate mode.
+
+**Steps**
+1. **Image on the stick, Release, Cruzer Glide.** `scripts/build.sh --release`. In Finder, copy any small `.img` or `.iso` onto the stick's volume. Launch `build/RaccoonWriter.app`, press Choose, and pick the copy **on the stick**. In the drive list, the stick's row should say "Holds this image" in orange. Select it: below the list an orange message says "“<file>” is stored on this drive (/Volumes/<NAME>), and writing erases the whole drive. …" and Continue is disabled. Turn "Show all external disks" on and off; the row and message should stay. Choose the image again from `~/Downloads` (or anywhere on the Mac): the label and message go away and Continue is enabled. Don't continue; quit. Delete the copy from the stick if you like.
+2. **Image deleted before writing, Simulate, Debug.** `scripts/build.sh`, then `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`. Copy any small image to a new name, for example `cp <image> ~/Downloads/h17-delete-me.img`, and choose that copy. Pick `disk90` "Simulated USB Stick (works)", Continue. On the confirm screen, delete `~/Downloads/h17-delete-me.img` in Terminal, then press Erase and Write. After the simulated password wait, the failed screen should say "The image file couldn’t be read", "“h17-delete-me.img” could not be read. Check that the file is still there and readable." and "Nothing was written to the drive." Quit.
+3. **Optional: APFS.** If you have an external drive formatted as APFS that appears in the list (turn on "Show all external disks" if needed), repeat step 1 with an image stored on it. The row should say "Holds this image" there too.
+
+**Expected**
+- Step 1: the label, the message with the stick's mount point, Continue disabled, and all three cleared by choosing an image on the Mac. No password dialog appears.
+- Step 2: the failed screen as above, with "Nothing was written to the drive." rather than "may be partially written".
+- Step 3: same as step 1.
+
+**Result:**
+**Notes:**
