@@ -2,7 +2,7 @@
 
 **Raccoon Writer** (formerly Red Delicious Media Writer, and before that ISO Sword, which is why the repo is `iso-sword`) is a native macOS app (Swift/SwiftUI) that writes `.iso` and `.img` disk images to USB drives, for example to make a bootable Linux installer. It does the same job as balenaEtcher and Fedora Media Writer: pick an image, pick a drive, confirm, and it writes the image, reads it back to verify it, then ejects the drive.
 
-> **Status:** v1 is feature-complete and covered by unit tests. Hardware testing on an Apple Silicon Mac with a SanDisk Cruzer Glide USB stick is partly done, using [`docs/HARDWARE_TESTS.md`](docs/HARDWARE_TESTS.md). A Fedora Live ISO and a FreeBSD `.img` were written, verified, and booted on another machine. Cancelling, an image too big for the stick, and keeping the boot and internal disks out of the list also passed. Still to run: quitting mid-write, pulling the stick out mid-write, a drive in use, and the newest checks (H17, H18). The app hasn't been run on an Intel Mac yet. Until the checklist is complete, use only drives whose contents you don't need. See [`PLAN.md`](PLAN.md) for progress.
+> **Status:** v1 is feature-complete, covered by unit tests, and has passed the hardware checklist in [`docs/HARDWARE_TESTS.md`](docs/HARDWARE_TESTS.md) on an Apple Silicon Mac, writing to a SanDisk Cruzer Glide USB stick and an SD card in the built-in slot. A Fedora Live ISO and a FreeBSD `.img` were written, verified, and booted on another machine. The one test not run is the Intel Mac run (H13): the only Intel Mac available runs macOS 13, and the app needs macOS 14, so the Intel half of the universal binary is untested. See [`PLAN.md`](PLAN.md) for the full history.
 
 ## Safety: what the app erases
 
@@ -94,6 +94,7 @@ If you build from source: macOS treats each ad-hoc-signed rebuild as a new app (
 - **Hybrid ISOs only.** The image is copied byte for byte. That works for images built to boot from USB: most Linux ISOs (Fedora, Ubuntu, Debian, Arch…) and raw `.img` files. An ISO with no partition table (plain ISO 9660, often meant for optical discs) gets a "may not boot from a USB drive" warning. It can still be written, but probably won't boot.
 - **Windows installer ISOs are not supported.** They need their files extracted onto a formatted drive, not a raw copy.
 - **No compressed images.** Decompress `.xz`, `.gz` or `.zip` images first (for example `xz -dk image.img.xz`).
+- **No macOS disk images.** The open panel offers `.dmg` files, because macOS gives `.img` and `.dmg` the same file type, but the app refuses them. A `.dmg` is meant to be opened on a Mac, not copied onto a drive.
 - **One drive at a time.** No persistence partitions.
 - **The image can't be on the drive you write it to.** Writing erases the drive, so the app refuses a drive that holds the image. Copy the image to your Mac first. An image inside a `.dmg` that is stored on the drive isn't recognized as being on it. macOS should then refuse to unmount the drive while the disk image is attached, so the write stops with "The drive is in use" before anything is written.
 - **Some built-in card readers are not listed.** A Mac's built-in SD card slot is listed only when macOS reports it on the Secure Digital bus, as the MacBook Pro's SDXC slot does. A built-in reader that macOS reports on another bus, such as an internal USB bus, is treated as an internal disk and hidden. Use a USB card reader instead.
@@ -107,7 +108,6 @@ If you build from source: macOS treats each ad-hoc-signed rebuild as a new app (
 
 ## Roadmap
 
-- **A privileged helper** registered with `SMAppService`, so writes no longer need a password every time. Needs Developer ID signing, and the helper must re-check the target disk itself.
 - **Developer ID signing, notarization** and a DMG download.
 - Later: compressed images, SHA-256 display, drag-and-drop, localization.
 
