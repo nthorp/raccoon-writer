@@ -1,6 +1,6 @@
 # Hardware test checklist (T12)
 
-The first real-world check of Raccoon Writer. Builds before T14 were called ISO Sword (`build/IsoSword.app`, env vars `ISOSWORD_*`, log subsystem `com.example.isosword`), and builds from T14 until T23 were called Red Delicious Media Writer (`build/RedDelicious.app`, env vars `REDDELICIOUS_*`, log subsystem `com.example.reddelicious`). Raccoon Writer builds used the log subsystem `com.example.raccoonwriter` until 2026-11-01, when it became `com.raccoonwriter.app`; the recorded results below keep the names of the build they ran on. Every test here is run by a person (Nick), never by an agent. Agents must not write to real disks.
+The first real-world check of Raccoon Writer. Every test here is run by a person (Nick), never by an agent. Agents must not write to real disks.
 
 **Most of these tests erase a USB stick.** Use sticks that hold nothing you need. H11 pulls a stick out mid-write. That is almost always harmless, but use a spare stick you don't mind losing.
 
@@ -17,11 +17,11 @@ A test passes only if every **Expected** item happened. If one item differs but 
 - A Mac with Apple Silicon. An Intel Mac too if you have one (H13).
 - One or two USB sticks you can erase, at least 8 GB. One of them is the spare for H11.
 - A PC (or Intel Mac) that can boot from USB, for H6 and H7.
-- Images. Keep them in `~/iso-sword-test/`:
+- Images. Keep them in `~/raccoon-writer-test/`:
   - **A hybrid Linux ISO**, for example Fedora Workstation Live or Ubuntu Desktop (both are hybrid). At least 2 GB, so that H8 and H9 have time to click Cancel.
   - **An uncompressed `.img`**, for example a FreeBSD `memstick.img`, or a Raspberry Pi OS image unpacked with `xz -dk`. Raccoon Writer can't read `.xz`, `.gz` or `.zip`.
-  - **An image bigger than your stick.** A sparse file is enough. For a 16 GB stick: `mkfile -n 20g ~/iso-sword-test/too-big.img` (use a size larger than your stick).
-  - **Random test data for the RAM disk:** `head -c 200000000 /dev/urandom > ~/iso-sword-test/ram-test.img` (200 MB).
+  - **An image bigger than your stick.** A sparse file is enough. For a 16 GB stick: `mkfile -n 20g ~/raccoon-writer-test/too-big.img` (use a size larger than your stick).
+  - **Random test data for the RAM disk:** `head -c 200000000 /dev/urandom > ~/raccoon-writer-test/ram-test.img` (200 MB).
 
 ### Builds
 
@@ -131,7 +131,7 @@ A full write, verify and eject against a RAM disk, with the real password prompt
    echo "$DISK"
    ```
 3. `RACCOONWRITER_ALLOW_VIRTUAL_DISKS=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`
-4. Choose `~/iso-sword-test/ram-test.img`. Pick the RAM disk (its `diskN` is the one echoed above, named "Disk Image"). Click Continue, then **Erase and Write**.
+4. Choose `~/raccoon-writer-test/ram-test.img`. Pick the RAM disk (its `diskN` is the one echoed above, named "Disk Image"). Click Continue, then **Erase and Write**.
 5. Enter your password in the macOS dialog.
 6. Afterwards, clean up if the disk is still attached ("no such disk" is fine): `hdiutil detach "$DISK" || sudo hdiutil detach "$DISK"`
 
@@ -166,14 +166,14 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 
 **Result:** PASS
 **Notes:**
-- **Part 1, 2026-10-09, Debug build with `ISOSWORD_ALLOW_VIRTUAL_DISKS=1`.** `diskutil list` showed: `disk0` internal SSD; `disk3` boot APFS container (synthesized, store `disk0s2`); `disk5` iOS 26.5 Simulator image, mounted through its APFS container `disk6`; `disk7` USB stick (SanDisk Cruzer Glide, 31.4 GB); `disk8` mounted `TestDMG` `.dmg`; `disk9` unmounted 33.6 MB RAM disk (the control). The app listed **only `disk7` and `disk9`**, as expected: the internal disk, the boot container, both mounted disk images and the simulator's container were hidden, and the RAM disk showing confirms the debug flag was active.
+- **Part 1, 2026-10-09, Debug build with virtual disks allowed.** `diskutil list` showed: `disk0` internal SSD; `disk3` boot APFS container (synthesized, store `disk0s2`); `disk5` iOS 26.5 Simulator image, mounted through its APFS container `disk6`; `disk7` USB stick (SanDisk Cruzer Glide, 31.4 GB); `disk8` mounted `TestDMG` `.dmg`; `disk9` unmounted 33.6 MB RAM disk (the control). The app listed **only `disk7` and `disk9`**, as expected: the internal disk, the boot container, both mounted disk images and the simulator's container were hidden, and the RAM disk showing confirms the debug flag was active.
 - **Part 2, 2026-10-09, Release build, no debug flag.** Only the USB stick (`disk7`) was listed, with "Show all external disks" both off and on: no internal disk, boot container, simulator image or other disk image. Unplugging the stick removed it from the list, and plugging it back in brought it back. Unplugging it while it was selected removed it, cleared the selection and disabled Continue.
 - **Step 5:** an SD card in the MacBook Pro's built-in slot (`disk4`) mounted in Finder but was **not listed** in either toggle position. The slot reports `Internal = true` (details in H14), so it is hidden by design. This confirms the T03 guess. Write SD cards through a USB card reader instead (now in the README's known limitations).
 
 ### H4 — Image bigger than the stick
 
 **Steps**
-1. Choose `~/iso-sword-test/too-big.img`, then look at the stick in the drive list.
+1. Choose `~/raccoon-writer-test/too-big.img`, then look at the stick in the drive list.
 
 **Expected**
 - The stick's row says "Too small for this image".
@@ -223,7 +223,7 @@ The main end-to-end test. Also records the flush method on a real stick.
 **Result:** PASS
 **Notes:**
 - 2026-10-09, Release build, `Fedora-Workstation-Live-44-1.7.x86_64.iso` to the SanDisk Cruzer Glide (`disk7`, USB 2.0). Nick reports every expected result for steps 2–4: no boot warning; the confirm screen matched; the close button was greyed out and ⌘W ignored during the write; the sleep assertion was present during the run and gone after; progress went through writing, "Finishing the write" and verifying; "Finished. You can remove the drive." and the stick ejected.
-- **Flush method: `fsync fallback`.** Log: `2026-10-09 22:04:46.084688-0500 … IsoSword: [com.example.isosword:device] fullSync used fsync fallback`. This stick does not support `F_FULLFSYNC` (open question from T01). The write still verified. The cache is bypassed (`F_NOCACHE`), and the eject that follows has macOS flush the drive.
+- **Flush method: `fsync fallback`.** Log: `2026-10-09 22:04:46.084688-0500 … [device] fullSync used fsync fallback`. This stick does not support `F_FULLFSYNC` (open question from T01). The write still verified. The cache is bypassed (`F_NOCACHE`), and the eject that follows has macOS flush the drive.
 - **Average write speed 4.7 MB/s, total time 11 min 30 s** (write, flush, verify and eject). This is slow but in line with this stick, a USB 2.0 Cruzer Glide on a 480 Mb/s link through a hub. Writing is the stick's bottleneck.
 - **Boot test PASS:** the stick booted Fedora 44 Live on a 2017 Intel Mac.
 - T19: `F_FULLFSYNC` returns `ENOTTY` on any raw disk node, not only this stick, and `fsync` there doesn't reach the drive, so this build never flushed the stick's cache; the eject did. T19 flushes with `DKIOCSYNCHRONIZE` and re-runs the write on this stick; see T19 in `PLAN.md`.
@@ -331,7 +331,7 @@ The remount line shows T27 also remounts after a refused unmount (a partial unmo
 - The app launches, and H3 and H6 give the same results as on Apple Silicon. Record the flush method there too.
 
 **Result:** Not possible on Intel hardware
-**Notes:** The only Intel Mac available (2017) runs macOS Ventura 13.7.8, and ISO Sword requires macOS 14 or later (it uses the Observation framework), so the app can't run there. The 2017 Intel Mac was still used as the boot machine for H6 and H7.
+**Notes:** The only Intel Mac available (2017) runs macOS Ventura 13.7.8, and the app requires macOS 14 or later (it uses the Observation framework), so the app can't run there. The 2017 Intel Mac was still used as the boot machine for H6 and H7.
 
 ### H14 — What real disks report (read-only)
 
@@ -349,7 +349,7 @@ Change `disk4` to the disk's number first. Paste each output below, and note whe
 **Result:** PASS (no Thunderbolt or USB-C SSD available)
 **Notes:**
 - **USB stick 1, `disk7` on 2026-10-09** (read by the agent): MediaName `Cruzer Glide`, BusProtocol `USB`, Internal `false`, Removable `true`, RemovableMedia `true`, Ejectable `true`, VirtualOrPhysical `Physical`, DeviceBlockSize `512`, TotalSize `31406948352`. This matches the hand-written USB fixture's rules (T03): shown in the default list.
-- **SD card in the built-in SDXC slot, `disk4` on 2026-10-09** (read by the agent): MediaName `Built In SDXC Reader`, BusProtocol `Secure Digital`, Internal **`true`**, Removable `true`, RemovableMedia `true`, Ejectable `true`, VirtualOrPhysical `Physical`, DeviceBlockSize `512`, TotalSize `64021856256`. Hidden under both settings because it reports internal. The T03 fixture `info-disk7` guessed `Internal = false` for an SD card; a real built-in slot says `true`. Not seen in ISO Sword with the toggle off or on.
+- **SD card in the built-in SDXC slot, `disk4` on 2026-10-09** (read by the agent): MediaName `Built In SDXC Reader`, BusProtocol `Secure Digital`, Internal **`true`**, Removable `true`, RemovableMedia `true`, Ejectable `true`, VirtualOrPhysical `Physical`, DeviceBlockSize `512`, TotalSize `64021856256`. Hidden under both settings because it reports internal. The T03 fixture `info-disk7` guessed `Internal = false` for an SD card; a real built-in slot says `true`. Not seen in the app with the toggle off or on.
 - **SD card in a USB card reader, `disk8` on 2026-10-14** (read by the agent): MediaName `MassStorageClass`, BusProtocol `USB`, Internal `false`, Removable `true`, RemovableMedia `true`, Ejectable `true`, VirtualOrPhysical `Physical`, WholeDisk `true`, DeviceBlockSize `512`, TotalSize `64021856256` (the 64 GB card from H19, still holding the Raspberry Pi OS `bootfs` and Linux partitions written there). Nick saw it listed with the toggle off, with the drive symbol. It passes the default filter as a USB drive and is not a built-in card reader. The full plist is now `Tests/ImageWriterCoreTests/Fixtures/diskutil/info-disk9.plist`, replacing T29's guess (renamed to `disk9`).
 - No Thunderbolt or USB-C SSD was available.
 
@@ -367,7 +367,7 @@ Checks that a disk which takes over the drive's `/dev/diskN` name while the pass
    echo "$DISK"
    ```
 3. `RACCOONWRITER_ALLOW_VIRTUAL_DISKS=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`
-4. Choose `~/iso-sword-test/ram-test.img`, pick RAM disk A, click Continue, then **Erase and Write**. **Leave the password dialog open.**
+4. Choose `~/raccoon-writer-test/ram-test.img`, pick RAM disk A, click Continue, then **Erase and Write**. **Leave the password dialog open.**
 5. In Terminal, detach A and attach RAM disk **B**, which is half the size:
    ```sh
    hdiutil detach "$DISK" || sudo hdiutil detach "$DISK"

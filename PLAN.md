@@ -1,4 +1,4 @@
-# Raccoon Writer (repo: iso-sword) — Implementation Plan
+# Raccoon Writer — Implementation Plan
 
 > A native macOS app (Swift/SwiftUI) that writes `.iso` / `.img` images to removable USB drives.
 > Similar in function to balenaEtcher and Fedora Media Writer.
@@ -31,7 +31,7 @@
 
 | Area | Decision |
 | --- | --- |
-| App name / folder | **Raccoon Writer** (full and short name), target `RaccoonWriter`. Folder and repo stay `iso-sword`. Was "ISO Sword" / `IsoSword` until T14, then "Red Delicious Media Writer" / `RedDelicious` until T23 |
+| App name / folder | **Raccoon Writer** (full and short name), target `RaccoonWriter`. Folder and repo are `raccoon-writer` (renamed from `iso-sword` on 2026-11-01). Was "ISO Sword" / `IsoSword` until T14, then "Red Delicious Media Writer" / `RedDelicious` until T23 |
 | Bundle ID | `com.raccoonwriter.app` (from Nick's domain, raccoonwriter.com; also the log subsystem). Was `com.example.isosword` until T14, `com.example.reddelicious` until T23, then the placeholder `com.example.raccoonwriter` until 2026-11-01 |
 | Language / UI | Swift 5 language mode (targeted concurrency checking on), SwiftUI, Observation framework |
 | Platform | macOS 14+, universal binary (arm64 + x86_64) |
@@ -79,7 +79,7 @@ Error and cancel are possible from any step after Confirm. After a cancel or fai
 ### Repo layout (created in T00)
 
 ```
-iso-sword/
+raccoon-writer/
 ├── AGENTS.md
 ├── CLAUDE.md                 # one line: @AGENTS.md
 ├── PLAN.md
@@ -1673,7 +1673,7 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 
 ## 4. Future work (not in scope)
 
-- Rename the GitHub repo and local folder from `iso-sword` to match the app (T14 left them as they are).
+- ~~Rename the GitHub repo and local folder from `iso-sword` to match the app~~: done 2026-11-01 (`raccoon-writer`).
 - ~~`authopen -extauth` for a dialog naming ISO Sword~~: implemented in T13.
 - Developer ID signing, notarization, DMG packaging.
 - Compressed image support, SHA-256 display, drag-and-drop, localization.
@@ -1756,3 +1756,4 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 | 2026-10-14 | T12 DONE after Nick's H10, H11, H12 and H14 runs; a real USB card reader capture replaced the guessed `info-disk9` fixture. Every task in the plan is DONE | Claude |
 | 2026-10-14 | Privileged helper (`HelperOpener`, SMAppService) removed from future work at Nick's request | Claude |
 | 2026-11-01 | Bundle ID and log subsystem changed from the placeholder `com.example.raccoonwriter` to `com.raccoonwriter.app` before the public release | Claude |
+| 2026-11-01 | Repo and local folder renamed from `iso-sword` to `raccoon-writer`; title, section 1, repo layout and future work updated. Old names removed from README, AGENTS.md and `docs/HARDWARE_TESTS.md` (test image folder is now `~/raccoon-writer-test/`) | Claude |

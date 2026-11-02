@@ -1,6 +1,6 @@
 # Raccoon Writer
 
-**Raccoon Writer** (formerly Red Delicious Media Writer, and before that ISO Sword, which is why the repo is `iso-sword`) is a native macOS app (Swift/SwiftUI) that writes `.iso` and `.img` disk images to USB drives, for example to make a bootable Linux installer. It does the same job as balenaEtcher and Fedora Media Writer: pick an image, pick a drive, confirm, and it writes the image, reads it back to verify it, then ejects the drive.
+**Raccoon Writer** is a native macOS app (Swift/SwiftUI) that writes `.iso` and `.img` disk images to USB drives, for example to make a bootable Linux installer. It does the same job as balenaEtcher and Fedora Media Writer: pick an image, pick a drive, confirm, and it writes the image, reads it back to verify it, then ejects the drive.
 
 > **Status:** v1 is feature-complete, covered by unit tests, and has passed the hardware checklist in [`docs/HARDWARE_TESTS.md`](docs/HARDWARE_TESTS.md) on an Apple Silicon Mac, writing to a SanDisk Cruzer Glide USB stick and an SD card in the built-in slot. A Fedora Live ISO and a FreeBSD `.img` were written, verified, and booted on another machine. The one test not run is the Intel Mac run (H13): the only Intel Mac available runs macOS 13, and the app needs macOS 14, so the Intel half of the universal binary is untested. See [`PLAN.md`](PLAN.md) for the full history.
 

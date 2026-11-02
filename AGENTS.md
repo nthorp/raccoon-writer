@@ -1,4 +1,4 @@
-# AGENTS.md — Raccoon Writer (repo: iso-sword)
+# AGENTS.md — Raccoon Writer
 
 Native macOS app (Swift/SwiftUI) that writes `.iso` / `.img` images to USB drives. Read this file, then `PLAN.md`, at the start of every session.
 
