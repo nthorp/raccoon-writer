@@ -123,4 +123,6 @@ If you build from source: macOS treats each ad-hoc-signed rebuild as a new app (
 
 ## License
 
-Raccoon Writer is free software, licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
+Raccoon Writer's source code is free software, licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
+
+The Raccoon Writer name and the raccoon app icon (`App/AppIcon.icon/`) are not covered by the GPL. The icon is © 2026 Nicholas Thorp, all rights reserved. You may use it unchanged in builds of this project and in articles or reviews about it. If you distribute a modified version, please give it a different name and icon.
