@@ -7,5 +7,5 @@ public enum AppInfo {
     /// Menu bar (`CFBundleName`, at most 15 characters) and in sentences. Equal to
     /// `displayName` today; kept separate so a longer full name only changes this file.
     public static let shortName = "Raccoon Writer"
-    public static let bundleIdentifier = "com.example.raccoonwriter"
+    public static let bundleIdentifier = "com.raccoonwriter.app"
 }

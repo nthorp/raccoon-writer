@@ -50,10 +50,10 @@ These exist only in Debug builds. The Release build check fails if any of them l
 
 ### Logs
 
-The app logs to the unified log under subsystem `com.example.raccoonwriter`:
+The app logs to the unified log under subsystem `com.raccoonwriter.app`:
 
 ```sh
-log stream --predicate 'subsystem == "com.example.raccoonwriter"' --info
+log stream --predicate 'subsystem == "com.raccoonwriter.app"' --info
 ```
 
 ## How it works
@@ -82,7 +82,7 @@ At launch macOS may ask whether Raccoon Writer can access files on a removable v
 
 The failed screen lists two fixes, A and B:
 
-- **A: Reset the permission (recommended).** Run `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter` in Terminal. When macOS asks again, click Allow, then try again. If it doesn't ask, quit and reopen Raccoon Writer.
+- **A: Reset the permission (recommended).** Run `tccutil reset SystemPolicyRemovableVolumes com.raccoonwriter.app` in Terminal. When macOS asks again, click Allow, then try again. If it doesn't ask, quit and reopen Raccoon Writer.
 - **B: Turn on Full Disk Access.** Press **Open Full Disk Access Settings…** (or open System Settings › Privacy & Security › Full Disk Access), turn on Raccoon Writer, then try again. Raccoon Writer doesn't need full disk access, only access to removable drives, which Full Disk Access includes.
 
 Files & Folders usually has no Removable Volumes switch for Raccoon Writer. macOS adds a denied Full Disk Access entry for the app by itself, and Files & Folders then shows only "Full Disk Access" under the app's name, even though that access is off.

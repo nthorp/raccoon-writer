@@ -32,7 +32,7 @@
 | Area | Decision |
 | --- | --- |
 | App name / folder | **Raccoon Writer** (full and short name), target `RaccoonWriter`. Folder and repo stay `iso-sword`. Was "ISO Sword" / `IsoSword` until T14, then "Red Delicious Media Writer" / `RedDelicious` until T23 |
-| Bundle ID | `com.example.raccoonwriter` (placeholder; change before any public release). Was `com.example.isosword` until T14, then `com.example.reddelicious` until T23 |
+| Bundle ID | `com.raccoonwriter.app` (from Nick's domain, raccoonwriter.com; also the log subsystem). Was `com.example.isosword` until T14, `com.example.reddelicious` until T23, then the placeholder `com.example.raccoonwriter` until 2026-11-01 |
 | Language / UI | Swift 5 language mode (targeted concurrency checking on), SwiftUI, Observation framework |
 | Platform | macOS 14+, universal binary (arm64 + x86_64) |
 | Project structure | Swift Package `ImageWriterCore` (UI-free, testable) + thin SwiftUI app target |
@@ -1755,3 +1755,4 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 | 2026-10-14 | T29 DONE after Nick's H19 run: the built-in SD card is listed with the toggle off and writes with one password dialog, `DKIOCSYNCHRONIZE` and an eject; no separate privacy prompt | Claude |
 | 2026-10-14 | T12 DONE after Nick's H10, H11, H12 and H14 runs; a real USB card reader capture replaced the guessed `info-disk9` fixture. Every task in the plan is DONE | Claude |
 | 2026-10-14 | Privileged helper (`HelperOpener`, SMAppService) removed from future work at Nick's request | Claude |
+| 2026-11-01 | Bundle ID and log subsystem changed from the placeholder `com.example.raccoonwriter` to `com.raccoonwriter.app` before the public release | Claude |

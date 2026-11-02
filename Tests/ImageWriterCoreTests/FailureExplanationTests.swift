@@ -237,7 +237,7 @@ struct FailureExplanationTests {
 
         let reset = remedies[0]
         #expect(reset.title == "Reset the permission in Terminal")
-        #expect(reset.command == "tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter")
+        #expect(reset.command == "tccutil reset SystemPolicyRemovableVolumes com.raccoonwriter.app")
         #expect(reset.instructions.contains("click Allow, then try again"))
         #expect(reset.instructions.contains("quit and reopen Raccoon Writer"))
 

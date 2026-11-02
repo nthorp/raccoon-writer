@@ -1,6 +1,6 @@
 # Hardware test checklist (T12)
 
-The first real-world check of Raccoon Writer. Builds before T14 were called ISO Sword (`build/IsoSword.app`, env vars `ISOSWORD_*`, log subsystem `com.example.isosword`), and builds from T14 until T23 were called Red Delicious Media Writer (`build/RedDelicious.app`, env vars `REDDELICIOUS_*`, log subsystem `com.example.reddelicious`); the recorded results below keep the names of the build they ran on. Every test here is run by a person (Nick), never by an agent. Agents must not write to real disks.
+The first real-world check of Raccoon Writer. Builds before T14 were called ISO Sword (`build/IsoSword.app`, env vars `ISOSWORD_*`, log subsystem `com.example.isosword`), and builds from T14 until T23 were called Red Delicious Media Writer (`build/RedDelicious.app`, env vars `REDDELICIOUS_*`, log subsystem `com.example.reddelicious`). Raccoon Writer builds used the log subsystem `com.example.raccoonwriter` until 2026-11-01, when it became `com.raccoonwriter.app`; the recorded results below keep the names of the build they ran on. Every test here is run by a person (Nick), never by an agent. Agents must not write to real disks.
 
 **Most of these tests erase a USB stick.** Use sticks that hold nothing you need. H11 pulls a stick out mid-write. That is almost always harmless, but use a spare stick you don't mind losing.
 
@@ -37,7 +37,7 @@ Record the commit you tested: `git rev-parse --short HEAD`.
 Keep this running in a second Terminal window during every test. It shows which flush method was used (H6), authopen's error text, and why disks were filtered out:
 
 ```sh
-log stream --predicate 'subsystem == "com.example.raccoonwriter"' --info
+log stream --predicate 'subsystem == "com.raccoonwriter.app"' --info
 ```
 
 ### Identifying the stick
@@ -394,14 +394,14 @@ At launch, drive discovery makes macOS ask whether Raccoon Writer may access rem
 Keep this running in a second Terminal window for the whole test:
 
 ```sh
-log stream --predicate 'subsystem == "com.example.raccoonwriter" OR (subsystem == "com.apple.TCC" AND eventMessage CONTAINS[c] "raccoonwriter")' --info
+log stream --predicate 'subsystem == "com.raccoonwriter.app" OR (subsystem == "com.apple.TCC" AND eventMessage CONTAINS[c] "raccoonwriter")' --info
 ```
 
 **Steps**
 1. **Simulate, Debug.** `scripts/build.sh`, then `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`. Choose any image, pick `disk97` "Simulated USB Stick (privacy settings blocked)", Continue, Erase and Write. After the simulated password wait, the failed screen should say "macOS blocked access to removable drives", then show the explanation in a blue-tinted box like the T18 cancelled notice, then two fixes with blue A and B badges: "Reset the permission in Terminal" with the `tccutil` command, and "Turn on Full Disk Access" with a note that the app doesn't need full disk access. "Open Full Disk Access Settings…" sits next to "Try Again". Check Light and Dark and the window at its minimum size (the details should scroll, with the buttons still visible), and that the command can be selected and copied. Glance at a Done and a Cancelled screen too: they now share the scrolling layout. Press "Open Full Disk Access Settings…" and note which pane opens. Quit.
-2. **Deny, Release, Cruzer Glide.** `scripts/build.sh --release`, then `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter`. Plug in the stick and launch `build/RaccoonWriter.app`. The prompt should show the new text ("…to list them and write disk images to them."); press **Don't Allow**. Choose an image and the stick, Continue, Erase and Write, and enter your password.
+2. **Deny, Release, Cruzer Glide.** `scripts/build.sh --release`, then `tccutil reset SystemPolicyRemovableVolumes com.raccoonwriter.app`. Plug in the stick and launch `build/RaccoonWriter.app`. The prompt should show the new text ("…to list them and write disk images to them."); press **Don't Allow**. Choose an image and the stick, Continue, Erase and Write, and enter your password.
 3. **Fix 1, the Terminal reset.** Leave the app on the failed screen. Copy the command from the screen and run it in Terminal. Note whether the prompt comes back without relaunching (the drive list refreshes every few seconds). Click Allow, press Try Again and write again. If there is no prompt, or the write fails, quit and reopen, Allow, and write again; note that a relaunch was needed.
-3b. **Fix 2, Full Disk Access.** Run `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter`, relaunch and press Don't Allow again, then write until the failed screen appears. Press "Open Full Disk Access Settings…", turn on Raccoon Writer, and note whether macOS asks to quit and reopen. Press Try Again and write again; if it fails, quit and reopen and try once more. Afterwards turn Full Disk Access off again.
+3b. **Fix 2, Full Disk Access.** Run `tccutil reset SystemPolicyRemovableVolumes com.raccoonwriter.app`, relaunch and press Don't Allow again, then write until the failed screen appears. Press "Open Full Disk Access Settings…", turn on Raccoon Writer, and note whether macOS asks to quit and reopen. Press Try Again and write again; if it fails, quit and reopen and try once more. Afterwards turn Full Disk Access off again.
 4. **Optional: cancelled dialog unchanged.** Cancel the password dialog once. The T18 cancelled notice on the confirm screen should appear, not the new failed screen.
 
 **Expected**
@@ -450,13 +450,13 @@ From T27 on, a run that stops after the unmount but before the first write mount
 Keep this running in a second Terminal window for the whole test:
 
 ```sh
-log stream --predicate 'subsystem == "com.example.raccoonwriter"' --info
+log stream --predicate 'subsystem == "com.raccoonwriter.app"' --info
 ```
 
 **Steps**
-1. **Privacy denial, Release, Cruzer Glide.** Give the stick a volume with a file on it (for example ExFAT, named `TESTSTICK`). `scripts/build.sh --release`, then `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter`. Plug in the stick, check `TESTSTICK` is in Finder, and launch `build/RaccoonWriter.app`. Press **Don't Allow** at the prompt. Choose an image and the stick, Continue, Erase and Write, and enter your password. Wait for the failed screen ("macOS blocked access to removable drives").
+1. **Privacy denial, Release, Cruzer Glide.** Give the stick a volume with a file on it (for example ExFAT, named `TESTSTICK`). `scripts/build.sh --release`, then `tccutil reset SystemPolicyRemovableVolumes com.raccoonwriter.app`. Plug in the stick, check `TESTSTICK` is in Finder, and launch `build/RaccoonWriter.app`. Press **Don't Allow** at the prompt. Choose an image and the stick, Continue, Erase and Write, and enter your password. Wait for the failed screen ("macOS blocked access to removable drives").
 2. **Check the volume.** Without replugging, look for `TESTSTICK` in Finder and open the file on it. Press Try Again and look at the stick's row in the drive list: its volume name should be there. Optionally run `diskutil list external` (read-only) and note whether the volume shows a mount point.
-3. **Restore.** Run `tccutil reset SystemPolicyRemovableVolumes com.example.raccoonwriter`, quit the app, and click Allow at the next launch.
+3. **Restore.** Run `tccutil reset SystemPolicyRemovableVolumes com.raccoonwriter.app`, quit the app, and click Allow at the next launch.
 
 **Expected**
 - Step 1: the failed screen as in H16. The log shows `Remounted diskN after a run that stopped before writing`, then `Run failed in open: macOS privacy settings did not allow Raccoon Writer to open the drive.`
@@ -480,7 +480,7 @@ From T29 on, a card in a Mac's built-in SD card slot is listed with "Show all ex
 Keep this running in a second Terminal window for the whole test:
 
 ```sh
-log stream --predicate 'subsystem == "com.example.raccoonwriter"' --info
+log stream --predicate 'subsystem == "com.raccoonwriter.app"' --info
 ```
 
 **Steps**
