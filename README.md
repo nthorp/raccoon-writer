@@ -2,6 +2,10 @@
 
 **Raccoon Writer** is a native macOS app (Swift/SwiftUI) that writes `.iso` and `.img` disk images to USB drives, for example to make a bootable Linux installer. It does the same job as balenaEtcher and Fedora Media Writer: pick an image, pick a drive, confirm, and it writes the image, reads it back to verify it, then ejects the drive.
 
+![The setup screen: no image selected yet, and a prompt to insert a USB drive](docs/screenshots/setup.png)
+
+![Writing a Fedora Live ISO to a USB flash drive, 60 % done](docs/screenshots/writing.png)
+
 > **Status:** v1 is feature-complete, covered by unit tests, and has passed the hardware checklist in [`docs/HARDWARE_TESTS.md`](docs/HARDWARE_TESTS.md) on an Apple Silicon Mac, writing to a SanDisk Cruzer Glide USB stick and an SD card in the built-in slot. A Fedora Live ISO and a FreeBSD `.img` were written, verified, and booted on another machine. The one test not run is the Intel Mac run (H13): the only Intel Mac available runs macOS 13, and the app needs macOS 14, so the Intel half of the universal binary is untested. See [`PLAN.md`](PLAN.md) for the full history.
 
 ## Safety: what the app erases
@@ -23,7 +27,7 @@ After a cancelled or failed write, the drive's contents are undefined. The app s
 ## Requirements
 
 - macOS 14 or later, on Apple Silicon or Intel. The app is a universal binary.
-- To build: Xcode 16 or later. Command Line Tools alone can run the unit tests but not build the app.
+- To build: Xcode 26 or later. The app icon (`App/AppIcon.icon`) is an Icon Composer file, which older Xcode versions can't compile. Command Line Tools alone can run the unit tests but not build the app.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
 
 ## Build and run
@@ -117,12 +121,13 @@ If you build from source: macOS treats each ad-hoc-signed rebuild as a new app (
 - `App/`: thin SwiftUI app target
 - `Tests/ImageWriterCoreTests/`: unit tests (Swift Testing) and fixtures. No test touches a real disk.
 - `docs/HARDWARE_TESTS.md`: the manual checklist for real hardware
+- `docs/screenshots/`: the screenshots in this README
 - `Spikes/`: throwaway experiments (the `authopen` spike)
 - `scripts/`: build, test and release-check entry points
 - `PLAN.md`, `AGENTS.md`: the implementation plan and the rules for coding agents working on this repo
 
 ## License
 
-Raccoon Writer's source code is free software, licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
+Raccoon Writer's source code is Copyright © 2026 Nicholas Thorp. It is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version (GPL-3.0-or-later). It is distributed in the hope that it will be useful, but without any warranty. See [LICENSE](LICENSE) for details.
 
-The Raccoon Writer name and the raccoon app icon (`App/AppIcon.icon/`) are not covered by the GPL. The icon is © 2026 Nicholas Thorp, all rights reserved. You may use it unchanged in builds of this project and in articles or reviews about it. If you distribute a modified version, please give it a different name and icon.
+The Raccoon Writer name is not covered by the GPL. If you distribute a modified version, please give it a different name and icon.

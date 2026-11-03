@@ -58,7 +58,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | Mac model and chip | MacBook Pro (Mac15,10), Apple M3 Max, 36 GB | Same |
 | macOS version | 26.3.1 (25D2128) | 26.3.1 (25D2128) |
 | Xcode version | 26.6 (17F113) | 26.6 (17F113) |
-| Commit tested | 2df5b29 (app code unchanged since T11, 57fc215) | Release build, app code as of `3917068` (T29); H17 step 2 on the Debug build of the same code |
+| Commit tested | cdcb4a8 (app code unchanged since T11, d57740f) | Release build, app code as of `80b4bbb` (T29); H17 step 2 on the Debug build of the same code |
 | USB stick 1 (make, model, size, USB 2/3) | SanDisk Cruzer Glide, 31.4 GB, USB 2.0 link (480 Mb/s) through a GenesysLogic USB 2.1 hub | |
 | USB stick 2 / spare (make, model, size) | | |
 | Boot test machine | 2017 Intel Mac | |
@@ -91,7 +91,7 @@ Run it before and after inserting the stick. The new entry (for example `/dev/di
 | H18 | Drive remounted after a run that stops before writing | Release | PASS | Volume back in Finder after the privacy denial without replugging; `Remounted disk7 …` logged |
 | H19 | SD card in the built-in slot listed and written | Release | PASS | Listed with the toggle off, `sdcard` symbol; internal disk hidden; one password dialog, no privacy prompt; `DKIOCSYNCHRONIZE`; ejected. Optional step 3 not run; step 4 USB reader listed |
 
-**Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09). That build never tried `DKIOCSYNCHRONIZE`. **From T19 on: `DKIOCSYNCHRONIZE`** (Cruzer Glide, Release build, 2026-10-13, commit `169b386`; details under T19 in `PLAN.md`).
+**Flush method on the USB stick (from H6):** `fsync fallback` (SanDisk Cruzer Glide, 2026-10-09). That build never tried `DKIOCSYNCHRONIZE`. **From T19 on: `DKIOCSYNCHRONIZE`** (Cruzer Glide, Release build, 2026-10-13, commit `d1bd1bd`; details under T19 in `PLAN.md`).
 
 ---
 
@@ -114,8 +114,8 @@ Nothing touches a disk. This is a visual check of every screen, which agents cou
 - The window is a sensible size, and resizing it doesn't break the layout.
 
 **Result:** PASS
-**Notes:** 2026-10-09, Debug build. Nick reports every expected result, in Light and Dark Mode. Step 5 added and passed 2026-10-13 on commit `d77a66b` (T20).
-**T22, 2026-10-13, Debug build with the Hardened Runtime, commit `446d4f5` (app code as in `214f99c`):** PASS. Each drive row starts with its volume name, `disk90` runs to Done, and after the `disk93` cancel the confirm screen shows "Volume names: SIM93" and "Mounted volumes: /Volumes/SIM93".
+**Notes:** 2026-10-09, Debug build. Nick reports every expected result, in Light and Dark Mode. Step 5 added and passed 2026-10-13 on commit `4297b86` (T20).
+**T22, 2026-10-13, Debug build with the Hardened Runtime, commit `2d663fe` (app code as in `c2902e9`):** PASS. Each drive row starts with its volume name, `disk90` runs to Done, and after the `disk93` cancel the confirm screen shows "Volume names: SIM93" and "Mounted volumes: /Volumes/SIM93".
 
 ### H2 — RAM-disk dry run (debug flag)
 
@@ -145,7 +145,7 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 **Result:** PASS
 **Notes:** 2026-10-09, Debug build, 512 MiB RAM disk with `root:operator` nodes. Nick reports every expected result, including the authopen password dialog and the `fullSync used fsync fallback` log line. Afterwards the agent checked `hdiutil info`: the 512 MiB RAM disk was no longer attached. The agent also found that `log show` afterwards returned no lines from the app, because info-level lines aren't stored, so the flush method can only be seen live with `log stream`.
 - T19 adds `DKIOCSYNCHRONIZE` as the first flush method and re-runs this test; see T19 in `PLAN.md`.
-- T19 re-run, 2026-10-13, Debug build, commit `169b386`: write and verify passed, the RAM disk was ejected, and the log showed `fullSync used DKIOCSYNCHRONIZE` with no skipped methods.
+- T19 re-run, 2026-10-13, Debug build, commit `d1bd1bd`: write and verify passed, the RAM disk was ejected, and the log showed `fullSync used DKIOCSYNCHRONIZE` with no skipped methods.
 - T22 re-run, 2026-10-13, Debug build with the Hardened Runtime and `ENABLE_DEBUG_DYLIB: NO`: PASS. Nick reports the RAM-disk write and verify passed.
 
 ### H3 — Boot and internal disks never listed
@@ -196,8 +196,8 @@ A full write, verify and eject against a RAM disk, with the real password prompt
 
 **Result:** PASS
 **Notes:** 2026-10-09, Release build, stick formatted ExFAT/GPT as `TESTSTICK` with one test file. Clicking Cancel in the authopen dialog returned the app to the confirm screen with the notice, not an error screen. "Mounted volumes" read none and `TESTSTICK` left Finder. After a replug, `TESTSTICK` remounted. The agent checked read-only afterwards: `disk7` still had its GPT layout (EFI + `TESTSTICK`) and the test file was intact.
-**Re-run on T16, 2026-10-12, Release build, commit `e55abea`:** stick erased to ExFAT `TESTSTICK` with a test file. Cancel returned to the confirm screen with "…nothing was written and the drive was left as it was", and the volume stayed mounted. A full write and verify on the same stick then passed.
-**T22, 2026-10-13, Release build with the Hardened Runtime, commit `214f99c`:** PASS on the Cruzer Glide (`TESTSTICK`). The row and the confirm screen show the volume names, which include `EFI` from the GPT layout; Nick is fine with that. After the cancelled dialog, both "Volume names:" and "Mounted volumes:" were still shown. A full write and verify then passed, and the drive ejected. Not reported: whether the name stays on the row after `diskutil unmount`.
+**Re-run on T16, 2026-10-12, Release build, commit `51a3880`:** stick erased to ExFAT `TESTSTICK` with a test file. Cancel returned to the confirm screen with "…nothing was written and the drive was left as it was", and the volume stayed mounted. A full write and verify on the same stick then passed.
+**T22, 2026-10-13, Release build with the Hardened Runtime, commit `c2902e9`:** PASS on the Cruzer Glide (`TESTSTICK`). The row and the confirm screen show the volume names, which include `EFI` from the GPT layout; Nick is fine with that. After the cancelled dialog, both "Volume names:" and "Mounted volumes:" were still shown. A full write and verify then passed, and the drive ejected. Not reported: whether the name stays on the row after `diskutil unmount`.
 
 ### H6 — Hybrid Linux ISO, boots on a test machine
 
@@ -227,7 +227,7 @@ The main end-to-end test. Also records the flush method on a real stick.
 - **Average write speed 4.7 MB/s, total time 11 min 30 s** (write, flush, verify and eject). This is slow but in line with this stick, a USB 2.0 Cruzer Glide on a 480 Mb/s link through a hub. Writing is the stick's bottleneck.
 - **Boot test PASS:** the stick booted Fedora 44 Live on a 2017 Intel Mac.
 - T19: `F_FULLFSYNC` returns `ENOTTY` on any raw disk node, not only this stick, and `fsync` there doesn't reach the drive, so this build never flushed the stick's cache; the eject did. T19 flushes with `DKIOCSYNCHRONIZE` and re-runs the write on this stick; see T19 in `PLAN.md`.
-- T19 re-run, 2026-10-13, Release build, commit `169b386`, `ram-test.img` to the Cruzer Glide: write and verify passed, the stick was ejected, and the log showed `fullSync used DKIOCSYNCHRONIZE` with no skipped methods.
+- T19 re-run, 2026-10-13, Release build, commit `d1bd1bd`, `ram-test.img` to the Cruzer Glide: write and verify passed, the stick was ejected, and the log showed `fullSync used DKIOCSYNCHRONIZE` with no skipped methods.
 
 ### H7 — `.img` write
 
@@ -284,7 +284,7 @@ The main end-to-end test. Also records the flush method on a real stick.
 - During the password dialog the alert says "Cancel and quit?" and that the app quits once you answer the dialog, which it does.
 
 **Result:** PASS
-**Notes:** 2026-10-14, Release build, app code as of `3917068` (unchanged through `e45256f`), USB stick (Nick). Every expected result: Keep Writing let the write continue; Stop and Quit quit the app and nothing was left running; ⌘Q during the password dialog gave "Cancel and quit?", and after Stop and Quit, answering the dialog with **Cancel** quit the app. Stored log: `Run cancelled in authorize; it ended with: The administrator password prompt was cancelled.` The quit during the write logs nothing, as expected: a stop the user asked for unwinds with `CancellationError`, which isn't logged.
+**Notes:** 2026-10-14, Release build, app code as of `80b4bbb` (unchanged through `2e5a6f7`), USB stick (Nick). Every expected result: Keep Writing let the write continue; Stop and Quit quit the app and nothing was left running; ⌘Q during the password dialog gave "Cancel and quit?", and after Stop and Quit, answering the dialog with **Cancel** quit the app. Stored log: `Run cancelled in authorize; it ended with: The administrator password prompt was cancelled.` The quit during the write logs nothing, as expected: a stop the user asked for unwinds with `CancellationError`, which isn't logged.
 
 ### H11 — Pull the stick out mid-write (spare stick)
 
@@ -298,7 +298,7 @@ The main end-to-end test. Also records the flush method on a real stick.
 - After reinserting it, the stick can be written again successfully.
 
 **Result:** PASS
-**Notes:** 2026-10-14, Release build, app code as of `3917068`, USB stick (Nick, with the log read by the agent afterwards). The app showed "The drive was disconnected" and didn't hang. Try Again went back to the setup screen with no drive selected, and nothing was retried. After replugging, the stick was written successfully. The stored log has two pulls, both `ENXIO`: `Run failed in write: Writing to the drive failed. write at offset 130023424 failed: Device not configured (errno 6).` (21:56:29) and the same at offset 92274688 (21:57:35). So the stick came out at about 90–130 MB, earlier than the 30 % the step asks for, which doesn't change what's tested.
+**Notes:** 2026-10-14, Release build, app code as of `80b4bbb`, USB stick (Nick, with the log read by the agent afterwards). The app showed "The drive was disconnected" and didn't hang. Try Again went back to the setup screen with no drive selected, and nothing was retried. After replugging, the stick was written successfully. The stored log has two pulls, both `ENXIO`: `Run failed in write: Writing to the drive failed. write at offset 130023424 failed: Device not configured (errno 6).` (21:56:29) and the same at offset 92274688 (21:57:35). So the stick came out at about 90–130 MB, earlier than the 30 % the step asks for, which doesn't change what's tested.
 
 ### H12 — Drive in use (unmount refused)
 
@@ -312,7 +312,7 @@ The main end-to-end test. Also records the flush method on a real stick.
 - Second attempt: works normally.
 
 **Result:** PASS
-**Notes:** 2026-10-14, Release build, app code as of `3917068`, USB stick held by `tail -f` on a file in its volume (Nick, with the log read by the agent afterwards). The password dialog came first, then "The drive is in use" naming `tail`, with "Nothing was written to the drive." After stopping `tail`, the second attempt wrote normally. Stored log:
+**Notes:** 2026-10-14, Release build, app code as of `80b4bbb`, USB stick held by `tail -f` on a file in its volume (Nick, with the log read by the agent afterwards). The password dialog came first, then "The drive is in use" naming `tail`, with "Nothing was written to the drive." After stopping `tail`, the second attempt wrote normally. Stored log:
 ```
 diskutil unmountDisk /dev/disk7 exited 1: Unmount of disk7 failed: at least one volume could not be unmounted
 Unmount was dissented by PID 41965 (/usr/bin/tail)
@@ -385,7 +385,7 @@ Checks that a disk which takes over the drive's `/dev/diskN` name while the pass
 - The log shows `Refused diskN` from the `safety` category, and no unmount or authopen lines for that run.
 
 **Result:** PASS
-**Notes:** 2026-10-12, Debug build, commit `e55abea`. First attempt: leftover RAM disks `disk10` and `disk11` were attached, so A became `disk12` and B took `disk8`; the names differed, so it was redone. After detaching the leftovers, A and B were both `disk8`, and after the password the app showed "A different drive is attached" (size changed).
+**Notes:** 2026-10-12, Debug build, commit `51a3880`. First attempt: leftover RAM disks `disk10` and `disk11` were attached, so A became `disk12` and B took `disk8`; the names differed, so it was redone. After detaching the leftovers, A and B were both `disk8`, and after the password the app showed "A different drive is attached" (size changed).
 
 ### H16 — Removable Volumes privacy prompt denied (T25)
 
@@ -401,18 +401,18 @@ log stream --predicate 'subsystem == "com.raccoonwriter.app" OR (subsystem == "c
 1. **Simulate, Debug.** `scripts/build.sh`, then `RACCOONWRITER_SIMULATE=1 build/RaccoonWriter.app/Contents/MacOS/RaccoonWriter`. Choose any image, pick `disk97` "Simulated USB Stick (privacy settings blocked)", Continue, Erase and Write. After the simulated password wait, the failed screen should say "macOS blocked access to removable drives", then show the explanation in a blue-tinted box like the T18 cancelled notice, then two fixes with blue A and B badges: "Reset the permission in Terminal" with the `tccutil` command, and "Turn on Full Disk Access" with a note that the app doesn't need full disk access. "Open Full Disk Access Settings…" sits next to "Try Again". Check Light and Dark and the window at its minimum size (the details should scroll, with the buttons still visible), and that the command can be selected and copied. Glance at a Done and a Cancelled screen too: they now share the scrolling layout. Press "Open Full Disk Access Settings…" and note which pane opens. Quit.
 2. **Deny, Release, Cruzer Glide.** `scripts/build.sh --release`, then `tccutil reset SystemPolicyRemovableVolumes com.raccoonwriter.app`. Plug in the stick and launch `build/RaccoonWriter.app`. The prompt should show the new text ("…to list them and write disk images to them."); press **Don't Allow**. Choose an image and the stick, Continue, Erase and Write, and enter your password.
 3. **Fix 1, the Terminal reset.** Leave the app on the failed screen. Copy the command from the screen and run it in Terminal. Note whether the prompt comes back without relaunching (the drive list refreshes every few seconds). Click Allow, press Try Again and write again. If there is no prompt, or the write fails, quit and reopen, Allow, and write again; note that a relaunch was needed.
-3b. **Fix 2, Full Disk Access.** Run `tccutil reset SystemPolicyRemovableVolumes com.raccoonwriter.app`, relaunch and press Don't Allow again, then write until the failed screen appears. Press "Open Full Disk Access Settings…", turn on Raccoon Writer, and note whether macOS asks to quit and reopen. Press Try Again and write again; if it fails, quit and reopen and try once more. Afterwards turn Full Disk Access off again.
-4. **Optional: cancelled dialog unchanged.** Cancel the password dialog once. The T18 cancelled notice on the confirm screen should appear, not the new failed screen.
+4. **Fix 2, Full Disk Access.** Run `tccutil reset SystemPolicyRemovableVolumes com.raccoonwriter.app`, relaunch and press Don't Allow again, then write until the failed screen appears. Press "Open Full Disk Access Settings…", turn on Raccoon Writer, and note whether macOS asks to quit and reopen. Press Try Again and write again; if it fails, quit and reopen and try once more. Afterwards turn Full Disk Access off again.
+5. **Optional: cancelled dialog unchanged.** Cancel the password dialog once. The T18 cancelled notice on the confirm screen should appear, not the new failed screen.
 
 **Expected**
 - Step 1: the wording, both fixes and both buttons as above, readable in Light and Dark and at minimum width. The button opens Privacy & Security › Full Disk Access.
 - Step 2: the failed screen from step 1, "Nothing was written to the drive." The log shows the `authopen: couldn't open /dev/rdiskN: Operation not permitted` line followed by `authopen failure mapped to blockedByPrivacySettings`. The stick's contents are untouched. Note: the app unmounts the drive just before the open, so its volume will probably have left Finder; note whether it did.
-- Steps 3 and 3b: the write and verify pass after each fix. Note for each whether a relaunch was needed.
+- Steps 3 and 4: the write and verify pass after each fix. Note for each whether a relaunch was needed.
 
 **Found during the first run (2026-10-13):** after Don't Allow, Files & Folders showed only "Full Disk Access" under RaccoonWriter, with no Removable Volumes switch, although the app's Full Disk Access entry is denied (macOS adds it by itself). That is why the fixes changed from the Files & Folders switch to the two above.
 
 **Result:** PASS
-**Notes:** 2026-10-13, commit `1845799`, Cruzer Glide as `disk8`.
+**Notes:** 2026-10-13, commit `7d4461b`, Cruzer Glide as `disk8`.
 - Step 1 (Debug, Simulate): passed. The `disk97` screen showed the callout, the A and B fixes and both buttons in Light and Dark at minimum size, the command could be copied, the button opened Full Disk Access, and the Done and Cancelled screens were unchanged.
 - Step 2 (Release): passed. The prompt showed the new usage text; after Don't Allow and the password, the failed screen appeared and the log read:
   ```
@@ -440,7 +440,7 @@ Before T26, choosing an image stored on the stick and writing it to that stick f
 
 **Result:** PASS (steps 1 and 2; optional step 3 not run)
 **Notes:**
-- Step 1, 2026-10-14, Release build (`build/` as built for T29, commit `3917068`), USB stick: passed. With the image copied onto the stick, the row said "Holds this image" in orange. Selecting the stick showed the orange message with its `/Volumes/…` path and disabled Continue, and both stayed when the toggle was flipped. Choosing an image on the Mac cleared the label and the message and enabled Continue. So the mount point `diskutil` reports for a real stick matches the one `fstatfs` gives for a file on it.
+- Step 1, 2026-10-14, Release build (`build/` as built for T29, commit `80b4bbb`), USB stick: passed. With the image copied onto the stick, the row said "Holds this image" in orange. Selecting the stick showed the orange message with its `/Volumes/…` path and disabled Continue, and both stayed when the toggle was flipped. Choosing an image on the Mac cleared the label and the message and enabled Continue. So the mount point `diskutil` reports for a real stick matches the one `fstatfs` gives for a file on it.
 - Step 2, 2026-10-14, Debug build, Simulate mode, `disk90`: passed. With the image deleted on the confirm screen, Erase and Write led to the failed screen with "The image file couldn’t be read" and "Nothing was written to the drive.", not "may be partially written".
 
 ### H18 — Drive remounted after a run that stops before writing (T27)
@@ -501,6 +501,6 @@ for k in MediaName BusProtocol Internal Removable RemovableMedia Ejectable Virtu
 
 **Result:** PASS (steps 1 and 2; optional step 3 not run)
 **Notes:**
-- 2026-10-14, Release build, commit `3917068`, MacBook Pro (M3 Max) built-in slot. Nick reports the card wrote successfully. The log showed `fullSync used DKIOCSYNCHRONIZE`, so the built-in slot accepts the cache flush. Afterwards the agent ran `diskutil list` (read-only): no card was attached, which fits the card having been ejected. Stored logs had no lines from the app process, as expected for a successful run (info-level lines aren't kept). Not yet reported: step 1 (the card listed with the toggle off, the SD card symbol, "Secure Digital", the internal disk absent in both toggle positions), the number of password dialogs, any Removable Volumes prompt, and the done screen's eject message.
+- 2026-10-14, Release build, commit `80b4bbb`, MacBook Pro (M3 Max) built-in slot. Nick reports the card wrote successfully. The log showed `fullSync used DKIOCSYNCHRONIZE`, so the built-in slot accepts the cache flush. Afterwards the agent ran `diskutil list` (read-only): no card was attached, which fits the card having been ejected. Stored logs had no lines from the app process, as expected for a successful run (info-level lines aren't kept). Not yet reported: step 1 (the card listed with the toggle off, the SD card symbol, "Secure Digital", the internal disk absent in both toggle positions), the number of password dialogs, any Removable Volumes prompt, and the done screen's eject message.
 - Follow-up, 2026-10-14, Release build, card reinserted (Nick): step 1 passed. With the toggle off the card was listed with the SD card symbol, "Secure Digital" and its size, and the internal disk and boot container were absent with the toggle off and on. For the earlier write Nick confirms exactly one password dialog, no Removable Volumes prompt (the permission was already allowed since H16, so the built-in slot needs no separate grant), and "Finished. You can remove the drive." with the card ejected.
 - Step 4, 2026-10-14: the same card in a USB card reader was listed with the toggle off, with the drive symbol. Its keys are recorded under H14 and replace the guessed `info-disk9` fixture.

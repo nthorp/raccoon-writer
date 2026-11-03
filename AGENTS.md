@@ -5,6 +5,7 @@ Native macOS app (Swift/SwiftUI) that writes `.iso` / `.img` images to USB drive
 ## Workflow
 
 - Work from `PLAN.md`: take the first `TODO` task whose dependencies are `DONE`. Update the tracker and the task's Handoff notes when you finish. One task per commit, message format `T05: short summary`.
+- When no task is `TODO`, small changes don't need one: make the change, then add a row to the change log in `PLAN.md` (section 6). Larger work gets a new task first: the next free ID, a tracker row and a task section. If unsure which applies, ask the human.
 - Tasks marked 🧑 are human checkpoints: prepare, set `NEEDS_HUMAN`, stop. After the human reports results, record them and mark the task `DONE` yourself if every step (agent and human) and acceptance criterion is complete.
 - If blocked or if the plan seems wrong, set `BLOCKED`, explain in Handoff notes, and stop rather than improvising a large change.
 
@@ -28,8 +29,8 @@ Native macOS app (Swift/SwiftUI) that writes `.iso` / `.img` images to USB drive
 ## Commands
 
 - `scripts/test.sh` — run unit tests (`swift test`). Must pass before marking any task `DONE`.
-- `scripts/build.sh` — generate the project with XcodeGen and build the universal app. (`--release` also runs the release-flag check once T08 exists.)
-- Requires: Xcode 15+, `brew install xcodegen`.
+- `scripts/build.sh` — generate the project with XcodeGen and build the universal Debug app. `--release` builds Release and runs the release-flag check.
+- Requires: Xcode 26+ (the Icon Composer app icon, `App/AppIcon.icon`, needs it), `brew install xcodegen`.
 - Tests use Swift Testing (`import Testing`), not XCTest, so they run with only the Command Line Tools installed. This needs Xcode 16+ or the matching CLT.
 
 ## Style

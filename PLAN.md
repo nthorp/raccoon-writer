@@ -10,7 +10,7 @@
 ## 0. How to use this file (READ FIRST, every session)
 
 1. Read `AGENTS.md` (conventions), then this file.
-2. Look at the **Progress Tracker** (section 2). Pick the **first task whose status is `TODO` and whose dependencies are all `DONE`**. Do not skip ahead.
+2. Look at the **Progress Tracker** (section 2). Pick the **first task whose status is `TODO` and whose dependencies are all `DONE`**. Do not skip ahead. If every task is `DONE`, `AGENTS.md` says how to take on new work.
 3. Set its status to `IN_PROGRESS` and add the date before writing code.
 4. Do the work, following the task's **Steps** and meeting every **Acceptance criterion**.
 5. Run `scripts/test.sh` (and `scripts/build.sh` once T00 exists). A task is not `DONE` until these pass.
@@ -37,7 +37,7 @@
 | Platform | macOS 14+, universal binary (arm64 + x86_64) |
 | Project structure | Swift Package `ImageWriterCore` (UI-free, testable) + thin SwiftUI app target |
 | Project generation | **XcodeGen** (`project.yml`); never hand-edit `.pbxproj` (it is gitignored) |
-| Privilege model | **`authopen`** now, behind a `DeviceOpener` protocol so an SMAppService helper can replace it later |
+| Privilege model | **`authopen`**, behind a `DeviceOpener` protocol. A privileged SMAppService helper was considered and dropped on 2026-10-14 |
 | Image formats | `.iso` and `.img` only, raw block copy |
 | Verification | Always on (no toggle) |
 | Drive filter | Default: external, USB-attached physical disks that report removable or ejectable (sticks and card readers, but also most USB hard drives and SSDs). Drives over 500 GB get a "Large drive" warning in the list and on the confirm screen (T20), which never blocks the write. Toggle "Show all external disks". The boot disk and internal disks are **never** shown, except a built-in SD card reader (`Secure Digital`, removable media, physical, whole disk), which appears in the default list (Nick's decision 2026-10-14, implemented in T29; rule in `AGENTS.md`). |
@@ -691,7 +691,7 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
 - **2026-10-12: T13 runs before the remaining tests.** H1–H9 ran on the authopen-named-dialog build. Run H10, H11, H12 and H14 only after T13 is `DONE`, on the T13 build, and put the build's commit in each test's notes. See T13 "Order with T12".
 - **2026-10-12: run them on the T14 build instead.** T14 renames the app to Red Delicious (`build/RedDelicious.app`, `REDDELICIOUS_*` env vars, subsystem `com.example.reddelicious`), and the checklist's unrun steps use the new names.
 - **2026-10-13: and on the T23 build or later.** T23 renames the app to Raccoon Writer (`build/RaccoonWriter.app`, `RACCOONWRITER_*` env vars, subsystem `com.example.raccoonwriter`), and the checklist's steps use the new names.
-- **2026-10-14: H10, H11 and H12 PASS** (Nick, Release, app code as of `3917068`; details and log lines in `docs/HARDWARE_TESTS.md`). H11's pull gave "The drive was disconnected" (`ENXIO`); H12 named `tail` and remounted the stick.
+- **2026-10-14: H10, H11 and H12 PASS** (Nick, Release, app code as of `80b4bbb`; details and log lines in `docs/HARDWARE_TESTS.md`). H11's pull gave "The drive was disconnected" (`ENXIO`); H12 named `tail` and remounted the stick.
 - **2026-10-14: H11 Try Again confirmed; H14 PASS.** The agent read an SD card in a USB card reader with `diskutil info -plist` (read-only): BusProtocol `USB`, Internal `false`, RemovableMedia `true`, Physical, MediaName `MassStorageClass`. Nick saw it listed with the toggle off. The capture replaced T29's guessed `info-disk9` (only the disk number changed), and `usbCardReaderFields` checks its name, size and that it isn't a built-in card reader; 437 tests pass. No Thunderbolt or USB-C SSD was available. Run B column of the environment table filled in.
 - **DONE, 2026-10-14 (Claude).** Every test in the checklist has a result: H1–H12 and H14–H19 PASS, H13 not possible (the only Intel Mac runs macOS 13). No failures, so no issues to file. The README was kept accurate by each task since.
 
@@ -771,7 +771,7 @@ Run the spike against the RAM disk, then (optionally, with a spare USB stick hol
   7. Clean up any RAM disk still attached: `hdiutil detach "$DISK" || sudo hdiutil detach "$DISK"`.
   
   Then tell the agent the results. If they meet the acceptance criteria, the agent records them here and marks T13 `DONE`. After that, run T12's H10, H11, H12 and H14 on the T13 build.
-- **Human results, 2026-10-12, commit `0639200`** (Nick ran the steps in the order cancel, wrong password, write, second write, USB, so one pair of RAM disks covered steps 1–5):
+- **Human results, 2026-10-12, commit `d9c4e12`** (Nick ran the steps in the order cancel, wrong password, write, second write, USB, so one pair of RAM disks covered steps 1–5):
   - **Step 1, dialog (Debug, RAM disk with `root:operator` nodes):** named ISO Sword, as expected. Nick didn't record the exact headline or the icon.
   - **Step 2:** exactly one dialog per write. No second authopen dialog. The log was as expected (`fullSync used fsync fallback`). So the external authorization satisfies authopen.
   - **Step 3:** a second write within 5 minutes prompted again. `destroyRights` works.
@@ -904,7 +904,7 @@ This also removes the README limitation "after a cancelled password prompt the d
   5. Clean up any RAM disk still attached: `hdiutil detach "$DISK" || sudo hdiutil detach "$DISK"`, and the same with `"$DISK2"` after H15.
 
   Then tell the agent the results. If they meet the acceptance criteria, the agent records them here and marks T16 `DONE`.
-- **Human results, 2026-10-12, commit `e55abea`:**
+- **Human results, 2026-10-12, commit `51a3880`:**
   - **Step 1 (Debug, RAM disk):** exactly one dialog, then write and verify passed. So authopen accepts the external authorization when it runs after the unmount rather than straight after the dialog, and the size check matches on a RAM disk.
   - **Step 2 (H15):** the first attempt didn't test the takeover: leftover RAM disks (`disk10`, `disk11`) were attached, so A became `disk12` and B took the lowest free number, `disk8`. After detaching the leftovers, A and B were both `disk8`, and the app showed "A different drive is attached" (size changed) after the password. H15 step 2 now says to detach other RAM disks first.
   - **Step 3 (Release, real stick, H5):** the stick still held the FreeBSD image from H7, which macOS can't mount, so Nick erased it to ExFAT `TESTSTICK` with a test file first. Cancelling the dialog returned to the confirm screen with the new notice, and the volume stayed mounted.
@@ -948,8 +948,8 @@ This also removes the README limitation "after a cancelled password prompt the d
 - **Project:** XcodeGen 2.46 adds `AppIcon.icon` as a single `wrapper.icon` file reference in Resources, so `project.yml` is unchanged. `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` now resolves to it.
 - **Pre-26 fallback (step 4):** `actool` renders the legacy icons from the `.icon` file. With both sources present, the `.icns` (16–256 px) and the 7 flat `Assets.car` images (32–1024 px) were renders of the new icon, not the T15 PNGs. Removing the set left the `.icns` byte-identical and the same 7 images. Their digests changed, but they also change between two compiles of the same input, so the renders aren't byte-stable. The `.car` also has layered stacks for Aqua, DarkAqua and Tintable. So `App/Assets.xcassets` (it held only the icon) was deleted.
 - **Deviation:** none from the steps. Step 3's `project.yml` edit turned out not to be needed.
-- **Human results, 2026-10-13, on the T23 build or later (commit `162d647`):** Nick completed the human steps and reported that all passed. Icon Composer previews of the raccoon look right in Default, Dark, Clear and Tinted. No changes were saved, so no rebuild was needed. The installed copy's Dock and Finder icon follows each icon style, with a dark background in Dark. The README's "password dialog has no custom icon yet" limitation (step 4) is left as is until Nick confirms which icon the dialog showed.
-- **Acceptance:** every criterion is met. `scripts/test.sh` passes 374 tests and `scripts/build.sh --release` succeeds for `x86_64 arm64` with the release flag check passing, re-run on `162d647`. Marked `DONE`.
+- **Human results, 2026-10-13, on the T23 build or later (commit `07b4c67`):** Nick completed the human steps and reported that all passed. Icon Composer previews of the raccoon look right in Default, Dark, Clear and Tinted. No changes were saved, so no rebuild was needed. The installed copy's Dock and Finder icon follows each icon style, with a dark background in Dark. The README's "password dialog has no custom icon yet" limitation (step 4) is left as is until Nick confirms which icon the dialog showed.
+- **Acceptance:** every criterion is met. `scripts/test.sh` passes 374 tests and `scripts/build.sh --release` succeeds for `x86_64 arm64` with the release flag check passing, re-run on `07b4c67`. Marked `DONE`.
 
 ---
 
@@ -995,8 +995,8 @@ Out of scope (Nick chose only these two changes): new wording or a separate titl
   4. Press Cancel, choose the same drive again and Continue…. The confirm screen should have no box and look as it did before T18.
 
   Then tell the agent the results. If they meet the acceptance criteria, the agent records them here and marks T18 `DONE`.
-- **Human results, 2026-10-13, on the T23 build or later (commit `162d647`):** Nick ran steps 1–4 and all passed. The callout catches the eye before the red title, reads well in Light and Dark, and wraps at the narrowest window width. After Cancel and choosing the drive again, the confirm screen has no callout.
-- **Acceptance:** every criterion is met. `scripts/test.sh` passes 374 tests and `scripts/build.sh --release` succeeds for `x86_64 arm64` with the release flag check passing, re-run on `162d647`. Marked `DONE`.
+- **Human results, 2026-10-13, on the T23 build or later (commit `07b4c67`):** Nick ran steps 1–4 and all passed. The callout catches the eye before the red title, reads well in Light and Dark, and wraps at the narrowest window width. After Cancel and choosing the drive again, the confirm screen has no callout.
+- **Acceptance:** every criterion is met. `scripts/test.sh` passes 374 tests and `scripts/build.sh --release` succeeds for `x86_64 arm64` with the release flag check passing, re-run on `07b4c67`. Marked `DONE`.
 
 ---
 
@@ -1049,7 +1049,7 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
   2. **Real USB stick (the Cruzer Glide), Release build.** Run `scripts/build.sh --release`, then `open build/RaccoonWriter.app`. Write any image to the stick, for example the Fedora ISO from H6, and let it verify. It should pass. **Copy the `fullSync used …` line.** The expected result is `DKIOCSYNCHRONIZE`. If it says `F_FULLFSYNC` or `fsync fallback`, also copy the `fullSync skipped …` lines, because they give the errno.
 
   Then tell the agent the results. If the stick used `DKIOCSYNCHRONIZE`, the agent records the results here and in `docs/HARDWARE_TESTS.md` and marks T19 `DONE`. If not, the agent updates the README to say what the app actually does and decides with Nick whether the older `DKIOCSYNCHRONIZECACHE` is worth trying.
-- **Human results, 2026-10-13, commit `169b386`:**
+- **Human results, 2026-10-13, commit `d1bd1bd`:**
   - **Step 1 (Debug, RAM disk):** write and verify passed, and the RAM disk was ejected. Log: `20:32:18.191924 … RaccoonWriter: (RaccoonWriter.debug.dylib) [com.example.raccoonwriter:device] fullSync used DKIOCSYNCHRONIZE`, with no `skipped` lines. So the RAM disk driver supports `DKIOCSYNCHRONIZE`, though it returned `ENOTTY` for `F_FULLFSYNC` in T01.
   - **Step 2 (Release, the Cruzer Glide):** `ram-test.img` written; write and verify passed, and the stick was ejected. Log: `20:35:54.857664 … RaccoonWriter: [com.example.raccoonwriter:device] fullSync used DKIOCSYNCHRONIZE`, with no `skipped` lines. The stick now gets a real cache flush before success is reported.
   - The verify passing is inferred from the eject: the coordinator ejects only after `Verifier` succeeds.
@@ -1113,8 +1113,8 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
   5. Optional, if a USB hard drive or SSD over 500 GB is to hand: `scripts/build.sh --release`, `open build/RaccoonWriter.app`, plug it in and check it is listed with "Large drive". **Don't press Erase and Write.**
 
   Then tell the agent the results. If they meet the acceptance criteria, the agent records them here and marks T20 `DONE`.
-- **Human results, 2026-10-13, commit `d77a66b`:** Nick reports that all steps, 1–5 including the optional real-drive check, were completed and passed. The simulated hard drive is listed by default with "Large drive" and the sticks aren't; the confirm screen warning reads well in Light and Dark and at the narrowest width, and is absent for the working stick; the T18 callout still sits above the title.
-- **Acceptance:** every criterion is met. `scripts/test.sh` passes 379 tests and `scripts/build.sh --release` succeeds for `x86_64 arm64` with the release flag check passing, re-run on `d77a66b`. Marked `DONE`.
+- **Human results, 2026-10-13, commit `4297b86`:** Nick reports that all steps, 1–5 including the optional real-drive check, were completed and passed. The simulated hard drive is listed by default with "Large drive" and the sticks aren't; the confirm screen warning reads well in Light and Dark and at the narrowest width, and is absent for the working stick; the T18 callout still sits above the title.
+- **Acceptance:** every criterion is met. `scripts/test.sh` passes 379 tests and `scripts/build.sh --release` succeeds for `x86_64 arm64` with the release flag check passing, re-run on `4297b86`. Marked `DONE`.
 
 ---
 
@@ -1251,7 +1251,7 @@ The fix is `DKIOCSYNCHRONIZE` from `<sys/disk.h>`, `_IOW('d', 22, dk_synchronize
 - `scripts/test.sh` (396 tests in Swift Testing's count), `scripts/build.sh` and `scripts/build.sh --release` pass. The only Release warning is the existing `PosixIO.swift:36` one.
 - `docs/HARDWARE_TESTS.md` is unchanged until Nick's results are in; record them there (H5 for step 2, H2 for step 4) and here.
 
-**Nick's results** (2026-10-13, commit `214f99c`):
+**Nick's results** (2026-10-13, commit `c2902e9`):
 - Step 1 PASS: the About window shows "Copyright © 2026 Nicholas Thorp."; the holder is correct.
 - Step 2 PASS on the Cruzer Glide (TESTSTICK). Nick is fine with "EFI" appearing among the names, so it stays. Not yet reported: whether the name stays on the row after `diskutil unmount /Volumes/TESTSTICK` and Refresh.
 - Step 3 PASS: full write and verify with the Hardened Runtime, Release build.
@@ -1474,11 +1474,11 @@ Also, `NSRemovableVolumesUsageDescription` (T22) says the access is for reading 
 - New `FailureRemedy` (title, instructions, optional command and note) and `FailureExplanation.remedies`, empty for every other failure. The message now ends "To fix this, do one of the following." and is followed by: (1) "Reset the permission in Terminal": run `tccutil reset SystemPolicyRemovableVolumes <AppInfo.bundleIdentifier>`, click Allow when macOS asks, try again, and quit and reopen if it doesn't ask; (2) "Or turn on Full Disk Access" in Privacy & Security › Full Disk Access, with the note that the app doesn't need full disk access, only removable drives, which Full Disk Access includes. The relaunch hints are there because neither fix has been tried yet without relaunching.
 - `FailureAction.openPrivacySettings` became `openFullDiskAccessSettings`. The button reads "Open Full Disk Access Settings…" and opens `…?Privacy_AllFiles` (`PrivacySettingsLink.fullDiskAccess`). New `App/RemedyView.swift` shows each fix, with the command in a selectable monospaced box.
 - Tests: the remedies and their order, no "Files & Folders" in either, remedies and the button only for this failure, and the jargon check now also covers remedy titles, instructions and notes. 404 tests pass. Rendered with `ImageRenderer` at 540 × 460 (the minimum window) in Light and Dark: everything fits above the buttons.
-- README troubleshooting and H16 updated: step 3 tries the Terminal reset, the new step 3b tries Full Disk Access, and each records whether a relaunch was needed.
+- README troubleshooting and H16 updated: step 3 tries the Terminal reset, the new step 3b (now step 4) tries Full Disk Access, and each records whether a relaunch was needed.
 
 **Layout revision, 2026-10-13 (Nick's review of the screen).** The text hierarchy was flat. Now the message sits in the T18 blue `NoticeCallout` (moved out of `ConfirmView.swift` into `App/NoticeCallout.swift`), but only when the failure has remedies, so every other failed screen is unchanged. Each remedy has a blue letter badge (A, B; `RemedyView.letter(for:)`) and a headline title. "Or turn on Full Disk Access" became "Turn on Full Disk Access", since the letters already mark the options. With the callout the content ran one line over at 540 × 460, so `OutcomeView` now puts the details in a `ScrollView` (`scrollBounceBehavior(.basedOnSize)`) in place of the `Spacer`. This is shared by the Done, Failed and Cancelled screens, and keeps the buttons visible in a short window. Checked with an `NSHostingView` render (`ImageRenderer` can't draw scroll views): at 580 × 500 everything fits; at 540 × 460 only "Stopped while…" scrolls below.
 
-**DONE, 2026-10-13, after Nick's H16 runs (commit `1845799`).** All five steps passed; details in `docs/HARDWARE_TESTS.md` H16. Simulate screen, callout, A/B fixes, minimum size and the Full Disk Access button checked; Release on the Cruzer Glide logged `authopen failure mapped to blockedByPrivacySettings` after Don't Allow. Fix A: the prompt returns after Try Again (not on the failed screen, since only the drive list refreshes discovery), then the write and verify pass, no relaunch. Fix B: Full Disk Access works without relaunching. The cancelled-dialog notice is unchanged. Every acceptance criterion is met, with Full Disk Access in place of Files & Folders as Nick decided (see above). Possible follow-up: the fix A text says to quit and reopen if macOS doesn't ask; "click Try Again" would be enough.
+**DONE, 2026-10-13, after Nick's H16 runs (commit `7d4461b`).** All five steps passed; details in `docs/HARDWARE_TESTS.md` H16. Simulate screen, callout, A/B fixes, minimum size and the Full Disk Access button checked; Release on the Cruzer Glide logged `authopen failure mapped to blockedByPrivacySettings` after Don't Allow. Fix A: the prompt returns after Try Again (not on the failed screen, since only the drive list refreshes discovery), then the write and verify pass, no relaunch. Fix B: Full Disk Access works without relaunching. The cancelled-dialog notice is unchanged. Every acceptance criterion is met, with Full Disk Access in place of Files & Folders as Nick decided (see above). Possible follow-up: the fix A text says to quit and reopen if macOS doesn't ask; "click Try Again" would be enough.
 
 ### T26 — 🧑 Refuse a drive that holds the image; open the image before the unmount
 
@@ -1519,9 +1519,9 @@ Significance is low to moderate (no data loss, a wrong message); likelihood is l
 - New previews: "Image on the drive" (`SetupView`, using `PreviewSamples.imageOnStick`).
 
 **Instructions for Nick:** run H17 in `docs/HARDWARE_TESTS.md` (steps 1 and 2, step 3 optional) and report: whether the stick showed "Holds this image" with Continue disabled, the stick's mount point as the message showed it, and what the failed screen said in step 2.
-- **H17 step 1, 2026-10-14 (Nick, Release, `3917068`): PASS.** "Holds this image" on the stick's row, the message with its `/Volumes/…` path, Continue disabled, both kept across the toggle, and all cleared by choosing an image on the Mac. A real stick's `diskutil` mount point matches `fstatfs`.
+- **H17 step 1, 2026-10-14 (Nick, Release, `80b4bbb`): PASS.** "Holds this image" on the stick's row, the message with its `/Volumes/…` path, Continue disabled, both kept across the toggle, and all cleared by choosing an image on the Mac. A real stick's `diskutil` mount point matches `fstatfs`.
 - **H17 step 2, 2026-10-14 (Nick, Debug, Simulate): PASS.** The image deleted on the confirm screen gave "The image file couldn’t be read" and "Nothing was written to the drive.", not "may be partially written". Optional step 3 (APFS) not run.
-- **DONE, 2026-10-14 (Claude).** Every agent step and both required human steps are complete, and every acceptance criterion is met. `scripts/test.sh` (437 tests) passes, and `scripts/build.sh` and `scripts/build.sh --release` passed at `3917068`, which contains this task's code.
+- **DONE, 2026-10-14 (Claude).** Every agent step and both required human steps are complete, and every acceptance criterion is met. `scripts/test.sh` (437 tests) passes, and `scripts/build.sh` and `scripts/build.sh --release` passed at `80b4bbb`, which contains this task's code.
 
 ---
 
@@ -1566,7 +1566,7 @@ Significance is low (no data loss, a confusing state); likelihood is moderate fo
 
 **Instructions for Nick:** run H18 in `docs/HARDWARE_TESTS.md` (steps 1–3) and report: whether `TESTSTICK` was back in Finder on the failed screen without replugging, and the `Remounted …` or `Remount of … failed` log line.
 - **H18, 2026-10-14 (Nick, Release): PASS.** After the privacy denial, the volume was back in Finder without replugging, its file opened, and the drive list showed its volume name after Try Again. The stored log (read by the agent) shows `Remounted disk7 after a run that stopped before writing` about 0.4 s after authopen's "Operation not permitted", then `Run failed in open: …`. First real `diskutil mountDisk` from the app. Restoring the permission (H18 step 3) wasn't reported back; it doesn't affect the result.
-- **DONE, 2026-10-14 (Claude).** Every agent step and the test steps of H18 are complete, and every acceptance criterion is met. Tests (437) and both builds passed at `3917068`, which contains this task's code.
+- **DONE, 2026-10-14 (Claude).** Every agent step and the test steps of H18 are complete, and every acceptance criterion is met. Tests (437) and both builds passed at `80b4bbb`, which contains this task's code.
 
 ---
 
@@ -1664,9 +1664,9 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 - **Docs.** README: safety bullet names the exception and its four conditions; the "not listed" limitation is replaced by "Some built-in card readers are not listed" (other buses stay hidden) and "Cards in the built-in slot all have the same name" (the card-swap note). Section 5 "Wrong disk written" row. `docs/HARDWARE_TESTS.md`: H3 expected results mention the card, recorded notes untouched; H19 written; H19 row in the summary table.
 - **Builds.** `scripts/test.sh`, `scripts/build.sh` and `scripts/build.sh --release` pass; `build/RaccoonWriter.app` is the Release build.
 - **For Nick:** run H19 in `docs/HARDWARE_TESTS.md` on the Release build, with an SD card you don't need in the MacBook Pro's built-in slot. Steps 1–2 are required: the card listed with the toggle off (SD card symbol, "Secure Digital", size) and the internal disk absent in both toggle positions, then a Raspberry Pi OS `.img` or the H7 FreeBSD `.img` written and verified with one password dialog. Report any Removable Volumes prompt and the `fullSync used …` log line. Steps 3 (boot) and 4 (a USB card reader's `diskutil` keys) are optional.
-- **H19, 2026-10-14 (Nick, Release, `3917068`):** the card wrote successfully, and the log showed `fullSync used DKIOCSYNCHRONIZE`. Details in `docs/HARDWARE_TESTS.md` H19.
+- **H19, 2026-10-14 (Nick, Release, `80b4bbb`):** the card wrote successfully, and the log showed `fullSync used DKIOCSYNCHRONIZE`. Details in `docs/HARDWARE_TESTS.md` H19.
 - **H19 follow-up, 2026-10-14 (Nick, Release): PASS.** Step 1: the card was listed with the toggle off, with the `sdcard` symbol, "Secure Digital" and its size; the internal disk and boot container were hidden in both toggle positions. The write had one password dialog, no Removable Volumes prompt (already allowed since H16), and ended with "Finished. You can remove the drive." and the card ejected. Optional steps 3 (boot) and 4 (USB reader capture) not run, so `info-disk9` stays a guess.
-- **DONE, 2026-10-14 (Claude).** Every agent step and both required human steps are complete, and every acceptance criterion is met. Tests (437) and both builds passed at `3917068`.
+- **DONE, 2026-10-14 (Claude).** Every agent step and both required human steps are complete, and every acceptance criterion is met. Tests (437) and both builds passed at `80b4bbb`.
 - **Later, 2026-10-14 (T12's H14):** the guessed `info-disk9` was replaced by a real capture of an SD card in a USB reader (BusProtocol `USB`, Internal `false`, MediaName `MassStorageClass`). The guess's filter-relevant keys were right, so no test expectation changed.
 
 ---
@@ -1757,3 +1757,5 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 | 2026-10-14 | Privileged helper (`HelperOpener`, SMAppService) removed from future work at Nick's request | Claude |
 | 2026-11-01 | Bundle ID and log subsystem changed from the placeholder `com.example.raccoonwriter` to `com.raccoonwriter.app` before the public release | Claude |
 | 2026-11-01 | Repo and local folder renamed from `iso-sword` to `raccoon-writer`; title, section 1, repo layout and future work updated. Old names removed from README, AGENTS.md and `docs/HARDWARE_TESTS.md` (test image folder is now `~/raccoon-writer-test/`) | Claude |
+| 2026-11-02 | Pre-release cleanup: commit hashes in this file and `docs/HARDWARE_TESTS.md` mapped to the rewritten history (`git filter-repo`, 2026-11-01); build needs Xcode 26 (Icon Composer icon) in README and `AGENTS.md`; `AGENTS.md` covers new work once every task is `DONE`; SMAppService helper row in section 1 updated; H16 steps renumbered 1–5; README screenshots in `docs/screenshots/` | Claude |
+| 2026-11-02 | README license section: copyright line for the source code, license stated as GPL-3.0-or-later with the no-warranty note; the copyright claim and usage terms for the raccoon icon removed at Nick's request | Claude |
