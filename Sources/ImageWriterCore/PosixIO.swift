@@ -33,7 +33,9 @@ enum PosixIO {
     }
 
     static func ioctlStatus<Argument>(_ fd: Int32, _ request: UInt, _ argument: inout Argument) -> Int32 {
-        ioctl(fd, request, &argument) == -1 ? errno : 0
+        // An explicit pointer: passing `&argument` straight to `ioctl` converts a generic to a
+        // raw pointer implicitly, which the compiler warns about in case it holds references.
+        withUnsafeMutablePointer(to: &argument) { ioctl(fd, request, $0) } == -1 ? errno : 0
     }
 
     static func fsyncStatus(_ fd: Int32) -> Int32 {
