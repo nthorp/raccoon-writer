@@ -42,13 +42,13 @@
 | Verification | Always on (no toggle) |
 | Drive filter | Default: external, USB-attached physical disks that report removable or ejectable (sticks and card readers, but also most USB hard drives and SSDs). Drives over 500 GB get a "Large drive" warning in the list and on the confirm screen (T20), which never blocks the write. Toggle "Show all external disks". The boot disk and internal disks are **never** shown, except a built-in SD card reader (`Secure Digital`, removable media, physical, whole disk), which appears in the default list (Nick's decision 2026-10-14, implemented in T29; rule in `AGENTS.md`). |
 | Confirmation | Show drive name, size, mount points; explicit "Erase and Write" click |
-| Distribution | Personal / open source now. App Sandbox **off**. No Mac App Store. Signing and notarization deferred. |
+| Distribution | Open source. App Sandbox **off**. No Mac App Store. Since T30 (2026-11-03): Developer ID signed (Northwoods Digital LLC, team `VGLYJ29DX8`), notarized and stapled DMG on GitHub Releases, linked from raccoonwriter.com, made locally by `scripts/release.sh` and `scripts/publish-release.sh` (no CI). Version 1.0.0 is the first release |
 | Features | Minimal v1: no drag-and-drop, no SHA-256 display, no localization |
 | Agent files | `AGENTS.md` is the source of truth; `CLAUDE.md` imports it |
 
 ### Non-goals (v1)
 
-Windows ISOs or any file-extraction mode, compressed images (`.xz`, `.gz`, `.zip`), persistence partitions, multi-drive writes, Mac App Store, Developer ID signing and notarization, localization.
+Windows ISOs or any file-extraction mode, compressed images (`.xz`, `.gz`, `.zip`), persistence partitions, multi-drive writes, Mac App Store, localization.
 
 ### Runtime flow (target behavior)
 
@@ -93,9 +93,13 @@ raccoon-writer/
 ├── Spikes/                   # throwaway experiments (T01)
 ├── scripts/
 │   ├── build.sh              # xcodegen + xcodebuild (universal)
-│   └── test.sh               # swift test
+│   ├── test.sh               # swift test
+│   ├── release.sh            # sign, notarize, staple, DMG (T30)
+│   └── publish-release.sh    # tag + draft GitHub release (T30)
 └── docs/
-    └── HARDWARE_TESTS.md     # human checklist (T12)
+    ├── HARDWARE_TESTS.md     # human checklist (T12)
+    ├── RELEASING.md          # release setup and checklist (T30)
+    └── release-notes/        # one file per release (T30)
 ```
 
 ---
@@ -136,6 +140,8 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T27 | 🧑 Remount the drive when a run stops before writing | T26 | DONE | 2026-10-14 | Claude (prep) / Nick (run) |
 | T28 | Explain a `.dmg` picked in the open panel | T04 | DONE | 2026-10-14 | Claude |
 | T29 | 🧑 List built-in SD card readers in the default drive list | T25 | DONE | 2026-10-14 | Claude (prep) / Nick (run) |
+| T30 | Release scripts: Developer ID signing, notarization, stapling, DMG, draft GitHub release | T29 | DONE | 2026-11-03 | Claude |
+| T31 | 🧑 First signed release (1.0.0): credentials, signed run, download check, publish | T30 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T25 builds on T22's committed prep but not on Nick's T22 runs, so it may start while T22 is `NEEDS_HUMAN`. T27 builds on T26's committed prep but not on Nick's H17 runs, so it may start while T26 is `NEEDS_HUMAN`. T28 only changes `ImageInspector`, so it may start while T26 and T27 are `NEEDS_HUMAN`. T29 builds on T26's and T27's committed prep but not on Nick's H17 and H18 runs, so it may start while they are `NEEDS_HUMAN`. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -1671,11 +1677,72 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 
 ---
 
+### T30 — Release scripts: Developer ID signing, notarization, stapling, DMG, draft GitHub release
+
+**Goal:** make a downloadable release that Gatekeeper accepts. Today the app is ad-hoc signed, so a downloaded copy is blocked (README "Not signed or notarized"). The Hardened Runtime is already on (T22) and `scripts/build.sh` enforces it, so what's left is a Developer ID signature with a secure timestamp, notarization, stapling, a DMG and a GitHub release.
+
+**Decisions (Nick, 2026-11-03):** version **1.0.0**; publish on **GitHub Releases** (`nthorp/raccoon-writer`) and link from **raccoonwriter.com**; run **locally** with scripts (no CI, no secrets on GitHub).
+
+**Finding (2026-11-03):** this Mac has no usable signing identity (`security find-identity -v -p codesigning` → 0). The keychain holds only a *Developer ID Installer* certificate (Northwoods Digital LLC, `VGLYJ29DX8`), without its private key. That type signs `.pkg` files only; T31 step 1 creates a *Developer ID Application* certificate.
+
+**Out of scope:** CI releases; Sparkle or any in-app update check; a `.pkg` installer; a styled DMG window (background image, icon positions); renaming the bundle to `Raccoon Writer.app`.
+
+**Agent steps**
+1. `project.yml`: `MARKETING_VERSION` 1.0.0, `CURRENT_PROJECT_VERSION` stays 1.
+2. `scripts/release.sh [--skip-notarize]`, failing closed at every step: preflight (tools, clean tree, new tag); identity (`RACCOONWRITER_SIGN_IDENTITY` or the only Developer ID Application identity; ad-hoc with `--skip-notarize`) and notary profile (`RACCOONWRITER_NOTARY_PROFILE`, default `raccoon-writer-notary`, checked with `notarytool history` before the build); `scripts/test.sh` and `scripts/build.sh --release`; re-sign with `--options runtime --timestamp` and the entitlements file; check the Developer ID authority, runtime flag, timestamp, no `get-task-allow`, version; notarize (zip) and staple the app; DMG (`hdiutil create`, app + `Applications` link), signed; notarize and staple the DMG; mount it read-only and check the app (signature, architectures, release flags, staple, `spctl` `source=Notarized Developer ID` for app and DMG); SHA-256, zipped dSYM, the commit hash.
+3. `scripts/publish-release.sh <version>`: checks the DMG (SHA-256, staple, `spctl`), a clean tree on `main`, `HEAD` equal to the DMG's commit and to `origin/main`, the tag new locally, on origin and on GitHub; then an annotated tag, push, and `gh release create --draft --verify-tag` with the notes file and three assets.
+4. Docs: `docs/RELEASING.md` (setup, checklist, troubleshooting), `docs/release-notes/v1.0.0.md`, README (Download section, build note, TCC note, limitation, roadmap, layout), `AGENTS.md` Commands, this file (section 1, non-goals, layout, future work).
+5. `scripts/test.sh` passes; `bash -n` on both scripts; `scripts/release.sh --skip-notarize` end to end; failure paths (no identity, unknown identity, dirty tree, existing tag, missing artifacts, wrong version).
+
+**Acceptance criteria**
+- `scripts/release.sh --skip-notarize` produces a DMG holding a universal, Hardened Runtime, release-flag-clean `RaccoonWriter.app` 1.0.0 and an `Applications` link.
+- A signed run refuses to start without a Developer ID Application identity, a working notary profile, a clean tree or a new tag, and fails unless Apple accepts both submissions and `spctl` reports them notarized (T31 confirms the signed path).
+- `publish-release.sh` creates only a draft, and only for a notarized DMG built from the pushed `HEAD`.
+- `scripts/test.sh` passes.
+
+**Files:** `project.yml`, `scripts/release.sh`, `scripts/publish-release.sh`, `docs/RELEASING.md`, `docs/release-notes/v1.0.0.md`, `README.md`, `AGENTS.md`, `PLAN.md`
+
+**Handoff notes:**
+
+**Done, 2026-11-03 (Claude).** `scripts/test.sh` passes 437 tests. `scripts/release.sh --skip-notarize` ran end to end: `build/release-adhoc/RaccoonWriter-1.0.0-adhoc.dmg` (3.8 MB) holds the app (x86_64 + arm64, `flags=0x10002(adhoc,runtime)`, no `get-task-allow`, version 1.0.0 build 1, release flags clean) and the `Applications` link, and was detached afterwards. Nothing touched a disk: `hdiutil` created and mounted only the image file.
+- **Not tested:** the signed path (identity, `notarytool`, `stapler`, `spctl`) needs Nick's certificate and credentials; T31 runs it. `plutil -extract … raw` was checked against notarytool-style JSON, and non-JSON output (an auth error) makes it fail, which the script reports.
+- **Failure paths checked:** dirty tree (signed mode), unknown argument, no Developer ID Application identity (the message points out that the Installer certificate can't sign apps), an unknown `RACCOONWRITER_SIGN_IDENTITY`, an existing tag (in a scratch clone), and in `publish-release.sh` missing artifacts and a version that doesn't match `project.yml`.
+- **Deviations from the plan.** `--skip-notarize` only warns about a dirty tree, so the pipeline can be tested before committing; a signed run still refuses. Ad-hoc output goes to `build/release-adhoc/` with an `-adhoc` DMG name, so a dry run can't overwrite or be mistaken for a signed release, and `publish-release.sh` never sees it. `release.sh` writes `build/release/commit`, and `publish-release.sh` refuses unless it equals `HEAD`, so the tag always points at the commit the DMG came from. The script refuses nested code (frameworks, dylibs, helpers), since it signs without `--deep`.
+- **Names.** The bundle stays `RaccoonWriter.app`, so Finder shows "RaccoonWriter" in Applications (`CFBundleDisplayName` is used only for a localized name). Renaming it to `Raccoon Writer.app` in the DMG wouldn't break the signature; left for Nick to decide.
+- **Copyright vs. team.** `Info.plist` says "Copyright © 2026 Nicholas Thorp." and the signing team is Northwoods Digital LLC. Both are allowed; change the copyright before T31 step 2 if they should match.
+
+---
+
+### T31 — 🧑 First signed release (1.0.0)
+
+**Goal:** run T30's scripts with real credentials, check the download as a user gets it, and publish 1.0.0.
+
+**Human steps (Nick):** follow `docs/RELEASING.md`.
+1. **Setup step 1:** create a *Developer ID Application* certificate in Xcode (Settings › Accounts › Northwoods Digital LLC › Manage Certificates › + › Developer ID Application; Account Holder only). `security find-identity -v -p codesigning` then lists `Developer ID Application: Northwoods Digital LLC (VGLYJ29DX8)`. Export a `.p12` backup.
+2. **Setup step 2:** app-specific password, then `xcrun notarytool store-credentials raccoon-writer-notary --apple-id <Apple ID> --team-id VGLYJ29DX8`.
+3. `git push` so `origin/main` has the T30 commit, then run `scripts/release.sh`. Paste the final summary (SHA-256, both notarization IDs) and both `spctl` lines.
+4. `scripts/publish-release.sh 1.0.0`. Paste the draft URL.
+5. **Download check** (`docs/RELEASING.md` "Each release" step 6): download the DMG from the draft in Safari, check the SHA-256, drag to Applications, launch. Report every prompt shown. About shows 1.0.0. One write and verify on the Cruzer Glide; note whether the Removable Volumes prompt appears.
+6. Publish the draft. Point raccoonwriter.com's download link at `https://github.com/nthorp/raccoon-writer/releases/latest`.
+
+**Acceptance criteria**
+- Apple accepts both submissions, and `spctl` reports `source=Notarized Developer ID` for the app and the DMG.
+- A Safari download opens with only the "downloaded from the Internet" prompt, shows 1.0.0, and writes and verifies a stick.
+- The v1.0.0 release is published with the DMG, `.sha256` and dSYM zip, and raccoonwriter.com links to it.
+
+**Files:** `PLAN.md` (results), plus `scripts/` or `docs/` if a problem turns up
+
+**Handoff notes:**
+
+- **Prep, 2026-11-03 (Claude).** Scripts and docs from T30 are ready; NEEDS_HUMAN for steps 1–6.
+
+---
+
 ## 4. Future work (not in scope)
 
 - ~~Rename the GitHub repo and local folder from `iso-sword` to match the app~~: done 2026-11-01 (`raccoon-writer`).
 - ~~`authopen -extauth` for a dialog naming ISO Sword~~: implemented in T13.
-- Developer ID signing, notarization, DMG packaging.
+- ~~Developer ID signing, notarization, DMG packaging~~: T30 and T31.
 - Compressed image support, SHA-256 display, drag-and-drop, localization.
 
 ## 5. Open risks
@@ -1761,3 +1828,5 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 | 2026-11-02 | README license section: copyright line for the source code, license stated as GPL-3.0-or-later with the no-warranty note; the copyright claim and usage terms for the raccoon icon removed at Nick's request | Claude |
 | 2026-11-02 | `PosixIO.ioctlStatus` passes an explicit pointer from `withUnsafeMutablePointer`, which removes the build's one Swift warning (implicit generic-to-raw-pointer conversion). No behavior change; 437 tests pass | Claude |
 | 2026-11-02 | `.gitignore` ignores `.claude/settings.local.json`, so contributors' per-user agent settings aren't committed; it was ignored only by a global git config before | Claude |
+| 2026-11-03 | T30 and T31 added at Nick's request: a Developer ID signed, notarized 1.0.0 DMG on GitHub Releases, linked from raccoonwriter.com, made by local scripts. Found that the keychain has only a Developer ID Installer certificate (no key), which can't sign apps | Claude |
+| 2026-11-03 | T30 DONE: `scripts/release.sh` (sign, notarize and staple app and DMG; `--skip-notarize` dry run), `scripts/publish-release.sh` (tag, draft release), `docs/RELEASING.md`, 1.0.0 release notes, version 1.0.0, README Download section; section 1 Distribution row updated. T31 NEEDS_HUMAN | Claude |

@@ -8,6 +8,12 @@
 
 > **Status:** v1 is feature-complete, covered by unit tests, and has passed the hardware checklist in [`docs/HARDWARE_TESTS.md`](docs/HARDWARE_TESTS.md) on an Apple Silicon Mac, writing to a SanDisk Cruzer Glide USB stick and an SD card in the built-in slot. A Fedora Live ISO and a FreeBSD `.img` were written, verified, and booted on another machine. The one test not run is the Intel Mac run (H13): the only Intel Mac available runs macOS 13, and the app needs macOS 14, so the Intel half of the universal binary is untested. See [`PLAN.md`](PLAN.md) for the full history.
 
+## Download
+
+Download `RaccoonWriter-<version>.dmg` from the [latest release](https://github.com/nthorp/raccoon-writer/releases/latest), open it, and drag Raccoon Writer to Applications. It needs macOS 14 or later, on Apple Silicon or Intel.
+
+The app is signed with a Developer ID (Northwoods Digital LLC) and notarized by Apple, so it opens without Gatekeeper warnings. To check the download, compare `shasum -a 256 RaccoonWriter-<version>.dmg` with the `.sha256` file on the release page.
+
 ## Safety: what the app erases
 
 **Writing an image erases the entire target drive**: every partition and every volume on it, not just one volume. The data cannot be recovered.
@@ -43,7 +49,7 @@ open build/RaccoonWriter.app
 - `scripts/build.sh` generates `RaccoonWriter.xcodeproj` and builds a universal Debug `build/RaccoonWriter.app`.
 - `scripts/build.sh --release` builds Release, then checks that no debug-only test switches are in it.
 
-The Xcode project is generated from `project.yml` and is not checked in. The app is ad-hoc signed only (see Limitations).
+The Xcode project is generated from `project.yml` and is not checked in. A build from source is ad-hoc signed. Release downloads are made with `scripts/release.sh` (Developer ID signature, notarization, DMG) and `scripts/publish-release.sh`; see [`docs/RELEASING.md`](docs/RELEASING.md).
 
 ### Debug-only test modes
 
@@ -91,7 +97,7 @@ The failed screen lists two fixes, A and B:
 
 Files & Folders usually has no Removable Volumes switch for Raccoon Writer. macOS adds a denied Full Disk Access entry for the app by itself, and Files & Folders then shows only "Full Disk Access" under the app's name, even though that access is off.
 
-If you build from source: macOS treats each ad-hoc-signed rebuild as a new app (the log shows tccd "Failed to match existing code requirement"), so the prompt can come back after rebuilding.
+If you build from source: macOS treats each ad-hoc-signed rebuild as a new app (the log shows tccd "Failed to match existing code requirement"), so the prompt can come back after rebuilding. The signed download keeps the same identity across updates, so your answer carries over.
 
 ## Known limitations
 
@@ -107,13 +113,12 @@ If you build from source: macOS treats each ad-hoc-signed rebuild as a new app (
 - **A password prompt on every write.** The app discards the authorization as soon as the disk is open, so the next write asks again.
 - **Two identical drives look the same.** The checks compare size, name, block size and bus. If you swap in an identical drive while the password dialog is open, that drive is written. Don't swap drives during a write.
 - **The password dialog has no custom icon yet.** macOS also adds its own headline above the app's message, which can't be removed.
-- **Not signed or notarized.** Build from source. A copy downloaded or AirDropped from elsewhere is blocked by Gatekeeper until you remove the quarantine flag (`xattr -dr com.apple.quarantine RaccoonWriter.app`). The Hardened Runtime is already on, so notarization only needs a Developer ID signature.
+- **Builds from source aren't notarized.** The release downloads are. An ad-hoc build copied or AirDropped to another Mac is blocked by Gatekeeper until you remove the quarantine flag (`xattr -dr com.apple.quarantine RaccoonWriter.app`).
 - English only. No drag-and-drop and no checksum display.
 
 ## Roadmap
 
-- **Developer ID signing, notarization** and a DMG download.
-- Later: compressed images, SHA-256 display, drag-and-drop, localization.
+- Compressed images, SHA-256 display, drag-and-drop, localization.
 
 ## Layout
 
@@ -121,9 +126,10 @@ If you build from source: macOS treats each ad-hoc-signed rebuild as a new app (
 - `App/`: thin SwiftUI app target
 - `Tests/ImageWriterCoreTests/`: unit tests (Swift Testing) and fixtures. No test touches a real disk.
 - `docs/HARDWARE_TESTS.md`: the manual checklist for real hardware
+- `docs/RELEASING.md`, `docs/release-notes/`: how a signed release is made, and each release's notes
 - `docs/screenshots/`: the screenshots in this README
 - `Spikes/`: throwaway experiments (the `authopen` spike)
-- `scripts/`: build, test and release-check entry points
+- `scripts/`: build, test, release-check, release and publish entry points
 - `PLAN.md`, `AGENTS.md`: the implementation plan and the rules for coding agents working on this repo
 
 ## License

@@ -30,6 +30,7 @@ Native macOS app (Swift/SwiftUI) that writes `.iso` / `.img` images to USB drive
 
 - `scripts/test.sh` — run unit tests (`swift test`). Must pass before marking any task `DONE`.
 - `scripts/build.sh` — generate the project with XcodeGen and build the universal Debug app. `--release` builds Release and runs the release-flag check.
+- `scripts/release.sh` — Developer ID sign, notarize and staple the app and a DMG into `build/release/`. `scripts/publish-release.sh <version>` tags it and creates a draft GitHub release. See `docs/RELEASING.md`. Agents run only `scripts/release.sh --skip-notarize` (ad-hoc, no credentials, `build/release-adhoc/`). A signed run and `publish-release.sh` use Nick's credentials and publish publicly, so they run only when Nick asks.
 - Requires: Xcode 26+ (the Icon Composer app icon, `App/AppIcon.icon`, needs it), `brew install xcodegen`.
 - Tests use Swift Testing (`import Testing`), not XCTest, so they run with only the Command Line Tools installed. This needs Xcode 16+ or the matching CLT.
 
