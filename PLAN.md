@@ -42,7 +42,7 @@
 | Verification | Always on (no toggle) |
 | Drive filter | Default: external, USB-attached physical disks that report removable or ejectable (sticks and card readers, but also most USB hard drives and SSDs). Drives over 500 GB get a "Large drive" warning in the list and on the confirm screen (T20), which never blocks the write. Toggle "Show all external disks". The boot disk and internal disks are **never** shown, except a built-in SD card reader (`Secure Digital`, removable media, physical, whole disk), which appears in the default list (Nick's decision 2026-10-14, implemented in T29; rule in `AGENTS.md`). |
 | Confirmation | Show drive name, size, mount points; explicit "Erase and Write" click |
-| Distribution | Open source. App Sandbox **off**. No Mac App Store. Since T30 (2026-11-03): Developer ID signed (Northwoods Digital LLC, team `VGLYJ29DX8`), notarized and stapled DMG on GitHub Releases, linked from raccoonwriter.com, made locally by `scripts/release.sh` and `scripts/publish-release.sh` (no CI). Version 1.0.0 is the first release |
+| Distribution | Open source. App Sandbox **off**. No Mac App Store. Since T30 (2026-11-03): Developer ID signed (Northwoods Digital LLC, team `VGLYJ29DX8`), notarized and stapled DMG on GitHub Releases, linked from raccoonwriter.com once the repo is public (it is private for now, so releases are visible only to collaborators), made locally by `scripts/release.sh` and `scripts/publish-release.sh` (no CI). Version 1.0.0 is the first release |
 | Features | Minimal v1: no drag-and-drop, no SHA-256 display, no localization |
 | Agent files | `AGENTS.md` is the source of truth; `CLAUDE.md` imports it |
 
@@ -141,7 +141,7 @@ Update this table whenever a task changes state. Keep it in sync with the task s
 | T28 | Explain a `.dmg` picked in the open panel | T04 | DONE | 2026-10-14 | Claude |
 | T29 | 🧑 List built-in SD card readers in the default drive list | T25 | DONE | 2026-10-14 | Claude (prep) / Nick (run) |
 | T30 | Release scripts: Developer ID signing, notarization, stapling, DMG, draft GitHub release | T29 | DONE | 2026-11-03 | Claude |
-| T31 | 🧑 First signed release (1.0.0): credentials, signed run, download check, publish | T30 | NEEDS_HUMAN | | Claude (prep) / Nick (run) |
+| T31 | 🧑 First signed release (1.0.0): credentials, signed run, download check, publish | T30 | DONE | 2026-11-04 | Claude (prep) / Nick (run) |
 
 Tasks are written so they can be done in ID order, except that T23 is listed above T19 so it is done first, and T24 is listed above T22 so it is done next. T25 builds on T22's committed prep but not on Nick's T22 runs, so it may start while T22 is `NEEDS_HUMAN`. T27 builds on T26's committed prep but not on Nick's H17 runs, so it may start while T26 is `NEEDS_HUMAN`. T28 only changes `ImageInspector`, so it may start while T26 and T27 are `NEEDS_HUMAN`. T29 builds on T26's and T27's committed prep but not on Nick's H17 and H18 runs, so it may start while they are `NEEDS_HUMAN`. T03 and T04 do not depend on the spike, so if T01 is waiting on Nick, an agent may proceed with T03 and T04, then T07. Do not start T05 until T02 is `DONE`.
 
@@ -1727,7 +1727,7 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 **Acceptance criteria**
 - Apple accepts both submissions, and `spctl` reports `source=Notarized Developer ID` for the app and the DMG.
 - A Safari download opens with only the "downloaded from the Internet" prompt, shows 1.0.0, and writes and verifies a stick.
-- The v1.0.0 release is published with the DMG, `.sha256` and dSYM zip, and raccoonwriter.com links to it.
+- The v1.0.0 release is published with the DMG, `.sha256` and dSYM zip, and raccoonwriter.com links to it. (Amended 2026-11-04, Nick: the repo stays private for now, so the release is published privately and the website link waits until the repo goes public.)
 
 **Files:** `PLAN.md` (results), plus `scripts/` or `docs/` if a problem turns up
 
@@ -1736,6 +1736,10 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 - **Prep, 2026-11-03 (Claude).** Scripts and docs from T30 are ready; NEEDS_HUMAN for steps 1–6.
 - **Setup, 2026-11-04 (Nick).** Steps 1–2 done. The new certificate wasn't a valid identity until Apple's Developer ID G2 intermediate (`DeveloperIDG2CA.cer`) was added to the login keychain; Xcode hadn't installed it. `docs/RELEASING.md` troubleshooting covers it.
 - **First signed run, 2026-11-04 (Nick, `a5d1d9f`).** `scripts/release.sh`: both submissions `Accepted` (app `69b9b913-16a6-4058-a1f5-22c590a01a45`), DMG stapled, `spctl` `source=Notarized Developer ID`. `publish-release.sh` pushed `v1.0.0` and created the draft. Then Nick asked for the app to ship as `Raccoon Writer.app`, so the draft and the `v1.0.0` tag (local and origin) were deleted, unpublished, and 1.0.0 is rebuilt with the rename.
+- **Second signed run, 2026-11-04 (Claude, at Nick's request, `0aa07ca`).** Both submissions `Accepted`: app `b6bb270c-1c96-45e3-8f85-35cfc10a051c`, DMG `095afa53-46ef-4e65-a3c2-bb6c4e4a7873`. `spctl`: `source=Notarized Developer ID` for `Raccoon Writer.app` inside the DMG and for the DMG. DMG SHA-256 `1fea1caac734719ae97896dbd56f632a2f2cf4efda5b5797ed810a80301c021d`. `publish-release.sh` tagged `v1.0.0` at `0aa07ca` and created the draft.
+- **Download check, 2026-11-04 (Nick): PASS** (step 5).
+- **Published, 2026-11-04.** The repo `nthorp/raccoon-writer` is private, and Nick wants it to stay private for now. A published release in a private repo is visible only to collaborators, so `releases/latest` 404s for everyone else. At Nick's decision the release was published privately (`gh release edit v1.0.0 --draft=false --latest`), and the repo is still private. **Deferred:** step 6's raccoonwriter.com link, and the README Download section reaching the public, both wait until the repo is made public. No rebuild is needed then: the published 1.0.0 assets become downloadable as they are.
+- **DONE, 2026-11-04 (Claude).** Steps 1–5 are complete. Step 6 is done except the website link, which Nick deferred until the repo is public (acceptance criterion amended).
 
 ---
 
@@ -1832,3 +1836,4 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 | 2026-11-03 | T30 and T31 added at Nick's request: a Developer ID signed, notarized 1.0.0 DMG on GitHub Releases, linked from raccoonwriter.com, made by local scripts. Found that the keychain has only a Developer ID Installer certificate (no key), which can't sign apps | Claude |
 | 2026-11-03 | T30 DONE: `scripts/release.sh` (sign, notarize and staple app and DMG; `--skip-notarize` dry run), `scripts/publish-release.sh` (tag, draft release), `docs/RELEASING.md`, 1.0.0 release notes, version 1.0.0, README Download section; section 1 Distribution row updated. T31 NEEDS_HUMAN | Claude |
 | 2026-11-04 | The DMG ships the app as `Raccoon Writer.app` (with a space) at Nick's request; only the DMG copy is renamed, the build output and bundle ID are unchanged. Copyright stays "Nicholas Thorp" | Claude |
+| 2026-11-04 | T31 DONE: 1.0.0 rebuilt with `Raccoon Writer.app`, both notarizations accepted, Nick's download check passed, release `v1.0.0` published in the still-private repo. The raccoonwriter.com link waits until the repo is public | Claude |
