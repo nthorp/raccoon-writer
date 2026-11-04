@@ -37,12 +37,14 @@ Neither script touches a disk: `hdiutil` only creates and mounts an image file. 
 4. **Build:** `scripts/release.sh`. It takes a few minutes per notarization round, and there are two (app, then DMG). It stops at the first problem. On success it prints the DMG path, its SHA-256 and both notarization IDs, and the app and the DMG have each passed `spctl` as `source=Notarized Developer ID`.
 5. **Draft release:** `scripts/publish-release.sh <version>`. It checks the DMG again, checks that the DMG was built from `HEAD`, then tags `v<version>`, pushes the tag and creates the draft.
 6. **Check the download.** On the draft release page, download the DMG **in Safari**, so it gets the quarantine flag like a user's download. Then:
-   - `shasum -a 256 ~/Downloads/RaccoonWriter-<version>.dmg` matches the `.sha256` file.
+   - `shasum -a 256 ~/Downloads/RaccoonWriter.dmg` matches the `.sha256` file.
    - Open the DMG and drag Raccoon Writer to Applications. Launch it from Applications. The only prompt is macOS's "downloaded from the Internet" one, with no "cannot be verified" or "damaged" warning.
    - Raccoon Writer › About shows the new version.
    - Write and verify one image to a USB stick whose contents you don't need (as in `docs/HARDWARE_TESTS.md`).
 7. **Publish** the draft on GitHub.
-8. **Website.** raccoonwriter.com's download link points at `https://github.com/nthorp/raccoon-writer/releases/latest`, so it needs no change per release. Update any version number shown on the site.
+8. **Website.** raccoonwriter.com's Download button points at `https://github.com/nthorp/raccoon-writer/releases/latest/download/RaccoonWriter.dmg`, so it needs no change per release. Update any version number shown on the site.
+
+The DMG is always named `RaccoonWriter.dmg`, with the version only in the release title and the dSYM name. That fixed name is what makes the `releases/latest/download/` link work, so don't rename it. GitHub serves `latest` from the newest published release that isn't a draft or a prerelease. While the repo is private, the link works only for people with access to it.
 
 ## Troubleshooting
 

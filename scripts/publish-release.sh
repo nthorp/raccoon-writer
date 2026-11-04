@@ -22,7 +22,8 @@ project_version="$(sed -nE 's/^[[:space:]]*MARKETING_VERSION:[[:space:]]*"?([^"[
     || die "project.yml says MARKETING_VERSION $project_version, not $version"
 
 out=build/release
-dmg="$out/RaccoonWriter-$version.dmg"
+# A fixed name for releases/latest/download/RaccoonWriter.dmg; see scripts/release.sh.
+dmg="$out/RaccoonWriter.dmg"
 sha="$dmg.sha256"
 dsym="$out/RaccoonWriter-$version.dSYM.zip"
 notes="docs/release-notes/$tag.md"

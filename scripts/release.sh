@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Builds a Developer ID signed, notarized and stapled build/release/RaccoonWriter-<version>.dmg.
+# Builds a Developer ID signed, notarized and stapled build/release/RaccoonWriter.dmg.
+# The DMG name has no version, so releases/latest/download/RaccoonWriter.dmg always points at
+# the newest release (the website's Download button uses it). Keep the name stable.
 # Usage: scripts/release.sh [--skip-notarize]
 #
 # --skip-notarize  Ad-hoc signature, no notarization, output in build/release-adhoc/.
@@ -40,7 +42,7 @@ tag="v$version"
 
 if (( notarize )); then
     out=build/release
-    dmg_name="RaccoonWriter-$version.dmg"
+    dmg_name="RaccoonWriter.dmg"
 else
     out=build/release-adhoc
     dmg_name="RaccoonWriter-$version-adhoc.dmg"

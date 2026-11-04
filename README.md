@@ -10,9 +10,9 @@
 
 ## Download
 
-Download `RaccoonWriter-<version>.dmg` from the [latest release](https://github.com/nthorp/raccoon-writer/releases/latest), open it, and drag Raccoon Writer to Applications. It needs macOS 14 or later, on Apple Silicon or Intel.
+Download [`RaccoonWriter.dmg`](https://github.com/nthorp/raccoon-writer/releases/latest/download/RaccoonWriter.dmg) from the [latest release](https://github.com/nthorp/raccoon-writer/releases/latest), open it, and drag Raccoon Writer to Applications. It needs macOS 14 or later, on Apple Silicon or Intel.
 
-The app is signed with a Developer ID (Northwoods Digital LLC) and notarized by Apple, so it opens without Gatekeeper warnings. To check the download, compare `shasum -a 256 RaccoonWriter-<version>.dmg` with the `.sha256` file on the release page.
+The app is signed with a Developer ID (Northwoods Digital LLC) and notarized by Apple, so it opens without Gatekeeper warnings. To check the download, compare `shasum -a 256 RaccoonWriter.dmg` with the `.sha256` file on the release page.
 
 ## Safety: what the app erases
 
