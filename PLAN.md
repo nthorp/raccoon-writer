@@ -1685,7 +1685,7 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 
 **Finding (2026-11-03):** this Mac has no usable signing identity (`security find-identity -v -p codesigning` → 0). The keychain holds only a *Developer ID Installer* certificate (Northwoods Digital LLC, `VGLYJ29DX8`), without its private key. That type signs `.pkg` files only; T31 step 1 creates a *Developer ID Application* certificate.
 
-**Out of scope:** CI releases; Sparkle or any in-app update check; a `.pkg` installer; a styled DMG window (background image, icon positions); renaming the bundle to `Raccoon Writer.app`.
+**Out of scope:** CI releases; Sparkle or any in-app update check; a `.pkg` installer; a styled DMG window (background image, icon positions).
 
 **Agent steps**
 1. `project.yml`: `MARKETING_VERSION` 1.0.0, `CURRENT_PROJECT_VERSION` stays 1.
@@ -1708,8 +1708,7 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 - **Not tested:** the signed path (identity, `notarytool`, `stapler`, `spctl`) needs Nick's certificate and credentials; T31 runs it. `plutil -extract … raw` was checked against notarytool-style JSON, and non-JSON output (an auth error) makes it fail, which the script reports.
 - **Failure paths checked:** dirty tree (signed mode), unknown argument, no Developer ID Application identity (the message points out that the Installer certificate can't sign apps), an unknown `RACCOONWRITER_SIGN_IDENTITY`, an existing tag (in a scratch clone), and in `publish-release.sh` missing artifacts and a version that doesn't match `project.yml`.
 - **Deviations from the plan.** `--skip-notarize` only warns about a dirty tree, so the pipeline can be tested before committing; a signed run still refuses. Ad-hoc output goes to `build/release-adhoc/` with an `-adhoc` DMG name, so a dry run can't overwrite or be mistaken for a signed release, and `publish-release.sh` never sees it. `release.sh` writes `build/release/commit`, and `publish-release.sh` refuses unless it equals `HEAD`, so the tag always points at the commit the DMG came from. The script refuses nested code (frameworks, dylibs, helpers), since it signs without `--deep`.
-- **Names.** The bundle stays `RaccoonWriter.app`, so Finder shows "RaccoonWriter" in Applications (`CFBundleDisplayName` is used only for a localized name). Renaming it to `Raccoon Writer.app` in the DMG wouldn't break the signature; left for Nick to decide.
-- **Copyright vs. team.** `Info.plist` says "Copyright © 2026 Nicholas Thorp." and the signing team is Northwoods Digital LLC. Both are allowed; change the copyright before T31 step 2 if they should match.
+- **Names.** The DMG ships the app as `Raccoon Writer.app` (Nick, 2026-11-04), so Finder shows the name with a space; `CFBundleDisplayName` alone doesn't do that without a localized name. Only the copy in the DMG is renamed: the bundle folder name isn't sealed by the signature or the notarization ticket, so `build/RaccoonWriter.app`, `PRODUCT_NAME`, the executable and the bundle ID are unchanged. The copyright (Nicholas Thorp) and the signing team (Northwoods Digital LLC) stay as they are, also Nick's decision.
 
 ---
 
@@ -1735,6 +1734,8 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 **Handoff notes:**
 
 - **Prep, 2026-11-03 (Claude).** Scripts and docs from T30 are ready; NEEDS_HUMAN for steps 1–6.
+- **Setup, 2026-11-04 (Nick).** Steps 1–2 done. The new certificate wasn't a valid identity until Apple's Developer ID G2 intermediate (`DeveloperIDG2CA.cer`) was added to the login keychain; Xcode hadn't installed it. `docs/RELEASING.md` troubleshooting covers it.
+- **First signed run, 2026-11-04 (Nick, `a5d1d9f`).** `scripts/release.sh`: both submissions `Accepted` (app `69b9b913-16a6-4058-a1f5-22c590a01a45`), DMG stapled, `spctl` `source=Notarized Developer ID`. `publish-release.sh` pushed `v1.0.0` and created the draft. Then Nick asked for the app to ship as `Raccoon Writer.app`, so the draft and the `v1.0.0` tag (local and origin) were deleted, unpublished, and 1.0.0 is rebuilt with the rename.
 
 ---
 
@@ -1830,3 +1831,4 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 | 2026-11-02 | `.gitignore` ignores `.claude/settings.local.json`, so contributors' per-user agent settings aren't committed; it was ignored only by a global git config before | Claude |
 | 2026-11-03 | T30 and T31 added at Nick's request: a Developer ID signed, notarized 1.0.0 DMG on GitHub Releases, linked from raccoonwriter.com, made by local scripts. Found that the keychain has only a Developer ID Installer certificate (no key), which can't sign apps | Claude |
 | 2026-11-03 | T30 DONE: `scripts/release.sh` (sign, notarize and staple app and DMG; `--skip-notarize` dry run), `scripts/publish-release.sh` (tag, draft release), `docs/RELEASING.md`, 1.0.0 release notes, version 1.0.0, README Download section; section 1 Distribution row updated. T31 NEEDS_HUMAN | Claude |
+| 2026-11-04 | The DMG ships the app as `Raccoon Writer.app` (with a space) at Nick's request; only the DMG copy is renamed, the build output and bundle ID are unchanged. Copyright stays "Nicholas Thorp" | Claude |

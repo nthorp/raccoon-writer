@@ -28,6 +28,7 @@ step() { echo; echo "==> $*"; }
 
 app=build/RaccoonWriter.app
 dsym=build/RaccoonWriter.app.dSYM
+shipped_app="Raccoon Writer.app"
 entitlements=App/RaccoonWriter.entitlements
 profile="${RACCOONWRITER_NOTARY_PROFILE:-raccoon-writer-notary}"
 
@@ -193,7 +194,9 @@ fi
 step "Build the DMG"
 staging="$out/dmg-staging"
 mkdir -p "$staging"
-ditto "$app" "$staging/RaccoonWriter.app"
+# Shipped as "Raccoon Writer.app" so Finder shows the name with a space. The bundle
+# folder name is not sealed by the signature or the notarization ticket.
+ditto "$app" "$staging/$shipped_app"
 ln -s /Applications "$staging/Applications"
 hdiutil create -quiet -volname "Raccoon Writer" -srcfolder "$staging" -fs HFS+ -format UDZO -ov "$dmg"
 rm -rf "$staging"
@@ -214,8 +217,8 @@ mount_point="$(mktemp -d -t raccoonwriter-dmg)"
 detach() { hdiutil detach -quiet "$mount_point" >/dev/null 2>&1 || true; rmdir "$mount_point" 2>/dev/null || true; }
 trap detach EXIT
 hdiutil attach -quiet -readonly -nobrowse -noautoopen -mountpoint "$mount_point" "$dmg"
-mounted_app="$mount_point/RaccoonWriter.app"
-[[ -d "$mounted_app" ]] || die "the DMG has no RaccoonWriter.app"
+mounted_app="$mount_point/$shipped_app"
+[[ -d "$mounted_app" ]] || die "the DMG has no $shipped_app"
 [[ "$(readlink "$mount_point/Applications")" == /Applications ]] \
     || die "the DMG has no Applications link"
 codesign --verify --strict "$mounted_app"
@@ -239,7 +242,7 @@ if (( notarize )); then
 fi
 detach
 trap - EXIT
-echo "DMG holds RaccoonWriter.app ($archs) and an Applications link"
+echo "DMG holds $shipped_app ($archs) and an Applications link"
 
 # ---------------------------------------------------------------------------------------
 step "Checksums and symbols"

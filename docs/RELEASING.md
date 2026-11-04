@@ -46,7 +46,7 @@ Neither script touches a disk: `hdiutil` only creates and mounts an image file. 
 
 ## Troubleshooting
 
-- **"no valid 'Developer ID Application' identity".** Do setup step 1. If the certificate shows in Keychain Access but not in `security find-identity -v`, its private key isn't on this Mac (import the `.p12`), or it has expired or been revoked.
+- **"no valid 'Developer ID Application' identity".** Do setup step 1. If `security find-identity -p codesigning` (without `-v`) lists the identity but `-v` doesn't, Apple's intermediate certificate is usually missing: download [`DeveloperIDG2CA.cer`](https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer) and run `security add-certificates -k ~/Library/Keychains/login.keychain-db DeveloperIDG2CA.cer`. If the identity isn't listed at all, its private key isn't on this Mac (import the `.p12`), or it has expired or been revoked.
 - **"several Developer ID Application identities".** Usually an old and a renewed certificate. Set `RACCOONWRITER_SIGN_IDENTITY` to the SHA-1 of the one to use.
 - **"notarytool cannot use keychain profile".** Do setup step 2. An app-specific password stops working if you change your Apple ID password.
 - **Notarization status `Invalid`.** The script prints Apple's log, also saved as `build/release/notary-app-log.json` or `notary-dmg-log.json`. Typical causes are a missing Hardened Runtime, a missing secure timestamp or the `get-task-allow` entitlement, and the script checks all three before submitting.
