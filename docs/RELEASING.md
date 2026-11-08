@@ -44,7 +44,7 @@ Neither script touches a disk: `hdiutil` only creates and mounts an image file. 
 7. **Publish** the draft on GitHub.
 8. **Website.** raccoonwriter.com's Download button points at `https://github.com/nthorp/raccoon-writer/releases/latest/download/RaccoonWriter.dmg`, so it needs no change per release. Update any version number shown on the site.
 
-The DMG is always named `RaccoonWriter.dmg`, with the version only in the release title and the dSYM name. That fixed name is what makes the `releases/latest/download/` link work, so don't rename it. GitHub serves `latest` from the newest published release that isn't a draft or a prerelease. While the repo is private, the link works only for people with access to it.
+The DMG is always named `RaccoonWriter.dmg`, with the version only in the release title and the dSYM name. That fixed name is what makes the `releases/latest/download/` link work, so don't rename it. GitHub serves `latest` from the newest published release that isn't a draft or a prerelease.
 
 ## Troubleshooting
 

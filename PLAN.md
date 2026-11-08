@@ -42,7 +42,7 @@
 | Verification | Always on (no toggle) |
 | Drive filter | Default: external, USB-attached physical disks that report removable or ejectable (sticks and card readers, but also most USB hard drives and SSDs). Drives over 500 GB get a "Large drive" warning in the list and on the confirm screen (T20), which never blocks the write. Toggle "Show all external disks". The boot disk and internal disks are **never** shown, except a built-in SD card reader (`Secure Digital`, removable media, physical, whole disk), which appears in the default list (Nick's decision 2026-10-14, implemented in T29; rule in `AGENTS.md`). |
 | Confirmation | Show drive name, size, mount points; explicit "Erase and Write" click |
-| Distribution | Open source. App Sandbox **off**. No Mac App Store. Since T30 (2026-11-03): Developer ID signed (Northwoods Digital LLC, team `VGLYJ29DX8`), notarized and stapled DMG on GitHub Releases, linked from raccoonwriter.com once the repo is public (it is private for now, so releases are visible only to collaborators), made locally by `scripts/release.sh` and `scripts/publish-release.sh` (no CI). Version 1.0.0 is the first release |
+| Distribution | Open source. App Sandbox **off**. No Mac App Store. Since T30 (2026-11-03): Developer ID signed (Northwoods Digital LLC, team `VGLYJ29DX8`), notarized and stapled DMG on GitHub Releases, linked from raccoonwriter.com, made locally by `scripts/release.sh` and `scripts/publish-release.sh` (no CI). Version 1.0.0 is the first release |
 | Features | Minimal v1: no drag-and-drop, no SHA-256 display, no localization |
 | Agent files | `AGENTS.md` is the source of truth; `CLAUDE.md` imports it |
 
@@ -1740,6 +1740,7 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 - **Download check, 2026-11-04 (Nick): PASS** (step 5).
 - **Published, 2026-11-04.** The repo `nthorp/raccoon-writer` is private, and Nick wants it to stay private for now. A published release in a private repo is visible only to collaborators, so `releases/latest` 404s for everyone else. At Nick's decision the release was published privately (`gh release edit v1.0.0 --draft=false --latest`), and the repo is still private. **Deferred:** step 6's raccoonwriter.com link, and the README Download section reaching the public, both wait until the repo is made public. No rebuild is needed then: the published 1.0.0 assets become downloadable as they are.
 - **DONE, 2026-11-04 (Claude).** Steps 1–5 are complete. Step 6 is done except the website link, which Nick deferred until the repo is public (acceptance criterion amended).
+- **Repo made public, 2026-11-08.** The published 1.0.0 assets and `releases/latest/download/RaccoonWriter.dmg` are now reachable by everyone, so the deferred raccoonwriter.com link can go live.
 
 ---
 
@@ -1838,3 +1839,6 @@ Significance is moderate (a common use case needs extra hardware today); likelih
 | 2026-11-04 | The DMG ships the app as `Raccoon Writer.app` (with a space) at Nick's request; only the DMG copy is renamed, the build output and bundle ID are unchanged. Copyright stays "Nicholas Thorp" | Claude |
 | 2026-11-04 | T31 DONE: 1.0.0 rebuilt with `Raccoon Writer.app`, both notarizations accepted, Nick's download check passed, release `v1.0.0` published in the still-private repo. The raccoonwriter.com link waits until the repo is public | Claude |
 | 2026-11-04 | Release DMG renamed to a fixed `RaccoonWriter.dmg` (and `.sha256`), so `releases/latest/download/RaccoonWriter.dmg` always gets the newest release and the website button never needs editing. The dSYM keeps its version. The published 1.0.0 assets were renamed in place (DMG unchanged, SHA-256 `1fea1caa…021d`; checksum file regenerated) and the release notes updated | Claude |
+| 2026-11-08 | Repo prepared to go public: removed the "private for now" wording from section 1's Distribution row and `docs/RELEASING.md`, and added a dated note to T31's Handoff notes. Earlier Handoff notes stay as written | Claude |
+| 2026-11-08 | README: the Status paragraph is cut to one line (released, tested on Apple Silicon, not yet on an Intel Mac). "The Intel build" wording dropped here and in the 1.0.0 release notes file, since the app is one universal binary. The test and hardware details moved to a new Testing section after "How it works" | Claude |
+| 2026-11-08 | README: new "How this was built" section before License, describing the plan, the human checkpoints for real hardware, and tests gating each task | Claude |

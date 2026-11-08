@@ -6,7 +6,7 @@
 
 ![Writing a Fedora Live ISO to a USB flash drive, 60 % done](docs/screenshots/writing.png)
 
-> **Status:** v1 is feature-complete, covered by unit tests, and has passed the hardware checklist in [`docs/HARDWARE_TESTS.md`](docs/HARDWARE_TESTS.md) on an Apple Silicon Mac, writing to a SanDisk Cruzer Glide USB stick and an SD card in the built-in slot. A Fedora Live ISO and a FreeBSD `.img` were written, verified, and booted on another machine. The one test not run is the Intel Mac run (H13): the only Intel Mac available runs macOS 13, and the app needs macOS 14, so the Intel half of the universal binary is untested. See [`PLAN.md`](PLAN.md) for the full history.
+> **Status:** 1.0 is released. It has been tested on an Apple Silicon Mac with USB sticks and the built-in SD card slot, but not yet on an Intel Mac.
 
 ## Download
 
@@ -84,6 +84,12 @@ Select image → Select drive → Confirm
 - Verification is always on. It compares every byte of the image with what the drive returns.
 - The Mac is kept from idle-sleeping during a write. The window can't be closed mid-write, and quitting asks first, then stops the write cleanly.
 
+## Testing
+
+- **Unit tests.** `scripts/test.sh` runs over 400 tests (Swift Testing) on the disk filter, safety check, write engine, verifier and failure handling. No test touches a real disk: they use fakes, temp files and `diskutil` output captured from real Macs.
+- **Hardware checklist.** [`docs/HARDWARE_TESTS.md`](docs/HARDWARE_TESTS.md) is run by hand on real drives. It has passed on an Apple Silicon Mac with a SanDisk Cruzer Glide USB stick and an SD card in the built-in slot. A Fedora Live ISO and a FreeBSD `.img` were written, verified and booted on another machine.
+- **Not yet run:** the Intel Mac test (H13). The only Intel Mac available runs macOS 13, and the app needs macOS 14.
+
 ## Troubleshooting
 
 ### "macOS blocked access to removable drives"
@@ -131,6 +137,14 @@ If you build from source: macOS treats each ad-hoc-signed rebuild as a new app (
 - `Spikes/`: throwaway experiments (the `authopen` spike)
 - `scripts/`: build, test, release-check, release and publish entry points
 - `PLAN.md`, `AGENTS.md`: the implementation plan and the rules for coding agents working on this repo
+
+## How this was built
+
+I built Raccoon Writer with an AI coding agent, Claude Code, which wrote most of the code. I owned the plan: the scope, the design decisions and the safety rules.
+
+- **The plan.** [`PLAN.md`](PLAN.md) breaks the work into 32 tasks, each with steps, acceptance criteria and handoff notes from whoever did it. [`AGENTS.md`](AGENTS.md) holds the rules every agent session follows.
+- **Agents never touch a real disk.** Any task that needed real hardware or a judgment call was a human checkpoint (14 of the 32). The agent prepared the build and exact instructions, then stopped. I ran the test on real drives and reported the results, which are recorded in [`docs/HARDWARE_TESTS.md`](docs/HARDWARE_TESTS.md).
+- **Tests gate every task.** A task counts as done only when the unit tests pass. Commits start with their task ID (for example `T05: …`), so the git log reads as the build history.
 
 ## License
 
